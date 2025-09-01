@@ -1,0 +1,407 @@
+syntax = "proto3";
+
+package pi_controller;
+
+option go_package = "github.com/spenceryork/pi-controller/proto";
+
+import "google/protobuf/timestamp.proto";
+
+// PiControllerService provides gRPC API for managing Pi clusters
+service PiControllerService {
+  // Cluster management
+  rpc CreateCluster(CreateClusterRequest) returns (Cluster);
+  rpc GetCluster(GetClusterRequest) returns (Cluster);
+  rpc ListClusters(ListClustersRequest) returns (ListClustersResponse);
+  rpc UpdateCluster(UpdateClusterRequest) returns (Cluster);
+  rpc DeleteCluster(DeleteClusterRequest) returns (DeleteClusterResponse);
+
+  // Node management
+  rpc CreateNode(CreateNodeRequest) returns (Node);
+  rpc GetNode(GetNodeRequest) returns (Node);
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
+  rpc UpdateNode(UpdateNodeRequest) returns (Node);
+  rpc DeleteNode(DeleteNodeRequest) returns (DeleteNodeResponse);
+  rpc ProvisionNode(ProvisionNodeRequest) returns (ProvisionNodeResponse);
+  rpc DeprovisionNode(DeprovisionNodeRequest) returns (DeprovisionNodeResponse);
+
+  // GPIO management
+  rpc CreateGPIODevice(CreateGPIODeviceRequest) returns (GPIODevice);
+  rpc GetGPIODevice(GetGPIODeviceRequest) returns (GPIODevice);
+  rpc ListGPIODevices(ListGPIODevicesRequest) returns (ListGPIODevicesResponse);
+  rpc UpdateGPIODevice(UpdateGPIODeviceRequest) returns (GPIODevice);
+  rpc DeleteGPIODevice(DeleteGPIODeviceRequest) returns (DeleteGPIODeviceResponse);
+  rpc ReadGPIO(ReadGPIORequest) returns (ReadGPIOResponse);
+  rpc WriteGPIO(WriteGPIORequest) returns (WriteGPIOResponse);
+
+  // Real-time GPIO streaming
+  rpc StreamGPIOReadings(StreamGPIOReadingsRequest) returns (stream GPIOReading);
+
+  // Health and status
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc GetSystemInfo(SystemInfoRequest) returns (SystemInfoResponse);
+}
+
+// Cluster messages
+message Cluster {
+  uint32 id = 1;
+  string name = 2;
+  string description = 3;
+  ClusterStatus status = 4;
+  string version = 5;
+  string master_endpoint = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  repeated Node nodes = 9;
+}
+
+enum ClusterStatus {
+  CLUSTER_STATUS_UNSPECIFIED = 0;
+  CLUSTER_STATUS_PENDING = 1;
+  CLUSTER_STATUS_PROVISIONING = 2;
+  CLUSTER_STATUS_ACTIVE = 3;
+  CLUSTER_STATUS_DEGRADED = 4;
+  CLUSTER_STATUS_MAINTENANCE = 5;
+  CLUSTER_STATUS_FAILED = 6;
+}
+
+message CreateClusterRequest {
+  string name = 1;
+  string description = 2;
+  string version = 3;
+  string master_endpoint = 4;
+}
+
+message GetClusterRequest {
+  uint32 id = 1;
+}
+
+message ListClustersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message ListClustersResponse {
+  repeated Cluster clusters = 1;
+  int32 total_count = 2;
+}
+
+message UpdateClusterRequest {
+  uint32 id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional ClusterStatus status = 4;
+  optional string version = 5;
+  optional string master_endpoint = 6;
+}
+
+message DeleteClusterRequest {
+  uint32 id = 1;
+}
+
+message DeleteClusterResponse {
+  bool success = 1;
+}
+
+// Node messages
+message Node {
+  uint32 id = 1;
+  string name = 2;
+  string ip_address = 3;
+  string mac_address = 4;
+  NodeStatus status = 5;
+  NodeRole role = 6;
+  string architecture = 7;
+  string model = 8;
+  string serial_number = 9;
+  int32 cpu_cores = 10;
+  int64 memory = 11;
+  optional uint32 cluster_id = 12;
+  string kube_version = 13;
+  string node_name = 14;
+  string os_version = 15;
+  string kernel_version = 16;
+  google.protobuf.Timestamp last_seen = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp updated_at = 19;
+  repeated GPIODevice gpio_devices = 20;
+}
+
+enum NodeStatus {
+  NODE_STATUS_UNSPECIFIED = 0;
+  NODE_STATUS_DISCOVERED = 1;
+  NODE_STATUS_PROVISIONING = 2;
+  NODE_STATUS_READY = 3;
+  NODE_STATUS_NOT_READY = 4;
+  NODE_STATUS_MAINTENANCE = 5;
+  NODE_STATUS_FAILED = 6;
+  NODE_STATUS_UNKNOWN = 7;
+}
+
+enum NodeRole {
+  NODE_ROLE_UNSPECIFIED = 0;
+  NODE_ROLE_MASTER = 1;
+  NODE_ROLE_WORKER = 2;
+}
+
+message CreateNodeRequest {
+  string name = 1;
+  string ip_address = 2;
+  string mac_address = 3;
+  NodeRole role = 4;
+  string architecture = 5;
+  string model = 6;
+  string serial_number = 7;
+  int32 cpu_cores = 8;
+  int64 memory = 9;
+  optional uint32 cluster_id = 10;
+}
+
+message GetNodeRequest {
+  uint32 id = 1;
+}
+
+message ListNodesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  optional uint32 cluster_id = 3;
+  optional NodeStatus status = 4;
+}
+
+message ListNodesResponse {
+  repeated Node nodes = 1;
+  int32 total_count = 2;
+}
+
+message UpdateNodeRequest {
+  uint32 id = 1;
+  optional string name = 2;
+  optional string ip_address = 3;
+  optional string mac_address = 4;
+  optional NodeStatus status = 5;
+  optional NodeRole role = 6;
+  optional string architecture = 7;
+  optional string model = 8;
+  optional string serial_number = 9;
+  optional int32 cpu_cores = 10;
+  optional int64 memory = 11;
+  optional uint32 cluster_id = 12;
+  optional string kube_version = 13;
+  optional string node_name = 14;
+  optional string os_version = 15;
+  optional string kernel_version = 16;
+}
+
+message DeleteNodeRequest {
+  uint32 id = 1;
+}
+
+message DeleteNodeResponse {
+  bool success = 1;
+}
+
+message ProvisionNodeRequest {
+  uint32 id = 1;
+  uint32 cluster_id = 2;
+}
+
+message ProvisionNodeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeprovisionNodeRequest {
+  uint32 id = 1;
+}
+
+message DeprovisionNodeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// GPIO messages
+message GPIODevice {
+  uint32 id = 1;
+  string name = 2;
+  string description = 3;
+  int32 pin_number = 4;
+  GPIODirection direction = 5;
+  GPIOPullMode pull_mode = 6;
+  int32 value = 7;
+  GPIODeviceType device_type = 8;
+  GPIOStatus status = 9;
+  uint32 node_id = 10;
+  GPIOConfig config = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+enum GPIODirection {
+  GPIO_DIRECTION_UNSPECIFIED = 0;
+  GPIO_DIRECTION_INPUT = 1;
+  GPIO_DIRECTION_OUTPUT = 2;
+}
+
+enum GPIOPullMode {
+  GPIO_PULL_MODE_UNSPECIFIED = 0;
+  GPIO_PULL_MODE_NONE = 1;
+  GPIO_PULL_MODE_UP = 2;
+  GPIO_PULL_MODE_DOWN = 3;
+}
+
+enum GPIODeviceType {
+  GPIO_DEVICE_TYPE_UNSPECIFIED = 0;
+  GPIO_DEVICE_TYPE_DIGITAL = 1;
+  GPIO_DEVICE_TYPE_ANALOG = 2;
+  GPIO_DEVICE_TYPE_PWM = 3;
+  GPIO_DEVICE_TYPE_SPI = 4;
+  GPIO_DEVICE_TYPE_I2C = 5;
+}
+
+enum GPIOStatus {
+  GPIO_STATUS_UNSPECIFIED = 0;
+  GPIO_STATUS_ACTIVE = 1;
+  GPIO_STATUS_INACTIVE = 2;
+  GPIO_STATUS_ERROR = 3;
+}
+
+message GPIOConfig {
+  // PWM specific
+  int32 frequency = 1;
+  int32 duty_cycle = 2;
+  
+  // SPI specific
+  int32 spi_mode = 3;
+  int32 spi_bits = 4;
+  int32 spi_speed = 5;
+  int32 spi_channel = 6;
+  
+  // I2C specific
+  int32 i2c_address = 7;
+  int32 i2c_bus = 8;
+  
+  // Sampling configuration
+  int32 sample_rate = 9;
+}
+
+message CreateGPIODeviceRequest {
+  string name = 1;
+  string description = 2;
+  int32 pin_number = 3;
+  GPIODirection direction = 4;
+  GPIOPullMode pull_mode = 5;
+  GPIODeviceType device_type = 6;
+  uint32 node_id = 7;
+  GPIOConfig config = 8;
+}
+
+message GetGPIODeviceRequest {
+  uint32 id = 1;
+}
+
+message ListGPIODevicesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  optional uint32 node_id = 3;
+  optional GPIODeviceType device_type = 4;
+  optional GPIOStatus status = 5;
+}
+
+message ListGPIODevicesResponse {
+  repeated GPIODevice gpio_devices = 1;
+  int32 total_count = 2;
+}
+
+message UpdateGPIODeviceRequest {
+  uint32 id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional GPIODirection direction = 4;
+  optional GPIOPullMode pull_mode = 5;
+  optional GPIODeviceType device_type = 6;
+  optional GPIOStatus status = 7;
+  optional GPIOConfig config = 8;
+}
+
+message DeleteGPIODeviceRequest {
+  uint32 id = 1;
+}
+
+message DeleteGPIODeviceResponse {
+  bool success = 1;
+}
+
+message ReadGPIORequest {
+  uint32 id = 1;
+}
+
+message ReadGPIOResponse {
+  uint32 device_id = 1;
+  int32 pin = 2;
+  double value = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message WriteGPIORequest {
+  uint32 id = 1;
+  int32 value = 2;
+}
+
+message WriteGPIOResponse {
+  uint32 device_id = 1;
+  int32 pin = 2;
+  int32 value = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message GPIOReading {
+  uint32 id = 1;
+  uint32 device_id = 2;
+  double value = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message StreamGPIOReadingsRequest {
+  uint32 device_id = 1;
+  int32 sample_rate = 2; // readings per second
+}
+
+// Health and system info messages
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string version = 3;
+  string uptime = 4;
+}
+
+message SystemInfoRequest {}
+
+message SystemInfoResponse {
+  string go_version = 1;
+  string go_os = 2;
+  string go_arch = 3;
+  int32 cpu_count = 4;
+  int32 goroutines = 5;
+  MemoryInfo memory = 6;
+  GCInfo gc = 7;
+  google.protobuf.Timestamp timestamp = 8;
+  string uptime = 9;
+}
+
+message MemoryInfo {
+  uint64 alloc = 1;
+  uint64 total_alloc = 2;
+  uint64 sys = 3;
+  uint64 heap_alloc = 4;
+  uint64 heap_sys = 5;
+  uint64 heap_inuse = 6;
+  uint64 heap_idle = 7;
+  uint64 heap_objects = 8;
+}
+
+message GCInfo {
+  uint32 num_gc = 1;
+  uint64 pause_total = 2;
+  google.protobuf.Timestamp last_gc = 3;
+}
