@@ -200,7 +200,32 @@ func (s *Server) Start() error {
 // Stop gracefully stops the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
 	s.logger.Info("Shutting down API server")
+	
+	// Close all services first
+	if err := s.Close(); err != nil {
+		s.logger.WithError(err).Error("Failed to close services during shutdown")
+	}
+	
 	return s.server.Shutdown(ctx)
+}
+
+// Close closes all services and their connections
+func (s *Server) Close() error {
+	s.logger.Info("Closing API server services")
+	
+	// Close GPIO service and its agent connections
+	if s.gpioService != nil {
+		if err := s.gpioService.Close(); err != nil {
+			s.logger.WithError(err).Error("Failed to close GPIO service")
+			return err
+		}
+	}
+	
+	// Close other services as needed
+	// (cluster service and node service don't currently need cleanup)
+	
+	s.logger.Info("API server services closed successfully")
+	return nil
 }
 
 // Router returns the underlying Gin router for testing

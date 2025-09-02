@@ -1,11 +1,13 @@
 package services
 
 import (
+	"context"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/dsyorkd/pi-controller/internal/errors"
+	"github.com/dsyorkd/pi-controller/internal/grpc/client"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/storage"
@@ -13,15 +15,26 @@ import (
 
 // GPIOService handles GPIO device business logic
 type GPIOService struct {
-	db     *storage.Database
-	logger logger.Interface
+	db            *storage.Database
+	logger        logger.Interface
+	agentManager  client.PiAgentClientManagerInterface
 }
 
 // NewGPIOService creates a new GPIO service
 func NewGPIOService(db *storage.Database, logger logger.Interface) *GPIOService {
 	return &GPIOService{
-		db:     db,
-		logger: logger.WithField("service", "gpio"),
+		db:           db,
+		logger:       logger.WithField("service", "gpio"),
+		agentManager: client.NewPiAgentClientManager(logger),
+	}
+}
+
+// NewGPIOServiceWithManager creates a new GPIO service with a custom agent manager (for testing)
+func NewGPIOServiceWithManager(db *storage.Database, logger logger.Interface, agentManager client.PiAgentClientManagerInterface) *GPIOService {
+	return &GPIOService{
+		db:           db,
+		logger:       logger.WithField("service", "gpio"),
+		agentManager: agentManager,
 	}
 }
 
@@ -293,17 +306,58 @@ func (s *GPIOService) Read(id uint) (*models.GPIODevice, error) {
 		return nil, errors.Wrapf(ErrValidationFailed, "GPIO device %d is not active", id)
 	}
 
-	// TODO: Implement actual GPIO reading from hardware
-	// For now, we'll just return the current stored value
-	// In a real implementation, this would:
-	// 1. Connect to the node's agent via gRPC
-	// 2. Request a GPIO read operation
-	// 3. Update the device value and create a reading record
+	// Get gRPC client for the node
+	agentClient, err := s.agentManager.GetClient(&device.Node)
+	if err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"node_id":   device.NodeID,
+			"error":     err,
+		}).Error("Failed to get Pi Agent client")
+		return nil, errors.Wrapf(err, "failed to connect to node %d", device.NodeID)
+	}
 
-	// Create a reading record
+	// Configure the pin if not already configured
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := agentClient.ConfigureGPIOPin(ctx, device); err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"pin":       device.PinNumber,
+			"error":     err,
+		}).Error("Failed to configure GPIO pin")
+		return nil, errors.Wrapf(err, "failed to configure GPIO pin %d", device.PinNumber)
+	}
+
+	// Read the GPIO pin value from the hardware
+	actualValue, err := agentClient.ReadGPIOPin(ctx, device.PinNumber)
+	if err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"pin":       device.PinNumber,
+			"error":     err,
+		}).Error("Failed to read GPIO pin from hardware")
+		return nil, errors.Wrapf(err, "failed to read GPIO pin %d from hardware", device.PinNumber)
+	}
+
+	// Update the device value in database if it changed
+	if device.Value != actualValue {
+		device.SetValue(actualValue)
+		if err := s.db.DB().Save(device).Error; err != nil {
+			s.logger.WithFields(map[string]interface{}{
+				"device_id": id,
+				"value":     actualValue,
+				"error":     err,
+			}).Error("Failed to update device value after hardware read")
+			// Don't return error here, the read was successful
+		}
+	}
+
+	// Create a reading record with the actual hardware value
 	reading := models.GPIOReading{
 		DeviceID:  device.ID,
-		Value:     float64(device.Value),
+		Value:     float64(actualValue),
 		Timestamp: time.Now(),
 	}
 
@@ -338,21 +392,49 @@ func (s *GPIOService) Write(id uint, value int) error {
 		return errors.Wrapf(ErrValidationFailed, "GPIO device %d is not configured as output", id)
 	}
 
-	// TODO: Implement actual GPIO writing to hardware
-	// For now, we'll just update the stored value
-	// In a real implementation, this would:
-	// 1. Connect to the node's agent via gRPC
-	// 2. Send a GPIO write command
-	// 3. Update the device value upon success
+	// Get gRPC client for the node
+	agentClient, err := s.agentManager.GetClient(&device.Node)
+	if err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"node_id":   device.NodeID,
+			"error":     err,
+		}).Error("Failed to get Pi Agent client")
+		return errors.Wrapf(err, "failed to connect to node %d", device.NodeID)
+	}
 
-	// Update device value
+	// Configure the pin if not already configured
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := agentClient.ConfigureGPIOPin(ctx, device); err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"pin":       device.PinNumber,
+			"error":     err,
+		}).Error("Failed to configure GPIO pin")
+		return errors.Wrapf(err, "failed to configure GPIO pin %d", device.PinNumber)
+	}
+
+	// Write the value to the hardware GPIO pin
+	if err := agentClient.WriteGPIOPin(ctx, device.PinNumber, value); err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"pin":       device.PinNumber,
+			"value":     value,
+			"error":     err,
+		}).Error("Failed to write GPIO pin to hardware")
+		return errors.Wrapf(err, "failed to write GPIO pin %d to hardware", device.PinNumber)
+	}
+
+	// Update device value in database after successful hardware write
 	device.SetValue(value)
 	if err := s.db.DB().Save(device).Error; err != nil {
 		s.logger.WithFields(map[string]interface{}{
 			"device_id": id,
 			"value":     value,
 			"error":     err,
-		}).Error("Failed to update GPIO device value")
+		}).Error("Failed to update GPIO device value after hardware write")
 		return errors.Wrapf(err, "failed to update GPIO device value")
 	}
 
@@ -444,4 +526,17 @@ func (s *GPIOService) CleanupOldReadings(olderThan time.Duration) (int64, error)
 	}).Info("Cleaned up old GPIO readings")
 
 	return result.RowsAffected, nil
+}
+
+// Close gracefully closes the GPIO service and all agent connections
+func (s *GPIOService) Close() error {
+	s.logger.Info("Shutting down GPIO service")
+	
+	if err := s.agentManager.CloseAll(); err != nil {
+		s.logger.WithError(err).Error("Failed to close all agent connections")
+		return errors.Wrapf(err, "failed to close agent connections")
+	}
+	
+	s.logger.Info("GPIO service shut down successfully")
+	return nil
 }
