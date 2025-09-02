@@ -1,0 +1,272 @@
+package gpio
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/sirupsen/logrus"
+)
+
+// Controller manages GPIO operations and provides a unified interface
+type Controller struct {
+	config    *Config
+	impl      FullInterface
+	logger    *logrus.Entry
+	available bool
+}
+
+// NewController creates a new GPIO controller
+func NewController(config *Config, logger *logrus.Logger) *Controller {
+	if config == nil {
+		config = DefaultConfig()
+	}
+
+	controller := &Controller{
+		config: config,
+		logger: logger.WithField("component", "gpio"),
+	}
+
+	// Initialize the appropriate implementation based on configuration
+	if config.MockMode {
+		controller.impl = NewMockGPIO(config)
+		controller.available = true
+		controller.logger.Info("Initialized GPIO controller in mock mode")
+	} else {
+		// TODO: Initialize real GPIO implementation for Raspberry Pi
+		// This would typically use libraries like periph.io or similar
+		controller.logger.Warn("Real GPIO mode not yet implemented, falling back to mock mode")
+		controller.impl = NewMockGPIO(config)
+		controller.available = true
+	}
+
+	return controller
+}
+
+// Initialize initializes the GPIO controller
+func (c *Controller) Initialize(ctx context.Context) error {
+	if err := c.impl.Initialize(ctx); err != nil {
+		c.logger.WithError(err).Error("Failed to initialize GPIO implementation")
+		return fmt.Errorf("failed to initialize GPIO: %w", err)
+	}
+
+	c.logger.Info("GPIO controller initialized successfully")
+	return nil
+}
+
+// Close closes the GPIO controller
+func (c *Controller) Close() error {
+	if err := c.impl.Close(); err != nil {
+		c.logger.WithError(err).Error("Failed to close GPIO implementation")
+		return fmt.Errorf("failed to close GPIO: %w", err)
+	}
+
+	c.logger.Info("GPIO controller closed successfully")
+	return nil
+}
+
+// IsAvailable returns whether GPIO hardware is available
+func (c *Controller) IsAvailable() bool {
+	return c.available && c.impl.IsAvailable()
+}
+
+// IsPinAllowed checks if a pin is allowed to be used
+func (c *Controller) IsPinAllowed(pin int) bool {
+	// Check if pin is in restricted list
+	for _, restricted := range c.config.RestrictedPins {
+		if pin == restricted {
+			return false
+		}
+	}
+
+	// If allowed pins list is empty, all non-restricted pins are allowed
+	if len(c.config.AllowedPins) == 0 {
+		return true
+	}
+
+	// Check if pin is in allowed list
+	for _, allowed := range c.config.AllowedPins {
+		if pin == allowed {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ConfigurePin configures a GPIO pin
+func (c *Controller) ConfigurePin(config PinConfig) error {
+	if !c.IsPinAllowed(config.Pin) {
+		return fmt.Errorf("pin %d is not allowed", config.Pin)
+	}
+
+	// Apply default pull mode if not specified
+	if config.PullMode == "" {
+		config.PullMode = c.config.DefaultPullMode
+	}
+
+	if err := c.impl.ConfigurePin(config); err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"pin":       config.Pin,
+			"direction": config.Direction,
+			"error":     err,
+		}).Error("Failed to configure GPIO pin")
+		return fmt.Errorf("failed to configure pin %d: %w", config.Pin, err)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"pin":       config.Pin,
+		"direction": config.Direction,
+		"pull_mode": config.PullMode,
+	}).Info("GPIO pin configured successfully")
+
+	return nil
+}
+
+// ReadPin reads the current value of a GPIO pin
+func (c *Controller) ReadPin(pin int) (PinValue, error) {
+	if !c.IsPinAllowed(pin) {
+		return Low, fmt.Errorf("pin %d is not allowed", pin)
+	}
+
+	value, err := c.impl.ReadPin(pin)
+	if err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"pin":   pin,
+			"error": err,
+		}).Error("Failed to read GPIO pin")
+		return Low, fmt.Errorf("failed to read pin %d: %w", pin, err)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"pin":   pin,
+		"value": value,
+	}).Debug("GPIO pin read successfully")
+
+	return value, nil
+}
+
+// WritePin writes a value to a GPIO pin
+func (c *Controller) WritePin(pin int, value PinValue) error {
+	if !c.IsPinAllowed(pin) {
+		return fmt.Errorf("pin %d is not allowed", pin)
+	}
+
+	if err := c.impl.WritePin(pin, value); err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"pin":   pin,
+			"value": value,
+			"error": err,
+		}).Error("Failed to write GPIO pin")
+		return fmt.Errorf("failed to write pin %d: %w", pin, err)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"pin":   pin,
+		"value": value,
+	}).Debug("GPIO pin written successfully")
+
+	return nil
+}
+
+// GetPinState returns the current state of a GPIO pin
+func (c *Controller) GetPinState(pin int) (*PinState, error) {
+	if !c.IsPinAllowed(pin) {
+		return nil, fmt.Errorf("pin %d is not allowed", pin)
+	}
+
+	return c.impl.GetPinState(pin)
+}
+
+// ListConfiguredPins returns a list of all configured GPIO pins
+func (c *Controller) ListConfiguredPins() ([]PinState, error) {
+	return c.impl.ListConfiguredPins()
+}
+
+// SetPWM configures PWM on a pin
+func (c *Controller) SetPWM(pin int, frequency int, dutyCycle int) error {
+	if !c.IsPinAllowed(pin) {
+		return fmt.Errorf("pin %d is not allowed", pin)
+	}
+
+	if err := c.impl.SetPWM(pin, frequency, dutyCycle); err != nil {
+		c.logger.WithFields(logrus.Fields{
+			"pin":        pin,
+			"frequency":  frequency,
+			"duty_cycle": dutyCycle,
+			"error":      err,
+		}).Error("Failed to set PWM")
+		return fmt.Errorf("failed to set PWM on pin %d: %w", pin, err)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"pin":        pin,
+		"frequency":  frequency,
+		"duty_cycle": dutyCycle,
+	}).Info("PWM configured successfully")
+
+	return nil
+}
+
+// ReadAnalog reads an analog value
+func (c *Controller) ReadAnalog(pin int) (float64, error) {
+	if !c.IsPinAllowed(pin) {
+		return 0, fmt.Errorf("pin %d is not allowed", pin)
+	}
+
+	return c.impl.ReadAnalog(pin)
+}
+
+// SPI methods
+func (c *Controller) SPITransfer(channel int, data []byte) ([]byte, error) {
+	return c.impl.SPITransfer(channel, data)
+}
+
+func (c *Controller) SPIWrite(channel int, data []byte) error {
+	return c.impl.SPIWrite(channel, data)
+}
+
+func (c *Controller) SPIRead(channel int, length int) ([]byte, error) {
+	return c.impl.SPIRead(channel, length)
+}
+
+// I2C methods
+func (c *Controller) I2CWrite(bus int, address int, data []byte) error {
+	return c.impl.I2CWrite(bus, address, data)
+}
+
+func (c *Controller) I2CRead(bus int, address int, length int) ([]byte, error) {
+	return c.impl.I2CRead(bus, address, length)
+}
+
+func (c *Controller) I2CWriteRegister(bus int, address int, register int, data []byte) error {
+	return c.impl.I2CWriteRegister(bus, address, register, data)
+}
+
+func (c *Controller) I2CReadRegister(bus int, address int, register int, length int) ([]byte, error) {
+	return c.impl.I2CReadRegister(bus, address, register, length)
+}
+
+// Event methods
+func (c *Controller) EnableInterrupt(pin int, eventType EventType, handler EventHandler) error {
+	if !c.IsPinAllowed(pin) {
+		return fmt.Errorf("pin %d is not allowed", pin)
+	}
+
+	return c.impl.EnableInterrupt(pin, eventType, handler)
+}
+
+func (c *Controller) DisableInterrupt(pin int) error {
+	if !c.IsPinAllowed(pin) {
+		return fmt.Errorf("pin %d is not allowed", pin)
+	}
+
+	return c.impl.DisableInterrupt(pin)
+}
+
+func (c *Controller) StartEventLoop(ctx context.Context) error {
+	return c.impl.StartEventLoop(ctx)
+}
+
+func (c *Controller) StopEventLoop() error {
+	return c.impl.StopEventLoop()
+}

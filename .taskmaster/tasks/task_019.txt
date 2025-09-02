@@ -1,0 +1,11 @@
+# Task ID: 19
+# Title: Replace Mock GPIO Service with Real gRPC Implementation
+# Status: todo
+# Dependencies: 17
+# Priority: high
+# Description: Refactor the Pi Controller's GPIO service to remove all mock implementations and replace them with real gRPC calls to the Pi Agents.
+# Details:
+The controller's GPIO service will act as a gRPC client. When an API request to control a GPIO pin is received, the service will look up the target node's address and dispatch a gRPC request to the corresponding agent.
+
+# Test Strategy:
+Write an integration test that starts a controller and a mock agent. The test will call the controller's REST API for GPIO control and verify that the mock agent receives the correct gRPC call with the correct parameters.

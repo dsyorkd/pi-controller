@@ -9,14 +9,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/spenceryork/pi-controller/internal/api"
-	"github.com/spenceryork/pi-controller/internal/config"
-	grpcserver "github.com/spenceryork/pi-controller/internal/grpc/server"
-	"github.com/spenceryork/pi-controller/internal/storage"
-	"github.com/spenceryork/pi-controller/internal/websocket"
+	"github.com/dsyorkd/pi-controller/internal/api"
+	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/errors"
+	grpcserver "github.com/dsyorkd/pi-controller/internal/grpc/server"
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/migrations"
+	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/websocket"
 )
 
 var (
@@ -53,6 +55,7 @@ func init() {
 	rootCmd.Flags().StringVar(&logFormat, "log-format", "json", "log format (json, text)")
 	
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(migrateCmd)
 }
 
 var versionCmd = &cobra.Command{
@@ -65,11 +68,58 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var migrateCmd = &cobra.Command{
+	Use:   "migrate",
+	Short: "Database migration commands",
+	Long:  `Database migration commands for managing database schema changes`,
+}
+
+var migrateUpCmd = &cobra.Command{
+	Use:   "up",
+	Short: "Run pending migrations",
+	Long:  `Apply all pending database migrations`,
+	RunE:  runMigrateUp,
+}
+
+var migrateDownCmd = &cobra.Command{
+	Use:   "down",
+	Short: "Rollback the last migration",
+	Long:  `Rollback the most recently applied migration`,
+	RunE:  runMigrateDown,
+}
+
+var migrateStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show migration status",
+	Long:  `Display the status of all migrations`,
+	RunE:  runMigrateStatus,
+}
+
+var migrateResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "Reset database (DANGEROUS)",
+	Long:  `Drop all tables and reapply all migrations. WARNING: This destroys all data!`,
+	RunE:  runMigrateReset,
+}
+
+func init() {
+	migrateCmd.AddCommand(migrateUpCmd)
+	migrateCmd.AddCommand(migrateDownCmd)
+	migrateCmd.AddCommand(migrateStatusCmd)
+	migrateCmd.AddCommand(migrateResetCmd)
+	
+	// Add confirmation flag for reset command
+	migrateResetCmd.Flags().Bool("confirm", false, "Confirm destructive reset operation")
+}
+
 func runServer(cmd *cobra.Command, args []string) error {
 	// Setup logger
-	logger := setupLogger()
+	log, err := setupLogger()
+	if err != nil {
+		return errors.Wrapf(err, "failed to setup logger")
+	}
 	
-	logger.WithFields(logrus.Fields{
+	log.WithFields(map[string]interface{}{
 		"version": version,
 		"commit":  commit,
 		"date":    date,
@@ -78,23 +128,19 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	cfg, err := config.Load(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrapf(err, "failed to load config")
 	}
 
-	logger.WithField("config", cfg.App.DataDir).Info("Configuration loaded")
+	log.WithField("config", cfg.App.DataDir).Info("Configuration loaded")
 
 	// Initialize database
-	db, err := storage.New(&cfg.Database, logger)
+	db, err := storage.New(&cfg.Database, log)
 	if err != nil {
-		return fmt.Errorf("failed to initialize database: %w", err)
+		return errors.Wrapf(err, "failed to initialize database")
 	}
 	defer db.Close()
 
-	logger.Info("Database initialized successfully")
-
-	// Create context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	log.Info("Database initialized successfully")
 
 	// Setup graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -105,55 +151,54 @@ func runServer(cmd *cobra.Command, args []string) error {
 	serverErrors := make(chan error, 3)
 
 	// Start REST API server
-	apiServer := api.New(&cfg.API, logger, db)
+	apiServer := api.New(&cfg.API, log, db)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Info("Starting REST API server")
+		log.Info("Starting REST API server")
 		if err := apiServer.Start(); err != nil {
-			serverErrors <- fmt.Errorf("API server error: %w", err)
+			serverErrors <- errors.Wrapf(err, "API server error")
 		}
 	}()
 
 	// Start gRPC server
-	grpcServer, err := grpcserver.New(&cfg.GRPC, logger, db)
+	grpcServer, err := grpcserver.New(&cfg.GRPC, log, db)
 	if err != nil {
-		return fmt.Errorf("failed to create gRPC server: %w", err)
+		return errors.Wrapf(err, "failed to create gRPC server")
 	}
 	
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Info("Starting gRPC server")
+		log.Info("Starting gRPC server")
 		if err := grpcServer.Start(); err != nil {
-			serverErrors <- fmt.Errorf("gRPC server error: %w", err)
+			serverErrors <- errors.Wrapf(err, "gRPC server error")
 		}
 	}()
 
 	// Start WebSocket server
-	wsServer := websocket.New(&cfg.WebSocket, logger, db)
+	wsServer := websocket.New(&cfg.WebSocket, log, db)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		logger.Info("Starting WebSocket server")
+		log.Info("Starting WebSocket server")
 		if err := wsServer.Start(); err != nil {
-			serverErrors <- fmt.Errorf("WebSocket server error: %w", err)
+			serverErrors <- errors.Wrapf(err, "WebSocket server error")
 		}
 	}()
 
-	logger.Info("All servers started successfully")
+	log.Info("All servers started successfully")
 
 	// Wait for shutdown signal or server error
 	select {
 	case sig := <-sigChan:
-		logger.WithField("signal", sig).Info("Received shutdown signal")
+		log.WithField("signal", sig.String()).Info("Received shutdown signal")
 	case err := <-serverErrors:
-		logger.WithError(err).Error("Server error occurred")
-		cancel()
+		log.WithError(err).Error("Server error occurred")
 	}
 
 	// Graceful shutdown
-	logger.Info("Initiating graceful shutdown...")
+	log.Info("Initiating graceful shutdown...")
 	
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
@@ -161,7 +206,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Stop servers
 	go func() {
 		if err := apiServer.Stop(shutdownCtx); err != nil {
-			logger.WithError(err).Error("Error stopping API server")
+			log.WithError(err).Error("Error stopping API server")
 		}
 	}()
 
@@ -171,7 +216,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		if err := wsServer.Stop(shutdownCtx); err != nil {
-			logger.WithError(err).Error("Error stopping WebSocket server")
+			log.WithError(err).Error("Error stopping WebSocket server")
 		}
 	}()
 
@@ -184,43 +229,164 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	select {
 	case <-done:
-		logger.Info("All servers stopped gracefully")
+		log.Info("All servers stopped gracefully")
 	case <-shutdownCtx.Done():
-		logger.Warn("Shutdown timeout exceeded")
+		log.Warn("Shutdown timeout exceeded")
 	}
 
-	logger.Info("Pi Controller shutdown complete")
+	log.Info("Pi Controller shutdown complete")
 	return nil
 }
 
-func setupLogger() *logrus.Logger {
-	logger := logrus.New()
+func setupLogger() (*logger.Logger, error) {
+	cfg := logger.Config{
+		Level:  logLevel,
+		Format: logFormat,
+		Output: "stdout",
+	}
 
-	// Set log level
-	level, err := logrus.ParseLevel(logLevel)
+	log, err := logger.New(cfg)
 	if err != nil {
-		logger.Warnf("Invalid log level '%s', using info", logLevel)
-		level = logrus.InfoLevel
-	}
-	logger.SetLevel(level)
-
-	// Set log format
-	switch logFormat {
-	case "json":
-		logger.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		})
-	case "text":
-		logger.SetFormatter(&logrus.TextFormatter{
-			FullTimestamp:   true,
-			TimestampFormat: time.RFC3339,
-		})
-	default:
-		logger.Warnf("Invalid log format '%s', using json", logFormat)
-		logger.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		})
+		return nil, errors.Wrapf(err, "failed to create logger")
 	}
 
-	return logger
+	// Set as default logger
+	logger.SetDefault(log)
+	
+	return log, nil
+}
+
+// Migration command handlers
+
+func runMigrateUp(cmd *cobra.Command, args []string) error {
+	log, db, err := setupMigrationEnvironment()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	migrator := migrations.NewMigrator(db.DB(), log)
+	
+	log.Info("Running database migrations...")
+	if err := migrator.Up(); err != nil {
+		return errors.Wrapf(err, "failed to run migrations")
+	}
+
+	log.Info("Migrations completed successfully")
+	return nil
+}
+
+func runMigrateDown(cmd *cobra.Command, args []string) error {
+	log, db, err := setupMigrationEnvironment()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	migrator := migrations.NewMigrator(db.DB(), log)
+	
+	log.Info("Rolling back last migration...")
+	if err := migrator.Down(); err != nil {
+		return errors.Wrapf(err, "failed to rollback migration")
+	}
+
+	log.Info("Migration rollback completed successfully")
+	return nil
+}
+
+func runMigrateStatus(cmd *cobra.Command, args []string) error {
+	log, db, err := setupMigrationEnvironment()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	migrator := migrations.NewMigrator(db.DB(), log)
+	
+	statuses, err := migrator.Status()
+	if err != nil {
+		return errors.Wrapf(err, "failed to get migration status")
+	}
+
+	if len(statuses) == 0 {
+		fmt.Println("No migrations found")
+		return nil
+	}
+
+	fmt.Println("Migration Status:")
+	fmt.Println("=================")
+	for _, status := range statuses {
+		statusStr := "PENDING"
+		appliedAt := ""
+		if status.Applied {
+			statusStr = "APPLIED"
+			if status.AppliedAt != nil {
+				appliedAt = fmt.Sprintf(" (applied at %s)", status.AppliedAt.Format("2006-01-02 15:04:05"))
+			}
+		}
+		fmt.Printf("%-15s %s - %s%s\n", status.ID, statusStr, status.Description, appliedAt)
+	}
+
+	return nil
+}
+
+func runMigrateReset(cmd *cobra.Command, args []string) error {
+	confirm, _ := cmd.Flags().GetBool("confirm")
+	if !confirm {
+		return fmt.Errorf("reset operation requires --confirm flag due to destructive nature")
+	}
+
+	log, db, err := setupMigrationEnvironment()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	migrator := migrations.NewMigrator(db.DB(), log)
+	
+	log.Warn("DANGER: Resetting database - all data will be lost!")
+	if err := migrator.Reset(); err != nil {
+		return errors.Wrapf(err, "failed to reset database")
+	}
+
+	log.Info("Database reset completed successfully")
+	return nil
+}
+
+func setupMigrationEnvironment() (*logger.Logger, *storage.Database, error) {
+	// Setup logger
+	log, err := setupLogger()
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to setup logger")
+	}
+
+	// Load configuration
+	cfg, err := config.Load(configFile)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to load config")
+	}
+
+	// Initialize database without auto-migration
+	// We'll handle migrations explicitly through the migrator
+	db, err := setupDatabaseForMigration(&cfg.Database, log)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to initialize database")
+	}
+
+	return log, db, nil
+}
+
+func setupDatabaseForMigration(config *storage.Config, logger *logger.Logger) (*storage.Database, error) {
+	// This is a modified version of storage.New that doesn't run auto-migrations
+	if config == nil {
+		config = storage.DefaultConfig()
+	}
+
+	// Initialize database without running migrations
+	db, err := storage.NewWithoutMigration(config, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }

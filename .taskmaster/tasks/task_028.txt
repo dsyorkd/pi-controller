@@ -1,0 +1,11 @@
+# Task ID: 28
+# Title: Implement Certificate Authority and Node Certificate Management
+# Status: todo
+# Dependencies: 15
+# Priority: high
+# Description: Build a simple Certificate Authority (CA) within the controller to issue and manage TLS certificates for agents and internal services.
+# Details:
+Create a root CA certificate and key on first startup. Implement gRPC endpoints for Certificate Signing Requests (CSRs). When a new node registers, it will submit a CSR, and the controller will sign it, returning a valid client certificate.
+
+# Test Strategy:
+Write a unit test that generates a CSR, calls the signing endpoint, and validates the returned certificate against the CA's public key. Verify certificate fields like Common Name and expiration.

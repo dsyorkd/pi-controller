@@ -1,0 +1,44 @@
+# Pi Controller Configuration Example
+
+app:
+  name: "pi-controller"
+  environment: "development"
+  data_dir: "./data"
+  debug: false
+
+database:
+  path: "pi-controller.db"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+  log_level: "warn"
+
+api:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  cors_enabled: true
+  auth_enabled: false
+
+grpc:
+  host: "0.0.0.0"
+  port: 9090
+
+websocket:
+  host: "0.0.0.0"
+  port: 8081
+  path: "/ws"
+
+log:
+  level: "info"
+  format: "json"
+
+gpio:
+  enabled: true
+  mock_mode: false
+
+discovery:
+  enabled: true
+  method: "mdns"
+  port: 9091

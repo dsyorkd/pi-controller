@@ -1,0 +1,43 @@
+# Task ID: 2
+# Title: Implement Unit Tests for `internal/storage` Package
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Create unit tests for the storage layer in `internal/storage`. The tests should verify all database interaction logic, such as create, read, update, and delete operations.
+# Details:
+Use a mocking library like `testify/mock` or `sqlmock` to create a mock database connection. This will isolate the tests from any actual database, ensuring they run quickly and reliably. Test for correct query formation and handling of database errors.
+
+# Test Strategy:
+Unit tests focused on the data access layer. All external database dependencies will be mocked to test the logic in isolation.
+
+# Subtasks:
+## 1. Setup Test Suite with `sqlmock` and Test `Create` Operation [done]
+### Dependencies: None
+### Description: Create a new test file `internal/storage/postgres_test.go`. Set up the basic test suite structure using `testify/suite` and initialize `sqlmock` in a `SetupTest` function. Implement the first test for the primary 'create' method (e.g., `CreateDeployment`), verifying the correct `INSERT` query is executed and that the method handles both success and database errors.
+### Details:
+The test should mock the `db.Exec()` call, expecting a specific SQL `INSERT` statement with placeholder arguments. It must verify that the arguments passed to the query match the input data. A separate test case should simulate a database error from `Exec()` and assert that the method returns that error.
+
+## 2. Implement Tests for Single-Record `Read` Operation [done]
+### Dependencies: 2.1
+### Description: Add unit tests for the method responsible for retrieving a single record by its ID (e.g., `GetDeploymentByID`). The tests must cover the success case where a record is found and correctly scanned into the model struct, as well as the case where no record is found (`sql.ErrNoRows`).
+### Details:
+Use `sqlmock` to mock the `db.QueryRow()` call. For the success case, provide mock rows using `sqlmock.NewRows` that the `Scan` method can process. For the 'not found' case, configure the mock `QueryRow()` to return `sql.ErrNoRows` and assert that the storage method returns a corresponding application-level error (e.g., `storage.ErrNotFound`).
+
+## 3. Implement Tests for Multi-Record `List` Operation [done]
+### Dependencies: 2.1
+### Description: Write unit tests for the method that retrieves a collection of records (e.g., `ListDeployments`). Test the scenario where multiple records are returned and correctly mapped to a slice of model structs. Also, test the case where the query returns no rows, ensuring an empty slice and no error is returned.
+### Details:
+Use `sqlmock.NewRows` to define the columns and mock data for the result set. The test should mock the `db.Query()` call to return these rows. Verify the returned slice of structs matches the mocked data. A separate test should cover `db.Query()` itself returning an error.
+
+## 4. Implement Tests for `Update` Operation [done]
+### Dependencies: 2.1
+### Description: Create unit tests for the primary 'update' method (e.g., `UpdateDeployment`). Verify that the correct `UPDATE` SQL statement is generated with the correct parameters for a given ID. Test that the method correctly handles the result of the database execution.
+### Details:
+Mock the `db.Exec()` call, expecting a specific `UPDATE` query and arguments. Use `sqlmock.NewResult` to simulate the result of the execution (e.g., 1 row affected). Test the case where `Exec()` returns an error. Also, test the scenario where zero rows are affected, which might indicate the record to update didn't exist.
+
+## 5. Implement Tests for `Delete` Operation and General Error Handling [done]
+### Dependencies: 2.1, 2.2, 2.3, 2.4
+### Description: Add tests for the 'delete' method (e.g., `DeleteDeployment`), verifying the correct `DELETE` query and handling of its result. Additionally, review all previously written tests to ensure comprehensive handling of generic database errors (e.g., connection failures, syntax errors) for all CRUD methods.
+### Details:
+For the delete test, mock the `db.Exec()` call and its result. For the general error handling review, add test cases to other methods (Create, Get, List, Update) that simulate a generic `errors.New("database connection lost")` from `Query`, `QueryRow`, or `Exec` to ensure these errors are propagated correctly up the call stack.
+

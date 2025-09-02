@@ -4,15 +4,15 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // Logger creates a gin middleware for request logging using logrus
-func Logger(logger *logrus.Logger) gin.HandlerFunc {
+func Logger(logger logger.Interface) gin.HandlerFunc {
 	return gin.LoggerWithConfig(gin.LoggerConfig{
 		Formatter: func(param gin.LogFormatterParams) string {
 			// Use logrus for structured logging instead of default formatter
-			entry := logger.WithFields(logrus.Fields{
+			entry := logger.WithFields(map[string]interface{}{
 				"status":     param.StatusCode,
 				"method":     param.Method,
 				"path":       param.Path,

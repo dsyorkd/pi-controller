@@ -1,0 +1,11 @@
+# Task ID: 25
+# Title: Integrate `client-go` for Kubernetes API Communication
+# Status: todo
+# Dependencies: 23
+# Priority: medium
+# Description: Integrate the official Kubernetes `client-go` library into the Pi Controller to enable interaction with the Kubernetes API server.
+# Details:
+Add the `k8s.io/client-go` dependency. Implement logic to create a `clientset` using in-cluster or out-of-cluster configuration. This will be used by the Kubernetes controller component to watch and update CRDs.
+
+# Test Strategy:
+Write a simple test program that uses the `client-go` integration to connect to a test K3s cluster and list all pods in the `kube-system` namespace. This verifies connectivity and authentication.

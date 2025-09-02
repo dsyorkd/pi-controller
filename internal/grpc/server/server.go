@@ -4,25 +4,25 @@ import (
 	"context"
 	"net"
 
-	"github.com/sirupsen/logrus"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/spenceryork/pi-controller/internal/config"
-	"github.com/spenceryork/pi-controller/internal/storage"
-	pb "github.com/spenceryork/pi-controller/proto"
+	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/storage"
+	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 // Server represents the gRPC server
 type Server struct {
 	config   *config.GRPCConfig
-	logger   *logrus.Logger
+	logger   logger.Interface
 	database *storage.Database
 	server   *grpc.Server
 }
 
 // New creates a new gRPC server instance
-func New(cfg *config.GRPCConfig, logger *logrus.Logger, db *storage.Database) (*Server, error) {
+func New(cfg *config.GRPCConfig, logger logger.Interface, db *storage.Database) (*Server, error) {
 	var opts []grpc.ServerOption
 
 	// Add TLS credentials if configured
@@ -75,14 +75,14 @@ func (s *Server) Stop() {
 }
 
 // loggingInterceptor provides request logging for unary RPCs
-func loggingInterceptor(logger *logrus.Logger) grpc.UnaryServerInterceptor {
+func loggingInterceptor(logger logger.Interface) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		logger.WithField("method", info.FullMethod).Debug("gRPC request started")
 		
 		resp, err := handler(ctx, req)
 		
 		if err != nil {
-			logger.WithFields(logrus.Fields{
+			logger.WithFields(map[string]interface{}{
 				"method": info.FullMethod,
 				"error":  err,
 			}).Error("gRPC request failed")
@@ -95,14 +95,14 @@ func loggingInterceptor(logger *logrus.Logger) grpc.UnaryServerInterceptor {
 }
 
 // streamLoggingInterceptor provides request logging for streaming RPCs
-func streamLoggingInterceptor(logger *logrus.Logger) grpc.StreamServerInterceptor {
+func streamLoggingInterceptor(logger logger.Interface) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		logger.WithField("method", info.FullMethod).Debug("gRPC stream started")
 		
 		err := handler(srv, ss)
 		
 		if err != nil {
-			logger.WithFields(logrus.Fields{
+			logger.WithFields(map[string]interface{}{
 				"method": info.FullMethod,
 				"error":  err,
 			}).Error("gRPC stream failed")

@@ -11,7 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/spenceryork/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/agent"
+	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/grpc/client"
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 var (
@@ -64,10 +68,13 @@ var versionCmd = &cobra.Command{
 }
 
 func runAgent(cmd *cobra.Command, args []string) error {
-	// Setup logger
-	logger := setupLogger()
+	// Setup structured logger
+	structuredLogger, err := setupStructuredLogger()
+	if err != nil {
+		return fmt.Errorf("failed to setup logger: %w", err)
+	}
 	
-	logger.WithFields(logrus.Fields{
+	structuredLogger.WithFields(map[string]interface{}{
 		"version": version,
 		"commit":  commit,
 		"date":    date,
@@ -79,16 +86,55 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	logger.Info("Configuration loaded")
+	structuredLogger.Info("Configuration loaded")
 
-	// TODO: Implement agent functionality
-	// This would typically include:
-	// 1. GPIO hardware interface initialization
-	// 2. System monitoring setup
-	// 3. Connection to Pi Controller server
-	// 4. Registration with cluster
-	// 5. Periodic health reporting
-	// 6. GPIO command execution
+	// Override configuration with command-line flags
+	if serverAddress != "" {
+		cfg.GRPCClient.ServerAddress = serverAddress
+	}
+	if nodeID != "" {
+		cfg.GRPCClient.NodeID = nodeID
+	}
+
+	// Create gRPC client configuration
+	grpcConfig, err := client.ConfigFromYAML(cfg.GRPCClient)
+	if err != nil {
+		return fmt.Errorf("invalid gRPC client config: %w", err)
+	}
+
+	// Validate the configuration
+	if err := client.ValidateConfig(grpcConfig); err != nil {
+		return fmt.Errorf("gRPC client config validation failed: %w", err)
+	}
+
+	// Create gRPC client
+	grpcClient, err := client.NewClient(grpcConfig, structuredLogger)
+	if err != nil {
+		return fmt.Errorf("failed to create gRPC client: %w", err)
+	}
+
+	// Collect node information
+	nodeInfo, err := client.CollectNodeInfo(cfg.GRPCClient.NodeID, cfg.GRPCClient.NodeName)
+	if err != nil {
+		structuredLogger.WithError(err).Warn("Failed to collect node info, using defaults")
+		nodeInfo = &client.NodeInfo{
+			ID:   cfg.GRPCClient.NodeID,
+			Name: cfg.GRPCClient.NodeName,
+		}
+	}
+
+	// Set node info in client
+	grpcClient.SetNodeInfo(nodeInfo)
+
+	structuredLogger.WithFields(map[string]interface{}{
+		"node_id":     nodeInfo.ID,
+		"node_name":   nodeInfo.Name,
+		"ip_address":  nodeInfo.IPAddress,
+		"mac_address": nodeInfo.MACAddress,
+		"architecture": nodeInfo.Architecture,
+		"model":       nodeInfo.Model,
+		"cpu_cores":   nodeInfo.CPUCores,
+	}).Info("Node information collected")
 
 	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -98,33 +144,119 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	logger.Info("Pi Agent started successfully")
+	// Start gRPC client (this will connect and begin heartbeat)
+	if err := grpcClient.Start(ctx); err != nil {
+		structuredLogger.WithError(err).Error("Failed to start gRPC client")
+		return fmt.Errorf("failed to start gRPC client: %w", err)
+	}
 
-	// Main agent loop (placeholder)
+	// Register node with controller
+	registeredNode, err := grpcClient.RegisterNode(ctx, nodeInfo)
+	if err != nil {
+		structuredLogger.WithError(err).Error("Failed to register node")
+		return fmt.Errorf("failed to register node: %w", err)
+	}
+
+	structuredLogger.WithFields(map[string]interface{}{
+		"registered_node_id":   registeredNode.Id,
+		"registered_node_name": registeredNode.Name,
+		"node_status":          registeredNode.Status,
+	}).Info("Node registered successfully with controller")
+
+	// Start GPIO gRPC server if enabled
+	var agentServer *agent.Server
+	if cfg.AgentServer.EnableGPIO {
+		agentConfig := &agent.Config{
+			Address: cfg.AgentServer.Address,
+			Port:    cfg.AgentServer.Port,
+		}
+		
+		agentServer, err = agent.NewServer(agentConfig, structuredLogger)
+		if err != nil {
+			structuredLogger.WithError(err).Error("Failed to create agent server")
+			return fmt.Errorf("failed to create agent server: %w", err)
+		}
+
+		if err := agentServer.Initialize(ctx); err != nil {
+			structuredLogger.WithError(err).Error("Failed to initialize agent server")
+			return fmt.Errorf("failed to initialize agent server: %w", err)
+		}
+
+		if err := agentServer.Start(ctx); err != nil {
+			structuredLogger.WithError(err).Error("Failed to start agent server")
+			return fmt.Errorf("failed to start agent server: %w", err)
+		}
+
+		structuredLogger.WithField("address", agentServer.GetAddress()).Info("Agent GPIO gRPC server started")
+	}
+
+	structuredLogger.Info("Pi Agent started successfully")
+
+	// Main agent loop
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			// Periodic tasks like health reporting
-			logger.Debug("Agent heartbeat")
+			// Periodic tasks - the heartbeat is handled automatically by the gRPC client
+			structuredLogger.Debug("Agent periodic maintenance")
 			
-			// TODO: 
-			// - Report system metrics to server
+			// Update node status to indicate we're still alive
+			if err := grpcClient.UpdateNodeStatus(ctx, registeredNode.Id, registeredNode.Status); err != nil {
+				structuredLogger.WithError(err).Warn("Failed to update node status")
+			}
+			
+			// TODO: Future enhancements:
+			// - Collect and report system metrics
 			// - Update GPIO device states
-			// - Check for pending commands
-			// - Send status updates
+			// - Check for pending commands from controller
+			// - Monitor local system health
 
 		case sig := <-sigChan:
-			logger.WithField("signal", sig).Info("Received shutdown signal")
+			structuredLogger.WithField("signal", sig).Info("Received shutdown signal")
+			
+			// Update node status to maintenance before shutting down
+			if err := grpcClient.UpdateNodeStatus(ctx, registeredNode.Id, 
+				pb.NodeStatus_NODE_STATUS_MAINTENANCE); err != nil {
+				structuredLogger.WithError(err).Warn("Failed to update node status to maintenance")
+			}
+			
+			// Stop the agent server if it's running
+			if agentServer != nil {
+				if err := agentServer.Stop(); err != nil {
+					structuredLogger.WithError(err).Error("Error stopping agent server")
+				}
+			}
+			
+			// Stop the gRPC client
+			if err := grpcClient.Stop(); err != nil {
+				structuredLogger.WithError(err).Error("Error stopping gRPC client")
+			}
+			
 			cancel()
 			
 		case <-ctx.Done():
-			logger.Info("Pi Agent shutdown complete")
+			structuredLogger.Info("Pi Agent shutdown complete")
 			return nil
 		}
 	}
+}
+
+// setupStructuredLogger creates a structured logger compatible with our logger interface
+func setupStructuredLogger() (logger.Interface, error) {
+	loggerConfig := logger.Config{
+		Level:  logLevel,
+		Format: logFormat,
+		Output: "stdout",
+	}
+	
+	structuredLogger, err := logger.New(loggerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create structured logger: %w", err)
+	}
+	
+	return structuredLogger, nil
 }
 
 func setupLogger() *logrus.Logger {

@@ -7,18 +7,20 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/spenceryork/pi-controller/internal/models"
+	"github.com/dsyorkd/pi-controller/internal/errors"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/migrations"
+	"github.com/dsyorkd/pi-controller/internal/models"
 )
 
 // Database wraps GORM database connection with additional functionality
 type Database struct {
 	db     *gorm.DB
-	logger *logrus.Logger
+	logger applogger.Interface
 }
 
 // Config holds database configuration
@@ -42,31 +44,33 @@ func DefaultConfig() *Config {
 }
 
 // New creates a new database connection
-func New(config *Config, logger *logrus.Logger) (*Database, error) {
+func New(config *Config, logger applogger.Interface) (*Database, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
 
 	// Ensure directory exists
 	if err := ensureDirExists(filepath.Dir(config.Path)); err != nil {
-		return nil, fmt.Errorf("failed to create database directory: %w", err)
+		return nil, errors.Wrapf(err, "failed to create database directory")
 	}
 
 	// Configure GORM logger
 	gormLogger := logger.WithField("component", "database")
-	logLevel := logger.Info
+	var logLevel func(msg string, args ...interface{})
 	switch config.LogLevel {
 	case "error":
-		logLevel = logger.Error
+		logLevel = gormLogger.Error
 	case "warn":
-		logLevel = logger.Warn
+		logLevel = gormLogger.Warn
 	case "info":
-		logLevel = logger.Info
+		logLevel = gormLogger.Info
+	default:
+		logLevel = gormLogger.Info
 	}
 
 	// Open database connection
 	db, err := gorm.Open(sqlite.Open(config.Path), &gorm.Config{
-		Logger: &gormLogrusAdapter{
+		Logger: &gormSlogAdapter{
 			logger: gormLogger,
 			level:  logLevel,
 		},
@@ -75,13 +79,13 @@ func New(config *Config, logger *logrus.Logger) (*Database, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, errors.Wrapf(err, "failed to connect to database")
 	}
 
 	// Configure connection pool
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
+		return nil, errors.Wrapf(err, "failed to get underlying sql.DB")
 	}
 
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
@@ -103,10 +107,80 @@ func New(config *Config, logger *logrus.Logger) (*Database, error) {
 
 	// Run migrations
 	if err := database.migrate(); err != nil {
-		return nil, fmt.Errorf("failed to migrate database: %w", err)
+		return nil, errors.Wrapf(err, "failed to migrate database")
 	}
 
 	logger.WithField("path", config.Path).Info("Database connection established")
+	return database, nil
+}
+
+// NewWithoutMigration creates a new database connection without running migrations
+// This is useful for migration commands that need to manage migrations explicitly
+func NewWithoutMigration(config *Config, logger applogger.Interface) (*Database, error) {
+	if config == nil {
+		config = DefaultConfig()
+	}
+
+	// Ensure directory exists
+	if err := ensureDirExists(filepath.Dir(config.Path)); err != nil {
+		return nil, errors.Wrapf(err, "failed to create database directory")
+	}
+
+	// Configure GORM logger
+	gormLogger := logger.WithField("component", "database")
+	var logLevel func(msg string, args ...interface{})
+	switch config.LogLevel {
+	case "error":
+		logLevel = gormLogger.Error
+	case "warn":
+		logLevel = gormLogger.Warn
+	case "info":
+		logLevel = gormLogger.Info
+	default:
+		logLevel = gormLogger.Info
+	}
+
+	// Open database connection
+	db, err := gorm.Open(sqlite.Open(config.Path), &gorm.Config{
+		Logger: &gormSlogAdapter{
+			logger: gormLogger,
+			level:  logLevel,
+		},
+		NowFunc: func() time.Time {
+			return time.Now().UTC()
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to connect to database")
+	}
+
+	// Configure connection pool
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get underlying sql.DB")
+	}
+
+	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
+	
+	if config.ConnMaxLifetime != "" {
+		duration, err := time.ParseDuration(config.ConnMaxLifetime)
+		if err != nil {
+			logger.Warnf("Invalid conn_max_lifetime '%s', using default 5m", config.ConnMaxLifetime)
+			duration = 5 * time.Minute
+		}
+		sqlDB.SetConnMaxLifetime(duration)
+	}
+
+	database := &Database{
+		db:     db,
+		logger: logger,
+	}
+
+	// NOTE: We deliberately do NOT run migrations here
+	// This function is for migration commands that manage migrations explicitly
+
+	logger.WithField("path", config.Path).Info("Database connection established (without migrations)")
 	return database, nil
 }
 
@@ -137,14 +211,17 @@ func (d *Database) Health() error {
 func (d *Database) migrate() error {
 	d.logger.Info("Running database migrations")
 	
-	err := d.db.AutoMigrate(
-		&models.Cluster{},
-		&models.Node{},
-		&models.GPIODevice{},
-		&models.GPIOReading{},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to run auto-migration: %w", err)
+	// Use the new migration system
+	migrator := migrations.NewMigrator(d.db, d.logger)
+	
+	// Validate migration order first
+	if err := migrator.ValidateMigrationOrder(); err != nil {
+		return errors.Wrapf(err, "migration validation failed")
+	}
+	
+	// Run migrations
+	if err := migrator.Up(); err != nil {
+		return errors.Wrapf(err, "failed to run migrations")
 	}
 	
 	d.logger.Info("Database migrations completed successfully")
@@ -199,33 +276,33 @@ func ensureDirExists(dir string) error {
 	return os.MkdirAll(dir, 0755)
 }
 
-// gormLogrusAdapter adapts logrus logger to GORM logger interface
-type gormLogrusAdapter struct {
-	logger *logrus.Entry
-	level  func(args ...interface{})
+// gormSlogAdapter adapts our structured logger to GORM logger interface
+type gormSlogAdapter struct {
+	logger applogger.Interface
+	level  func(msg string, args ...interface{})
 }
 
-func (g *gormLogrusAdapter) LogMode(level logger.LogLevel) logger.Interface {
+func (g *gormSlogAdapter) LogMode(level logger.LogLevel) logger.Interface {
 	return g
 }
 
-func (g *gormLogrusAdapter) Info(ctx context.Context, msg string, data ...interface{}) {
+func (g *gormSlogAdapter) Info(ctx context.Context, msg string, data ...interface{}) {
 	g.logger.Infof(msg, data...)
 }
 
-func (g *gormLogrusAdapter) Warn(ctx context.Context, msg string, data ...interface{}) {
+func (g *gormSlogAdapter) Warn(ctx context.Context, msg string, data ...interface{}) {
 	g.logger.Warnf(msg, data...)
 }
 
-func (g *gormLogrusAdapter) Error(ctx context.Context, msg string, data ...interface{}) {
+func (g *gormSlogAdapter) Error(ctx context.Context, msg string, data ...interface{}) {
 	g.logger.Errorf(msg, data...)
 }
 
-func (g *gormLogrusAdapter) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+func (g *gormSlogAdapter) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	elapsed := time.Since(begin)
 	sql, rows := fc()
 	
-	fields := logrus.Fields{
+	fields := map[string]interface{}{
 		"duration": elapsed.String(),
 		"rows":     rows,
 		"sql":      sql,
@@ -236,4 +313,77 @@ func (g *gormLogrusAdapter) Trace(ctx context.Context, begin time.Time, fc func(
 	} else {
 		g.logger.WithFields(fields).Debug("Database query executed")
 	}
+}
+
+// NewForTest creates a new database connection for testing without running migrations
+func NewForTest(logger applogger.Interface) (*Database, error) {
+	config := &Config{
+		Path:            ":memory:",
+		MaxOpenConns:    5,
+		MaxIdleConns:    2,
+		ConnMaxLifetime: "5m",
+		LogLevel:        "error", // Reduce noise in tests
+	}
+
+	db, err := gorm.Open(sqlite.Open(config.Path), &gorm.Config{
+		Logger: &gormSlogAdapter{
+			logger: logger.WithField("component", "database"),
+			level:  logger.Error,
+		},
+		NowFunc: func() time.Time {
+			return time.Now().UTC()
+		},
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to connect to test database")
+	}
+
+	database := &Database{
+		db:     db,
+		logger: logger,
+	}
+
+	return database, nil
+}
+
+// NewForTestWithDB creates a new database instance using an existing gorm.DB for testing
+func NewForTestWithDB(db *gorm.DB, logger applogger.Interface) *Database {
+	return &Database{
+		db:     db,
+		logger: logger,
+	}
+}
+
+// Cluster CRUD operations
+
+// CreateCluster creates a new cluster in the database
+func (d *Database) CreateCluster(cluster *models.Cluster) error {
+	return d.db.Create(cluster).Error
+}
+
+// GetCluster retrieves a cluster by ID
+func (d *Database) GetCluster(id uint) (*models.Cluster, error) {
+	var cluster models.Cluster
+	err := d.db.First(&cluster, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &cluster, nil
+}
+
+// GetClusters retrieves all clusters
+func (d *Database) GetClusters() ([]*models.Cluster, error) {
+	var clusters []*models.Cluster
+	err := d.db.Find(&clusters).Error
+	return clusters, err
+}
+
+// UpdateCluster updates a cluster in the database
+func (d *Database) UpdateCluster(cluster *models.Cluster) error {
+	return d.db.Save(cluster).Error
+}
+
+// DeleteCluster deletes a cluster by ID
+func (d *Database) DeleteCluster(id uint) error {
+	return d.db.Delete(&models.Cluster{}, id).Error
 }

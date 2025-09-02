@@ -1,0 +1,11 @@
+# Task ID: 15
+# Title: Finalize Security Middleware Implementation
+# Status: todo
+# Dependencies: 13
+# Priority: high
+# Description: Complete the authentication and authorization middleware, including JWT validation and initial RBAC checks.
+# Details:
+Implement JWT token validation logic in the Gin middleware, checking for signature, expiration, and issuer. Create placeholder functions for RBAC checks that can be expanded later. Ensure protected routes return 401/403 errors correctly.
+
+# Test Strategy:
+Write integration tests for the API router. Test protected endpoints with no token, an invalid token, an expired token, and a valid token to ensure correct HTTP status codes are returned.

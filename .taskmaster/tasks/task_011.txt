@@ -1,0 +1,11 @@
+# Task ID: 11
+# Title: Fix All `go vet` Errors
+# Status: todo
+# Dependencies: None
+# Priority: high
+# Description: Address all existing compilation and static analysis errors reported by `go vet`, including logger type mismatches, undefined constants, and incorrect test imports.
+# Details:
+Scan the entire codebase using the `go vet ./...` command. Systematically fix each reported issue. This is a prerequisite for establishing a clean baseline for code quality.
+
+# Test Strategy:
+Run `go vet ./...` and confirm it returns no errors. Ensure the project compiles successfully with `go build ./...` and all existing tests pass with `go test ./...`.

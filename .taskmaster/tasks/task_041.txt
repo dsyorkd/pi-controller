@@ -1,0 +1,43 @@
+# Task ID: 41
+# Title: Write Unit Tests for `pkg/discovery` mDNS Logic
+# Status: todo
+# Dependencies: None
+# Priority: low
+# Description: Develop unit tests for the mDNS discovery logic in the `pkg/discovery` package.
+# Details:
+Mock the network interfaces and packet listeners to simulate mDNS queries and responses. Verify that the service correctly advertises itself and discovers other services on the mock network.
+
+# Test Strategy:
+Unit testing with mocked network dependencies. This will allow for testing the mDNS protocol logic without actual network traffic.
+
+# Subtasks:
+## 1. Set Up Test File and Mocking Infrastructure for Network I/O [pending]
+### Dependencies: None
+### Description: Create the `mdns_test.go` file within the `pkg/discovery` package. Implement a mock for `net.PacketConn` to simulate network-level interactions. This mock will be essential for intercepting outgoing mDNS advertisement packets and injecting incoming mDNS discovery responses without actual network traffic.
+### Details:
+The mock `net.PacketConn` should allow tests to write data to a buffer (simulating a sent packet) and read pre-defined data from a buffer (simulating a received packet). This forms the foundation for testing both the advertiser and discoverer components.
+
+## 2. Test `Advertiser` Initialization and Shutdown [pending]
+### Dependencies: 41.1
+### Description: Write a unit test to verify the lifecycle of the `Advertiser`. This includes testing the `NewAdvertiser` constructor to ensure it correctly initializes the mDNS server configuration without errors. Also, test the `Shutdown` method to confirm it gracefully closes the underlying server and releases resources.
+### Details:
+Focus on the state management of the `Advertiser`. The test should confirm that `NewAdvertiser` handles valid and invalid parameters correctly. The `Shutdown` test should verify that the underlying `zeroconf.Server.Shutdown()` method is called.
+
+## 3. Test `Advertiser` Service Announcement Logic [pending]
+### Dependencies: 41.1
+### Description: Implement a test to verify that calling `Advertiser.Start()` results in the correct mDNS announcement packet being sent. Use the mock `net.PacketConn` to capture the outgoing packet and assert that its payload contains the correct service instance, type, domain, and port.
+### Details:
+This test will require injecting the mock `net.PacketConn` into the `zeroconf` server instance used by the `Advertiser`. After calling `Start()`, read from the mock connection's write buffer and parse the mDNS packet to validate its contents against the service details provided during initialization.
+
+## 4. Test `Discoverer` for Finding a Single Service [pending]
+### Dependencies: 41.1
+### Description: Write a unit test for the `Discoverer` to verify it can find and correctly parse a single mDNS service announcement. The test should initiate discovery and then use the mock `net.PacketConn` to inject a simulated mDNS response packet onto the mock network.
+### Details:
+The test will call `Discoverer.Discover()` and then write a well-formed mDNS response packet to the mock `net.PacketConn`'s read buffer. Verify that the `Discover` method's result channel receives a `Service` object containing the expected instance name, hostname, port, and IP addresses from the simulated packet.
+
+## 5. Test `Discoverer` with Multiple Services and Context Cancellation [pending]
+### Dependencies: 41.4
+### Description: Extend the discovery tests to handle more complex scenarios. Verify that the `Discoverer` can find multiple services advertised on the network. Additionally, test the context cancellation logic to ensure that the discovery process terminates promptly when the provided context is cancelled.
+### Details:
+For the multiple service test, inject several distinct mDNS response packets and ensure all are received on the results channel. For the cancellation test, create a context using `context.WithCancel()`, call `Discover()`, immediately cancel the context, and verify that the discovery goroutine exits and the channel is closed without delay.
+

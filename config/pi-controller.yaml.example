@@ -1,0 +1,104 @@
+# Pi Controller Configuration Example
+
+app:
+  name: pi-controller
+  version: "1.0.0"
+  environment: production  # development, staging, production
+  data_dir: /var/lib/pi-controller
+  debug: false
+
+database:
+  path: pi-controller.db
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+  log_level: warn
+
+api:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  tls_cert_file: ""  # Path to TLS certificate
+  tls_key_file: ""   # Path to TLS private key
+  cors_enabled: true
+  auth_enabled: true  # Enable authentication
+
+grpc:
+  host: 0.0.0.0
+  port: 9090
+  tls_cert_file: ""
+  tls_key_file: ""
+
+websocket:
+  host: 0.0.0.0
+  port: 8081
+  path: /ws
+  read_buffer_size: 1024
+  write_buffer_size: 1024
+  check_origin: true  # Validate WebSocket origins
+
+log:
+  level: info        # debug, info, warn, error
+  format: json       # json, text
+  output: stdout     # stdout, stderr, file
+  file: ""           # Log file path (when output=file)
+  max_size: 100      # Max size in MB
+  max_backups: 3     # Number of old files to keep
+  max_age: 28        # Days to keep old files
+  compress: true     # Compress old files
+
+kubernetes:
+  config_path: ""           # Path to kubeconfig (empty for in-cluster)
+  in_cluster: false         # Running inside Kubernetes cluster
+  namespace: pi-cluster     # Default namespace
+  resync_interval: "30s"    # Controller resync interval
+
+gpio:
+  enabled: true
+  mock_mode: false          # Use mock GPIO for testing
+  sample_interval: "1s"     # GPIO sampling rate
+  retention_period: "24h"   # How long to keep GPIO readings
+  allowed_pins:             # Pins allowed for GPIO control
+    - 2
+    - 3
+    - 4
+    - 17
+    - 27
+    - 22
+    - 10
+    - 9
+    - 11
+    - 5
+    - 6
+    - 13
+    - 19
+    - 26
+    - 18
+    - 23
+    - 24
+    - 25
+    - 8
+    - 7
+    - 12
+    - 16
+    - 20
+    - 21
+  restricted_pins:          # System-critical pins to block
+    - 0   # I2C SDA
+    - 1   # I2C SCL  
+    - 14  # UART TX
+    - 15  # UART RX
+  default_direction: input
+  default_pull_mode: none   # none, up, down
+
+discovery:
+  enabled: true
+  method: mdns              # mdns, scan, static
+  interface: ""             # Network interface (empty for all)
+  port: 9091               # Discovery port
+  interval: "30s"          # Discovery scan interval
+  timeout: "5s"            # Discovery timeout
+  static_nodes: []         # Static node IPs (when method=static)
+  service_name: pi-controller
+  service_type: "_pi-controller._tcp"

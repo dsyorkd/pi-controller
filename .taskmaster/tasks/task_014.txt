@@ -1,0 +1,11 @@
+# Task ID: 14
+# Title: Complete Database Migration System
+# Status: todo
+# Dependencies: None
+# Priority: medium
+# Description: Implement a robust database migration system to manage schema changes for the SQLite database.
+# Details:
+Use a library like `golang-migrate/migrate` or `pressly/goose`. Create initial migration scripts for the existing database models. The system should support applying and rolling back migrations.
+
+# Test Strategy:
+Create a unit test that initializes an in-memory SQLite database, runs all 'up' migrations, and verifies the schema. Then, run all 'down' migrations and confirm the database is returned to its initial state.

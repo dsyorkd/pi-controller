@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/spenceryork/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/storage"
 )
 
 // HealthHandler handles health check endpoints

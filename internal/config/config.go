@@ -4,167 +4,222 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
-	"github.com/spenceryork/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/storage"
 )
 
 // Config holds the entire application configuration
 type Config struct {
 	// Application settings
-	App AppConfig `yaml:"app" mapstructure:"app"`
+	App AppConfig `yaml:"app"`
 	
 	// Database configuration
-	Database storage.Config `yaml:"database" mapstructure:"database"`
+	Database storage.Config `yaml:"database"`
 	
 	// API server configuration
-	API APIConfig `yaml:"api" mapstructure:"api"`
+	API APIConfig `yaml:"api"`
 	
 	// gRPC server configuration  
-	GRPC GRPCConfig `yaml:"grpc" mapstructure:"grpc"`
+	GRPC GRPCConfig `yaml:"grpc"`
 	
 	// WebSocket configuration
-	WebSocket WebSocketConfig `yaml:"websocket" mapstructure:"websocket"`
+	WebSocket WebSocketConfig `yaml:"websocket"`
 	
 	// Logging configuration
-	Log LogConfig `yaml:"log" mapstructure:"log"`
+	Log LogConfig `yaml:"log"`
 	
 	// Kubernetes configuration
-	Kubernetes KubernetesConfig `yaml:"kubernetes" mapstructure:"kubernetes"`
+	Kubernetes KubernetesConfig `yaml:"kubernetes"`
 	
 	// GPIO configuration
-	GPIO GPIOConfig `yaml:"gpio" mapstructure:"gpio"`
+	GPIO GPIOConfig `yaml:"gpio"`
 	
 	// Discovery configuration
-	Discovery DiscoveryConfig `yaml:"discovery" mapstructure:"discovery"`
+	Discovery DiscoveryConfig `yaml:"discovery"`
+	
+	// gRPC client configuration (for Pi Agent)
+	GRPCClient GRPCClientConfig `yaml:"grpc_client"`
+	
+	// Pi Agent gRPC server configuration
+	AgentServer AgentServerConfig `yaml:"agent_server"`
 }
 
 // AppConfig contains general application settings
 type AppConfig struct {
-	Name        string `yaml:"name" mapstructure:"name"`
-	Version     string `yaml:"version" mapstructure:"version"`
-	Environment string `yaml:"environment" mapstructure:"environment"`
-	DataDir     string `yaml:"data_dir" mapstructure:"data_dir"`
-	Debug       bool   `yaml:"debug" mapstructure:"debug"`
+	Name        string `yaml:"name"`
+	Version     string `yaml:"version"`
+	Environment string `yaml:"environment"`
+	DataDir     string `yaml:"data_dir"`
+	Debug       bool   `yaml:"debug"`
 }
 
 // APIConfig contains REST API server settings
 type APIConfig struct {
-	Host         string `yaml:"host" mapstructure:"host"`
-	Port         int    `yaml:"port" mapstructure:"port"`
-	ReadTimeout  string `yaml:"read_timeout" mapstructure:"read_timeout"`
-	WriteTimeout string `yaml:"write_timeout" mapstructure:"write_timeout"`
-	TLSCertFile  string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
-	TLSKeyFile   string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
-	CORSEnabled  bool   `yaml:"cors_enabled" mapstructure:"cors_enabled"`
-	AuthEnabled  bool   `yaml:"auth_enabled" mapstructure:"auth_enabled"`
+	Host         string `yaml:"host"`
+	Port         int    `yaml:"port"`
+	ReadTimeout  string `yaml:"read_timeout"`
+	WriteTimeout string `yaml:"write_timeout"`
+	TLSCertFile  string `yaml:"tls_cert_file"`
+	TLSKeyFile   string `yaml:"tls_key_file"`
+	CORSEnabled  bool   `yaml:"cors_enabled"`
+	AuthEnabled  bool   `yaml:"auth_enabled"`
 }
 
 // GRPCConfig contains gRPC server settings
 type GRPCConfig struct {
-	Host        string `yaml:"host" mapstructure:"host"`
-	Port        int    `yaml:"port" mapstructure:"port"`
-	TLSCertFile string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
-	TLSKeyFile  string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	TLSCertFile string `yaml:"tls_cert_file"`
+	TLSKeyFile  string `yaml:"tls_key_file"`
 }
 
 // WebSocketConfig contains WebSocket server settings
 type WebSocketConfig struct {
-	Host            string `yaml:"host" mapstructure:"host"`
-	Port            int    `yaml:"port" mapstructure:"port"`
-	Path            string `yaml:"path" mapstructure:"path"`
-	ReadBufferSize  int    `yaml:"read_buffer_size" mapstructure:"read_buffer_size"`
-	WriteBufferSize int    `yaml:"write_buffer_size" mapstructure:"write_buffer_size"`
-	CheckOrigin     bool   `yaml:"check_origin" mapstructure:"check_origin"`
+	Host            string `yaml:"host"`
+	Port            int    `yaml:"port"`
+	Path            string `yaml:"path"`
+	ReadBufferSize  int    `yaml:"read_buffer_size"`
+	WriteBufferSize int    `yaml:"write_buffer_size"`
+	CheckOrigin     bool   `yaml:"check_origin"`
 }
 
 // LogConfig contains logging configuration
 type LogConfig struct {
-	Level      string `yaml:"level" mapstructure:"level"`
-	Format     string `yaml:"format" mapstructure:"format"`
-	Output     string `yaml:"output" mapstructure:"output"`
-	File       string `yaml:"file" mapstructure:"file"`
-	MaxSize    int    `yaml:"max_size" mapstructure:"max_size"`
-	MaxBackups int    `yaml:"max_backups" mapstructure:"max_backups"`
-	MaxAge     int    `yaml:"max_age" mapstructure:"max_age"`
-	Compress   bool   `yaml:"compress" mapstructure:"compress"`
+	Level      string `yaml:"level"`
+	Format     string `yaml:"format"`
+	Output     string `yaml:"output"`
+	File       string `yaml:"file"`
+	MaxSize    int    `yaml:"max_size"`
+	MaxBackups int    `yaml:"max_backups"`
+	MaxAge     int    `yaml:"max_age"`
+	Compress   bool   `yaml:"compress"`
 }
 
 // KubernetesConfig contains Kubernetes client settings
 type KubernetesConfig struct {
-	ConfigPath     string `yaml:"config_path" mapstructure:"config_path"`
-	InCluster      bool   `yaml:"in_cluster" mapstructure:"in_cluster"`
-	Namespace      string `yaml:"namespace" mapstructure:"namespace"`
-	ResyncInterval string `yaml:"resync_interval" mapstructure:"resync_interval"`
+	ConfigPath     string `yaml:"config_path"`
+	InCluster      bool   `yaml:"in_cluster"`
+	Namespace      string `yaml:"namespace"`
+	ResyncInterval string `yaml:"resync_interval"`
 }
 
 // GPIOConfig contains GPIO service settings
 type GPIOConfig struct {
-	Enabled           bool     `yaml:"enabled" mapstructure:"enabled"`
-	MockMode          bool     `yaml:"mock_mode" mapstructure:"mock_mode"`
-	SampleInterval    string   `yaml:"sample_interval" mapstructure:"sample_interval"`
-	RetentionPeriod   string   `yaml:"retention_period" mapstructure:"retention_period"`
-	AllowedPins       []int    `yaml:"allowed_pins" mapstructure:"allowed_pins"`
-	RestrictedPins    []int    `yaml:"restricted_pins" mapstructure:"restricted_pins"`
-	DefaultDirection  string   `yaml:"default_direction" mapstructure:"default_direction"`
-	DefaultPullMode   string   `yaml:"default_pull_mode" mapstructure:"default_pull_mode"`
+	Enabled           bool     `yaml:"enabled"`
+	MockMode          bool     `yaml:"mock_mode"`
+	SampleInterval    string   `yaml:"sample_interval"`
+	RetentionPeriod   string   `yaml:"retention_period"`
+	AllowedPins       []int    `yaml:"allowed_pins"`
+	RestrictedPins    []int    `yaml:"restricted_pins"`
+	DefaultDirection  string   `yaml:"default_direction"`
+	DefaultPullMode   string   `yaml:"default_pull_mode"`
 }
 
 // DiscoveryConfig contains node discovery settings
 type DiscoveryConfig struct {
-	Enabled         bool     `yaml:"enabled" mapstructure:"enabled"`
-	Method          string   `yaml:"method" mapstructure:"method"` // mdns, scan, static
-	Interface       string   `yaml:"interface" mapstructure:"interface"`
-	Port            int      `yaml:"port" mapstructure:"port"`
-	Interval        string   `yaml:"interval" mapstructure:"interval"`
-	Timeout         string   `yaml:"timeout" mapstructure:"timeout"`
-	StaticNodes     []string `yaml:"static_nodes" mapstructure:"static_nodes"`
-	ServiceName     string   `yaml:"service_name" mapstructure:"service_name"`
-	ServiceType     string   `yaml:"service_type" mapstructure:"service_type"`
+	Enabled         bool     `yaml:"enabled"`
+	Method          string   `yaml:"method"` // mdns, scan, static
+	Interface       string   `yaml:"interface"`
+	Port            int      `yaml:"port"`
+	Interval        string   `yaml:"interval"`
+	Timeout         string   `yaml:"timeout"`
+	StaticNodes     []string `yaml:"static_nodes"`
+	ServiceName     string   `yaml:"service_name"`
+	ServiceType     string   `yaml:"service_type"`
 }
 
-// Load loads configuration from file and environment variables
+// GRPCClientConfig contains gRPC client settings for Pi Agent
+type GRPCClientConfig struct {
+	// Server connection
+	ServerAddress string `yaml:"server_address"`
+	ServerPort    int    `yaml:"server_port"`
+	
+	// Connection settings
+	ConnectionTimeout string `yaml:"connection_timeout"`
+	RequestTimeout    string `yaml:"request_timeout"`
+	MaxMessageSize    int    `yaml:"max_message_size"`
+	
+	// Retry configuration
+	MaxRetries        int    `yaml:"max_retries"`
+	InitialRetryDelay string `yaml:"initial_retry_delay"`
+	MaxRetryDelay     string `yaml:"max_retry_delay"`
+	RetryMultiplier   float64 `yaml:"retry_multiplier"`
+	
+	// Heartbeat settings
+	HeartbeatInterval string `yaml:"heartbeat_interval"`
+	HeartbeatTimeout  string `yaml:"heartbeat_timeout"`
+	
+	// Keep-alive settings
+	KeepAliveTime    string `yaml:"keepalive_time"`
+	KeepAliveTimeout string `yaml:"keepalive_timeout"`
+	
+	// Security
+	Insecure bool   `yaml:"insecure"`
+	TLSCert  string `yaml:"tls_cert"`
+	TLSKey   string `yaml:"tls_key"`
+	
+	// Node information
+	NodeID   string `yaml:"node_id"`
+	NodeName string `yaml:"node_name"`
+}
+
+// AgentServerConfig contains Pi Agent gRPC server settings
+type AgentServerConfig struct {
+	// Server settings
+	Address string `yaml:"address"`
+	Port    int    `yaml:"port"`
+	
+	// Service settings
+	EnableGPIO bool `yaml:"enable_gpio"`
+	
+	// Security
+	TLSCertFile string `yaml:"tls_cert_file"`
+	TLSKeyFile  string `yaml:"tls_key_file"`
+}
+
+// Load loads configuration from YAML file with defaults
 func Load(configPath string) (*Config, error) {
-	// Set defaults
-	setDefaults()
+	// Start with defaults
+	config := getDefaults()
 	
-	// Configure viper
-	viper.SetConfigType("yaml")
-	viper.SetEnvPrefix("PI_CONTROLLER")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
-	
-	// Load config file if provided
+	// Load config file if provided or found
+	var configFile string
 	if configPath != "" {
-		viper.SetConfigFile(configPath)
-		if err := viper.ReadInConfig(); err != nil {
-			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("failed to read config file: %w", err)
-			}
-		}
+		configFile = configPath
 	} else {
 		// Search for config file in standard locations
-		viper.SetConfigName("pi-controller")
-		viper.AddConfigPath(".")
-		viper.AddConfigPath("./config")
-		viper.AddConfigPath("/etc/pi-controller")
-		viper.AddConfigPath("$HOME/.pi-controller")
+		searchPaths := []string{
+			"./pi-controller.yaml",
+			"./config/pi-controller.yaml", 
+			"/etc/pi-controller/pi-controller.yaml",
+			filepath.Join(os.Getenv("HOME"), ".pi-controller", "pi-controller.yaml"),
+		}
 		
-		if err := viper.ReadInConfig(); err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-				return nil, fmt.Errorf("failed to read config file: %w", err)
+		for _, path := range searchPaths {
+			if _, err := os.Stat(path); err == nil {
+				configFile = path
+				break
 			}
 		}
 	}
 	
-	// Unmarshal into config struct
-	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	// Read and parse config file if found
+	if configFile != "" {
+		data, err := os.ReadFile(configFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
+		}
+		
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return nil, fmt.Errorf("failed to parse config file %s: %w", configFile, err)
+		}
 	}
+	
+	// Apply environment variable overrides
+	applyEnvOverrides(&config)
 	
 	// Validate and set derived values
 	if err := config.validate(); err != nil {
@@ -207,73 +262,162 @@ func (c *Config) validate() error {
 	return nil
 }
 
-// setDefaults sets default configuration values
-func setDefaults() {
-	// App defaults
-	viper.SetDefault("app.name", "pi-controller")
-	viper.SetDefault("app.version", "dev")
-	viper.SetDefault("app.environment", "development")
-	viper.SetDefault("app.data_dir", "./data")
-	viper.SetDefault("app.debug", false)
+// getDefaults returns a Config struct with default values based on environment
+func getDefaults() Config {
+	env := os.Getenv("PI_CONTROLLER_ENVIRONMENT")
+	if env == "" {
+		env = os.Getenv("ENVIRONMENT")
+	}
 	
-	// Database defaults
-	viper.SetDefault("database.path", "pi-controller.db")
-	viper.SetDefault("database.max_open_conns", 25)
-	viper.SetDefault("database.max_idle_conns", 5)
-	viper.SetDefault("database.conn_max_lifetime", "5m")
-	viper.SetDefault("database.log_level", "warn")
+	// Use secure production defaults unless explicitly set to development
+	if env == "development" || env == "dev" {
+		return getDevelopmentDefaults()
+	}
+	return getProductionDefaults()
+}
+
+// getDevelopmentDefaults returns development-friendly defaults (less secure, easier setup)
+func getDevelopmentDefaults() Config {
+	config := getProductionDefaults()
 	
-	// API defaults
-	viper.SetDefault("api.host", "0.0.0.0")
-	viper.SetDefault("api.port", 8080)
-	viper.SetDefault("api.read_timeout", "30s")
-	viper.SetDefault("api.write_timeout", "30s")
-	viper.SetDefault("api.cors_enabled", true)
-	viper.SetDefault("api.auth_enabled", false)
+	// Disable TLS for development ease
+	config.API.TLSCertFile = ""
+	config.API.TLSKeyFile = ""
+	config.GRPC.TLSCertFile = ""
+	config.GRPC.TLSKeyFile = ""
 	
-	// gRPC defaults
-	viper.SetDefault("grpc.host", "0.0.0.0")
-	viper.SetDefault("grpc.port", 9090)
-	
-	// WebSocket defaults
-	viper.SetDefault("websocket.host", "0.0.0.0")
-	viper.SetDefault("websocket.port", 8081)
-	viper.SetDefault("websocket.path", "/ws")
-	viper.SetDefault("websocket.read_buffer_size", 1024)
-	viper.SetDefault("websocket.write_buffer_size", 1024)
-	viper.SetDefault("websocket.check_origin", false)
-	
-	// Log defaults
-	viper.SetDefault("log.level", "info")
-	viper.SetDefault("log.format", "json")
-	viper.SetDefault("log.output", "stdout")
-	viper.SetDefault("log.max_size", 100)
-	viper.SetDefault("log.max_backups", 3)
-	viper.SetDefault("log.max_age", 28)
-	viper.SetDefault("log.compress", true)
-	
-	// Kubernetes defaults
-	viper.SetDefault("kubernetes.config_path", "")
-	viper.SetDefault("kubernetes.in_cluster", false)
-	viper.SetDefault("kubernetes.namespace", "default")
-	viper.SetDefault("kubernetes.resync_interval", "30s")
-	
-	// GPIO defaults
-	viper.SetDefault("gpio.enabled", true)
-	viper.SetDefault("gpio.mock_mode", false)
-	viper.SetDefault("gpio.sample_interval", "1s")
-	viper.SetDefault("gpio.retention_period", "24h")
-	viper.SetDefault("gpio.default_direction", "input")
-	viper.SetDefault("gpio.default_pull_mode", "none")
-	
-	// Discovery defaults
-	viper.SetDefault("discovery.enabled", true)
-	viper.SetDefault("discovery.method", "mdns")
-	viper.SetDefault("discovery.port", 9091)
-	viper.SetDefault("discovery.interval", "30s")
-	viper.SetDefault("discovery.timeout", "5s")
-	viper.SetDefault("discovery.service_name", "pi-controller")
-	viper.SetDefault("discovery.service_type", "_pi-controller._tcp")
+	return config
+}
+
+// getProductionDefaults returns secure production defaults
+func getProductionDefaults() Config {
+	return Config{
+		App: AppConfig{
+			Name:        "pi-controller",
+			Version:     "dev",
+			Environment: "development",
+			DataDir:     "./data",
+			Debug:       false,
+		},
+		Database: storage.Config{
+			Path:            "pi-controller.db",
+			MaxOpenConns:    25,
+			MaxIdleConns:    5,
+			ConnMaxLifetime: "5m",
+			LogLevel:        "warn",
+		},
+		API: APIConfig{
+			Host:         "0.0.0.0",
+			Port:         8080,
+			ReadTimeout:  "30s",
+			WriteTimeout: "30s",
+			TLSCertFile:  "/etc/pi-controller/tls/server.crt", // Default TLS cert path for production
+			TLSKeyFile:   "/etc/pi-controller/tls/server.key", // Default TLS key path for production
+			CORSEnabled:  true,
+			AuthEnabled:  true,  // Enable authentication by default for security
+		},
+		GRPC: GRPCConfig{
+			Host:        "0.0.0.0",
+			Port:        9090,
+			TLSCertFile: "/etc/pi-controller/tls/server.crt", // Default TLS cert path for production
+			TLSKeyFile:  "/etc/pi-controller/tls/server.key", // Default TLS key path for production
+		},
+		WebSocket: WebSocketConfig{
+			Host:            "0.0.0.0",
+			Port:            8081,
+			Path:            "/ws",
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			CheckOrigin:     false,
+		},
+		Log: LogConfig{
+			Level:      "info",
+			Format:     "json",
+			Output:     "stdout",
+			MaxSize:    100,
+			MaxBackups: 3,
+			MaxAge:     28,
+			Compress:   true,
+		},
+		Kubernetes: KubernetesConfig{
+			InCluster:      false,
+			Namespace:      "default",
+			ResyncInterval: "30s",
+		},
+		GPIO: GPIOConfig{
+			Enabled:          true,
+			MockMode:         false,
+			SampleInterval:   "1s",
+			RetentionPeriod:  "24h",
+			AllowedPins:      []int{2, 3, 4, 17, 27, 22, 10, 9, 11, 5, 6, 13, 19, 26, 18, 23, 24, 25, 8, 7, 12, 16, 20, 21}, // Safe GPIO pins
+			RestrictedPins:   []int{0, 1, 14, 15}, // System critical pins (I2C, UART)
+			DefaultDirection: "input",
+			DefaultPullMode:  "none",
+		},
+		Discovery: DiscoveryConfig{
+			Enabled:     true,
+			Method:      "mdns",
+			Port:        9091,
+			Interval:    "30s",
+			Timeout:     "5s",
+			ServiceName: "pi-controller",
+			ServiceType: "_pi-controller._tcp",
+		},
+		GRPCClient: GRPCClientConfig{
+			ServerAddress:     "localhost",
+			ServerPort:        9090,
+			ConnectionTimeout: "10s",
+			RequestTimeout:    "30s",
+			MaxMessageSize:    4 * 1024 * 1024, // 4MB
+			MaxRetries:        5,
+			InitialRetryDelay: "1s",
+			MaxRetryDelay:     "60s",
+			RetryMultiplier:   2.0,
+			HeartbeatInterval: "30s",
+			HeartbeatTimeout:  "5s",
+			KeepAliveTime:     "30s",
+			KeepAliveTimeout:  "5s",
+			Insecure:          true,
+			NodeID:            "",
+			NodeName:          "",
+		},
+		AgentServer: AgentServerConfig{
+			Address:    "0.0.0.0",
+			Port:       9091,
+			EnableGPIO: true,
+		},
+	}
+}
+
+// applyEnvOverrides applies environment variable overrides
+func applyEnvOverrides(config *Config) {
+	// Simple environment variable overrides for key settings
+	if env := os.Getenv("PI_CONTROLLER_API_PORT"); env != "" {
+		if port := parseIntEnv(env); port > 0 {
+			config.API.Port = port
+		}
+	}
+	if env := os.Getenv("PI_CONTROLLER_API_HOST"); env != "" {
+		config.API.Host = env
+	}
+	if env := os.Getenv("PI_CONTROLLER_LOG_LEVEL"); env != "" {
+		config.Log.Level = env
+	}
+	if env := os.Getenv("PI_CONTROLLER_DEBUG"); env == "true" {
+		config.App.Debug = true
+	}
+	if env := os.Getenv("PI_CONTROLLER_DATA_DIR"); env != "" {
+		config.App.DataDir = env
+	}
+}
+
+// parseIntEnv safely parses an integer from environment variable
+func parseIntEnv(env string) int {
+	var i int
+	if _, err := fmt.Sscanf(env, "%d", &i); err == nil {
+		return i
+	}
+	return 0
 }
 
 // GetAddress returns the formatted address for a service

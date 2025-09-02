@@ -1,0 +1,11 @@
+# Task ID: 24
+# Title: Implement Kubernetes Controller Reconciliation Loop
+# Status: todo
+# Dependencies: 19, 23
+# Priority: medium
+# Description: Develop the reconciliation loop for the `GPIOPin` CRD that watches for changes and calls the Pi Controller's service to enact hardware changes.
+# Details:
+Using `controller-runtime`, implement the `Reconcile` function. This function will fetch the `GPIOPin` resource, determine the target node, and call the appropriate GPIO service method (which in turn makes a gRPC call) to match the hardware state to the `spec`.
+
+# Test Strategy:
+Write integration tests using `envtest`. Create a `GPIOPin` resource in the test environment and verify that the reconciler calls a mocked version of the GPIO service with the correct parameters.

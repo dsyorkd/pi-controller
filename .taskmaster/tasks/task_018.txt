@@ -1,0 +1,11 @@
+# Task ID: 18
+# Title: Implement Pi Agent System Metrics Collection
+# Status: todo
+# Dependencies: 16
+# Priority: medium
+# Description: Add functionality to the Pi Agent to collect and report system metrics like CPU usage, memory usage, and core temperature.
+# Details:
+Use a library like `gopsutil/gopsutil` to gather system metrics. Expose this data via a new gRPC service endpoint that the controller can poll or stream.
+
+# Test Strategy:
+Run the agent on a Raspberry Pi and call the metrics gRPC endpoint. Compare the returned values with the output of standard Linux commands like `top`, `free`, and `vcgencmd measure_temp` to verify accuracy.

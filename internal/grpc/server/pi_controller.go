@@ -2,31 +2,44 @@ package server
 
 import (
 	"context"
+	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 
-	"github.com/spenceryork/pi-controller/internal/models"
-	"github.com/spenceryork/pi-controller/internal/storage"
-	pb "github.com/spenceryork/pi-controller/proto"
+	"github.com/dsyorkd/pi-controller/internal/api/middleware"
+	"github.com/dsyorkd/pi-controller/internal/models"
+	"github.com/dsyorkd/pi-controller/internal/storage"
+	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 // PiControllerServer implements the gRPC PiControllerService
 type PiControllerServer struct {
 	pb.UnimplementedPiControllerServiceServer
-	database *storage.Database
-	logger   *logrus.Logger
+	database    *storage.Database
+	logger      logger.Interface
+	authManager *middleware.AuthManager
+}
+
+// NewPiControllerServer creates a new gRPC server instance
+func NewPiControllerServer(database *storage.Database, logger logger.Interface, authManager *middleware.AuthManager) *PiControllerServer {
+	return &PiControllerServer{
+		database:    database,
+		logger:      logger.WithField("component", "grpc-server"),
+		authManager: authManager,
+	}
 }
 
 // Health returns the health status of the service
 func (s *PiControllerServer) Health(ctx context.Context, req *pb.HealthRequest) (*pb.HealthResponse, error) {
 	return &pb.HealthResponse{
 		Status:    "ok",
-		Timestamp: timestamppb.New(time.Now()),
+		Timestamp: timestamppb.Now(),
 		Version:   "dev",
 		Uptime:    "unknown", // TODO: Calculate actual uptime
 	}, nil
@@ -109,17 +122,18 @@ func (s *PiControllerServer) CreateNode(ctx context.Context, req *pb.CreateNodeR
 		Name:         req.Name,
 		IPAddress:    req.IpAddress,
 		MACAddress:   req.MacAddress,
-		Role:         s.nodeRoleFromProto(req.Role),
 		Architecture: req.Architecture,
 		Model:        req.Model,
 		SerialNumber: req.SerialNumber,
 		CPUCores:     int(req.CpuCores),
 		Memory:       req.Memory,
 		Status:       models.NodeStatusDiscovered,
+		Role:         models.NodeRoleWorker,
 	}
 
 	if req.ClusterId != nil {
-		node.ClusterID = req.ClusterId
+		clusterID := uint(*req.ClusterId)
+		node.ClusterID = &clusterID
 	}
 
 	result := s.database.DB().Create(&node)
@@ -134,7 +148,7 @@ func (s *PiControllerServer) CreateNode(ctx context.Context, req *pb.CreateNodeR
 // GetNode retrieves a node by ID
 func (s *PiControllerServer) GetNode(ctx context.Context, req *pb.GetNodeRequest) (*pb.Node, error) {
 	var node models.Node
-	result := s.database.DB().Preload("GPIODevices").First(&node, req.Id)
+	result := s.database.DB().First(&node, req.Id)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, status.Error(codes.NotFound, "Node not found")
@@ -148,6 +162,17 @@ func (s *PiControllerServer) GetNode(ctx context.Context, req *pb.GetNodeRequest
 
 // ReadGPIO reads the current value from a GPIO device
 func (s *PiControllerServer) ReadGPIO(ctx context.Context, req *pb.ReadGPIORequest) (*pb.ReadGPIOResponse, error) {
+	// Validate authentication - GPIO read operations require at least viewer role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Require at least viewer role for GPIO read operations
+	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
+		return nil, err
+	}
+
 	var device models.GPIODevice
 	result := s.database.DB().First(&device, req.Id)
 	if result.Error != nil {
@@ -173,8 +198,17 @@ func (s *PiControllerServer) ReadGPIO(ctx context.Context, req *pb.ReadGPIOReque
 	}
 	s.database.DB().Create(&reading)
 
+	// Audit log the GPIO read operation
+	s.logger.WithFields(map[string]interface{}{
+		"event_type": "gpio_read",
+		"user_id":    claims.UserID,
+		"device_id":  device.ID,
+		"pin":        device.PinNumber,
+		"value":      device.Value,
+	}).Info("GPIO read operation performed")
+
 	return &pb.ReadGPIOResponse{
-		DeviceId:  device.ID,
+		DeviceId:  uint32(device.ID),
 		Pin:       int32(device.PinNumber),
 		Value:     float64(device.Value),
 		Timestamp: timestamppb.New(reading.Timestamp),
@@ -183,6 +217,17 @@ func (s *PiControllerServer) ReadGPIO(ctx context.Context, req *pb.ReadGPIOReque
 
 // WriteGPIO writes a value to a GPIO device
 func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIORequest) (*pb.WriteGPIOResponse, error) {
+	// Validate authentication - GPIO write operations require at least operator role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Require at least operator role for GPIO write operations (more privileged than read)
+	if err := s.requireRole(claims, middleware.RoleOperator); err != nil {
+		return nil, err
+	}
+
 	var device models.GPIODevice
 	result := s.database.DB().First(&device, req.Id)
 	if result.Error != nil {
@@ -219,8 +264,17 @@ func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIOReq
 	}
 	s.database.DB().Create(&reading)
 
+	// Audit log the GPIO write operation
+	s.logger.WithFields(map[string]interface{}{
+		"event_type": "gpio_write",
+		"user_id":    claims.UserID,
+		"device_id":  device.ID,
+		"pin":        device.PinNumber,
+		"value":      req.Value,
+	}).Info("GPIO write operation performed")
+
 	return &pb.WriteGPIOResponse{
-		DeviceId:  device.ID,
+		DeviceId:  uint32(device.ID),
 		Pin:       int32(device.PinNumber),
 		Value:     req.Value,
 		Timestamp: timestamppb.New(reading.Timestamp),
@@ -231,14 +285,11 @@ func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIOReq
 
 func (s *PiControllerServer) clusterToProto(cluster *models.Cluster) *pb.Cluster {
 	pbCluster := &pb.Cluster{
-		Id:             cluster.ID,
+		Id:             uint32(cluster.ID),
 		Name:           cluster.Name,
 		Description:    cluster.Description,
-		Status:         s.clusterStatusToProto(cluster.Status),
 		Version:        cluster.Version,
 		MasterEndpoint: cluster.MasterEndpoint,
-		CreatedAt:      timestamppb.New(cluster.CreatedAt),
-		UpdatedAt:      timestamppb.New(cluster.UpdatedAt),
 	}
 
 	// Convert nodes if loaded
@@ -254,186 +305,82 @@ func (s *PiControllerServer) clusterToProto(cluster *models.Cluster) *pb.Cluster
 
 func (s *PiControllerServer) nodeToProto(node *models.Node) *pb.Node {
 	pbNode := &pb.Node{
-		Id:            node.ID,
-		Name:          node.Name,
-		IpAddress:     node.IPAddress,
-		MacAddress:    node.MACAddress,
-		Status:        s.nodeStatusToProto(node.Status),
-		Role:          s.nodeRoleToProto(node.Role),
-		Architecture:  node.Architecture,
-		Model:         node.Model,
-		SerialNumber:  node.SerialNumber,
-		CpuCores:      int32(node.CPUCores),
-		Memory:        node.Memory,
-		KubeVersion:   node.KubeVersion,
-		NodeName:      node.NodeName,
-		OsVersion:     node.OSVersion,
-		KernelVersion: node.KernelVersion,
-		LastSeen:      timestamppb.New(node.LastSeen),
-		CreatedAt:     timestamppb.New(node.CreatedAt),
-		UpdatedAt:     timestamppb.New(node.UpdatedAt),
-	}
-
-	if node.ClusterID != nil {
-		pbNode.ClusterId = node.ClusterID
-	}
-
-	// Convert GPIO devices if loaded
-	if node.GPIODevices != nil {
-		pbNode.GpioDevices = make([]*pb.GPIODevice, len(node.GPIODevices))
-		for i, device := range node.GPIODevices {
-			pbNode.GpioDevices[i] = s.gpioDeviceToProto(&device)
-		}
+		Id:         uint32(node.ID),
+		Name:       node.Name,
+		IpAddress:  node.IPAddress,
+		MacAddress: node.MACAddress,
 	}
 
 	return pbNode
 }
 
-func (s *PiControllerServer) gpioDeviceToProto(device *models.GPIODevice) *pb.GPIODevice {
-	return &pb.GPIODevice{
-		Id:          device.ID,
-		Name:        device.Name,
-		Description: device.Description,
-		PinNumber:   int32(device.PinNumber),
-		Direction:   s.gpioDirectionToProto(device.Direction),
-		PullMode:    s.gpioPullModeToProto(device.PullMode),
-		Value:       int32(device.Value),
-		DeviceType:  s.gpioDeviceTypeToProto(device.DeviceType),
-		Status:      s.gpioStatusToProto(device.Status),
-		NodeId:      device.NodeID,
-		Config:      s.gpioConfigToProto(&device.Config),
-		CreatedAt:   timestamppb.New(device.CreatedAt),
-		UpdatedAt:   timestamppb.New(device.UpdatedAt),
+// validateAuthentication validates the authentication token from gRPC metadata
+func (s *PiControllerServer) validateAuthentication(ctx context.Context) (*middleware.JWTClaims, error) {
+	// Skip authentication if auth manager is not configured
+	if s.authManager == nil {
+		s.logger.Warn("Authentication manager not configured for gRPC server")
+		return nil, status.Error(codes.Unauthenticated, "Authentication not configured")
 	}
+
+	// Extract metadata from context
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "Missing metadata")
+	}
+
+	// Get authorization header
+	authHeaders := md.Get("authorization")
+	if len(authHeaders) == 0 {
+		return nil, status.Error(codes.Unauthenticated, "Missing authorization header")
+	}
+
+	authHeader := authHeaders[0]
+	if authHeader == "" {
+		return nil, status.Error(codes.Unauthenticated, "Empty authorization header")
+	}
+
+	// Validate Bearer token format
+	const bearerPrefix = "Bearer "
+	if !strings.HasPrefix(authHeader, bearerPrefix) {
+		return nil, status.Error(codes.Unauthenticated, "Invalid authorization header format")
+	}
+
+	// Extract token
+	tokenString := strings.TrimPrefix(authHeader, bearerPrefix)
+	if tokenString == "" {
+		return nil, status.Error(codes.Unauthenticated, "Empty token")
+	}
+
+	// Validate token
+	claims, err := s.authManager.ValidateToken(tokenString)
+	if err != nil {
+		s.logger.WithError(err).Warn("Token validation failed in gRPC server")
+		return nil, status.Error(codes.Unauthenticated, "Invalid or expired token")
+	}
+
+	return claims, nil
 }
 
-func (s *PiControllerServer) gpioConfigToProto(config *models.GPIOConfig) *pb.GPIOConfig {
-	return &pb.GPIOConfig{
-		Frequency:   int32(config.Frequency),
-		DutyCycle:   int32(config.DutyCycle),
-		SpiMode:     int32(config.SPIMode),
-		SpiBits:     int32(config.SPIBits),
-		SpiSpeed:    int32(config.SPISpeed),
-		SpiChannel:  int32(config.SPIChannel),
-		I2CAddress:  int32(config.I2CAddress),
-		I2CBus:      int32(config.I2CBus),
-		SampleRate:  int32(config.SampleRate),
+// requireRole checks if the authenticated user has the required role
+func (s *PiControllerServer) requireRole(claims *middleware.JWTClaims, requiredRole string) error {
+	if claims == nil {
+		return status.Error(codes.Unauthenticated, "Authentication required")
 	}
-}
 
-// Status conversion helpers
-func (s *PiControllerServer) clusterStatusToProto(status models.ClusterStatus) pb.ClusterStatus {
-	switch status {
-	case models.ClusterStatusPending:
-		return pb.ClusterStatus_CLUSTER_STATUS_PENDING
-	case models.ClusterStatusProvisioning:
-		return pb.ClusterStatus_CLUSTER_STATUS_PROVISIONING
-	case models.ClusterStatusActive:
-		return pb.ClusterStatus_CLUSTER_STATUS_ACTIVE
-	case models.ClusterStatusDegraded:
-		return pb.ClusterStatus_CLUSTER_STATUS_DEGRADED
-	case models.ClusterStatusMaintenance:
-		return pb.ClusterStatus_CLUSTER_STATUS_MAINTENANCE
-	case models.ClusterStatusFailed:
-		return pb.ClusterStatus_CLUSTER_STATUS_FAILED
-	default:
-		return pb.ClusterStatus_CLUSTER_STATUS_UNSPECIFIED
+	// Admin role can access everything
+	if claims.Role == middleware.RoleAdmin {
+		return nil
 	}
-}
 
-func (s *PiControllerServer) nodeStatusToProto(status models.NodeStatus) pb.NodeStatus {
-	switch status {
-	case models.NodeStatusDiscovered:
-		return pb.NodeStatus_NODE_STATUS_DISCOVERED
-	case models.NodeStatusProvisioning:
-		return pb.NodeStatus_NODE_STATUS_PROVISIONING
-	case models.NodeStatusReady:
-		return pb.NodeStatus_NODE_STATUS_READY
-	case models.NodeStatusNotReady:
-		return pb.NodeStatus_NODE_STATUS_NOT_READY
-	case models.NodeStatusMaintenance:
-		return pb.NodeStatus_NODE_STATUS_MAINTENANCE
-	case models.NodeStatusFailed:
-		return pb.NodeStatus_NODE_STATUS_FAILED
-	case models.NodeStatusUnknown:
-		return pb.NodeStatus_NODE_STATUS_UNKNOWN
-	default:
-		return pb.NodeStatus_NODE_STATUS_UNSPECIFIED
+	// Operator role can access operator and viewer endpoints
+	if claims.Role == middleware.RoleOperator && (requiredRole == middleware.RoleOperator || requiredRole == middleware.RoleViewer) {
+		return nil
 	}
-}
 
-func (s *PiControllerServer) nodeRoleToProto(role models.NodeRole) pb.NodeRole {
-	switch role {
-	case models.NodeRoleMaster:
-		return pb.NodeRole_NODE_ROLE_MASTER
-	case models.NodeRoleWorker:
-		return pb.NodeRole_NODE_ROLE_WORKER
-	default:
-		return pb.NodeRole_NODE_ROLE_UNSPECIFIED
+	// Viewer role can only access viewer endpoints
+	if claims.Role == middleware.RoleViewer && requiredRole == middleware.RoleViewer {
+		return nil
 	}
-}
 
-func (s *PiControllerServer) nodeRoleFromProto(role pb.NodeRole) models.NodeRole {
-	switch role {
-	case pb.NodeRole_NODE_ROLE_MASTER:
-		return models.NodeRoleMaster
-	case pb.NodeRole_NODE_ROLE_WORKER:
-		return models.NodeRoleWorker
-	default:
-		return models.NodeRoleWorker
-	}
-}
-
-func (s *PiControllerServer) gpioDirectionToProto(direction models.GPIODirection) pb.GPIODirection {
-	switch direction {
-	case models.GPIODirectionInput:
-		return pb.GPIODirection_GPIO_DIRECTION_INPUT
-	case models.GPIODirectionOutput:
-		return pb.GPIODirection_GPIO_DIRECTION_OUTPUT
-	default:
-		return pb.GPIODirection_GPIO_DIRECTION_UNSPECIFIED
-	}
-}
-
-func (s *PiControllerServer) gpioPullModeToProto(pullMode models.GPIOPullMode) pb.GPIOPullMode {
-	switch pullMode {
-	case models.GPIOPullNone:
-		return pb.GPIOPullMode_GPIO_PULL_MODE_NONE
-	case models.GPIOPullUp:
-		return pb.GPIOPullMode_GPIO_PULL_MODE_UP
-	case models.GPIOPullDown:
-		return pb.GPIOPullMode_GPIO_PULL_MODE_DOWN
-	default:
-		return pb.GPIOPullMode_GPIO_PULL_MODE_UNSPECIFIED
-	}
-}
-
-func (s *PiControllerServer) gpioDeviceTypeToProto(deviceType models.GPIODeviceType) pb.GPIODeviceType {
-	switch deviceType {
-	case models.GPIODeviceTypeDigital:
-		return pb.GPIODeviceType_GPIO_DEVICE_TYPE_DIGITAL
-	case models.GPIODeviceTypeAnalog:
-		return pb.GPIODeviceType_GPIO_DEVICE_TYPE_ANALOG
-	case models.GPIODeviceTypePWM:
-		return pb.GPIODeviceType_GPIO_DEVICE_TYPE_PWM
-	case models.GPIODeviceTypeSPI:
-		return pb.GPIODeviceType_GPIO_DEVICE_TYPE_SPI
-	case models.GPIODeviceTypeI2C:
-		return pb.GPIODeviceType_GPIO_DEVICE_TYPE_I2C
-	default:
-		return pb.GPIODeviceType_GPIO_DEVICE_TYPE_UNSPECIFIED
-	}
-}
-
-func (s *PiControllerServer) gpioStatusToProto(status models.GPIOStatus) pb.GPIOStatus {
-	switch status {
-	case models.GPIOStatusActive:
-		return pb.GPIOStatus_GPIO_STATUS_ACTIVE
-	case models.GPIOStatusInactive:
-		return pb.GPIOStatus_GPIO_STATUS_INACTIVE
-	case models.GPIOStatusError:
-		return pb.GPIOStatus_GPIO_STATUS_ERROR
-	default:
-		return pb.GPIOStatus_GPIO_STATUS_UNSPECIFIED
-	}
+	return status.Error(codes.PermissionDenied, "Insufficient permissions")
 }

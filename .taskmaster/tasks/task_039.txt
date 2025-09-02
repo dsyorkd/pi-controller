@@ -1,0 +1,43 @@
+# Task ID: 39
+# Title: Write Unit Tests for `internal/websocket` Logic
+# Status: todo
+# Dependencies: 36
+# Priority: medium
+# Description: Create unit tests for the WebSocket server logic in the `internal/websocket` package, covering connection handling and message passing.
+# Details:
+Mock the underlying network connection to test the WebSocket upgrade process and message framing logic. Mock any backend services that the WebSocket hub interacts with to ensure the message broadcasting and client management logic is correct.
+
+# Test Strategy:
+Unit tests for WebSocket communication logic. Network connections and backend services will be mocked to test the hub and client management in isolation.
+
+# Subtasks:
+## 1. Create Unit Tests for Hub Client Management [pending]
+### Dependencies: None
+### Description: Write unit tests for the `Hub` struct in `internal/websocket/hub.go`. The tests should focus on the client registration, unregistration, and the main `Run` loop logic without involving actual network connections.
+### Details:
+In a new file `internal/websocket/hub_test.go`, create test cases for the `Hub`. Use channels to simulate clients connecting and disconnecting. Verify that the `clients` map inside the hub is correctly updated when clients are sent to the `register` and `unregister` channels. Ensure the `Run()` method correctly processes these channels.
+
+## 2. Implement Unit Test for `ServeWS` HTTP Upgrade [pending]
+### Dependencies: None
+### Description: Write a unit test for the `ServeWS` handler in `internal/websocket/server.go` to ensure it correctly handles the HTTP to WebSocket upgrade process.
+### Details:
+In a new file `internal/websocket/server_test.go`, use the `net/http/httptest` package to create a test server. Use a WebSocket client library (like `gorilla/websocket`) to attempt a connection to the test server's URL. Verify that the connection is successfully upgraded. Test edge cases, such as non-GET requests, which should fail.
+
+## 3. Write Unit Tests for the Client's `writePump` [pending]
+### Dependencies: None
+### Description: Create unit tests for the `writePump` method of the `Client` struct in `internal/websocket/client.go`. This test will verify that messages sent to the client's `send` channel are correctly written to the WebSocket connection.
+### Details:
+In a new file `internal/websocket/client_test.go`, create a mock `websocket.Conn` using an interface and a mock struct. The mock should allow you to assert that its `WriteMessage` method is called. Instantiate a `Client` with this mock connection. Run `writePump` in a goroutine, send a message to the client's `send` channel, and verify the mock's `WriteMessage` was called with the expected data.
+
+## 4. Write Unit Tests for the Client's `readPump` [pending]
+### Dependencies: None
+### Description: Create unit tests for the `readPump` method of the `Client` struct in `internal/websocket/client.go`. This test will verify that messages read from the connection are forwarded to the hub and that connection closure is handled correctly.
+### Details:
+In `internal/websocket/client_test.go`, use a mock `websocket.Conn` that can be configured to return specific messages or errors from its `ReadMessage` method. Instantiate a `Client` with the mock connection and a real `Hub`. Simulate receiving a message and assert that it is passed to the hub's `broadcast` channel. Also, test the case where `ReadMessage` returns an error, and verify the client is passed to the hub's `unregister` channel.
+
+## 5. Implement Unit Test for Hub Message Broadcasting [pending]
+### Dependencies: 39.1
+### Description: Write a unit test for the `Hub` in `internal/websocket/hub.go` to verify its message broadcasting functionality. Ensure that a message sent to the `broadcast` channel is delivered to all registered clients.
+### Details:
+In `internal/websocket/hub_test.go`, create a `Hub` and run it. Create several mock clients, each with its own `send` channel. Register these clients with the hub. Send a message to the hub's `broadcast` channel. Assert that each registered client's `send` channel receives the message. Also, test that a client that has been unregistered does not receive the message.
+

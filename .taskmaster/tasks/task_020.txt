@@ -1,0 +1,11 @@
+# Task ID: 20
+# Title: Implement GPIO Pin Reservation and Conflict Resolution
+# Status: todo
+# Dependencies: 19
+# Priority: high
+# Description: Develop a mechanism within the controller to reserve GPIO pins for specific tasks and prevent conflicting configurations.
+# Details:
+Add a 'reserved_by' field to the GPIO model in the database. When a request to use a pin is made, the service layer must check if it's already reserved. Implement logic to handle and report conflicts.
+
+# Test Strategy:
+Write service-level unit tests. Test scenarios where two clients attempt to reserve the same pin, attempt to use a reserved pin, and successfully release a pin.

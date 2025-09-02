@@ -1,0 +1,11 @@
+# Task ID: 32
+# Title: Implement GPIO Control Panel with WebSocket Updates
+# Status: todo
+# Dependencies: 19, 31
+# Priority: medium
+# Description: Create a UI component for controlling a node's GPIO pins and displaying their real-time status using WebSockets.
+# Details:
+Develop a visual representation of the GPIO header. Implement API calls to set pin modes and states. Establish a WebSocket connection to the controller to receive real-time updates on pin state changes and display them in the UI.
+
+# Test Strategy:
+In component tests, mock the WebSocket server to send state change messages and verify that the UI updates accordingly. Manually test against a live controller and a real Raspberry Pi to confirm end-to-end functionality.

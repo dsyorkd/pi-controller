@@ -1,0 +1,11 @@
+# Task ID: 21
+# Title: Implement mDNS Discovery Service
+# Status: todo
+# Dependencies: 13
+# Priority: high
+# Description: Implement a real mDNS discovery service for both the controller and agents to enable automatic discovery on the local network.
+# Details:
+Use the `hashicorp/mdns` library. The controller will listen for mDNS announcements for a specific service type (e.g., `_pi-controller-agent._tcp`). The agents will broadcast their presence and gRPC server address using this service type.
+
+# Test Strategy:
+Run the controller and multiple agents on the same local network. Verify that the controller's logs show the discovery of each agent. Check that the discovered nodes are added to the controller's database.

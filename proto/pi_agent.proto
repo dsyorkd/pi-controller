@@ -1,0 +1,251 @@
+syntax = "proto3";
+
+package pi_agent;
+
+option go_package = "github.com/dsyorkd/pi-controller/proto";
+
+import "google/protobuf/timestamp.proto";
+
+// PiAgentService provides gRPC API for direct hardware control on Pi nodes
+service PiAgentService {
+  // GPIO operations
+  rpc ConfigureGPIOPin(ConfigureGPIOPinRequest) returns (ConfigureGPIOPinResponse);
+  rpc ReadGPIOPin(ReadGPIOPinRequest) returns (ReadGPIOPinResponse);
+  rpc WriteGPIOPin(WriteGPIOPinRequest) returns (WriteGPIOPinResponse);
+  rpc SetGPIOPWM(SetGPIOPWMRequest) returns (SetGPIOPWMResponse);
+  rpc ListConfiguredPins(ListConfiguredPinsRequest) returns (ListConfiguredPinsResponse);
+  
+  // Health and status
+  rpc AgentHealth(AgentHealthRequest) returns (AgentHealthResponse);
+  rpc GetSystemInfo(GetSystemInfoRequest) returns (GetSystemInfoResponse);
+  
+  // System metrics
+  rpc GetSystemMetrics(GetSystemMetricsRequest) returns (GetSystemMetricsResponse);
+  rpc StreamSystemMetrics(StreamSystemMetricsRequest) returns (stream SystemMetricsResponse);
+}
+
+// GPIO pin configuration request
+message ConfigureGPIOPinRequest {
+  int32 pin = 1;
+  AgentGPIODirection direction = 2;
+  AgentGPIOPullMode pull_mode = 3;
+  // PWM configuration (optional)
+  int32 pwm_frequency = 4;
+  int32 pwm_duty_cycle = 5;
+}
+
+message ConfigureGPIOPinResponse {
+  bool success = 1;
+  string message = 2;
+  google.protobuf.Timestamp configured_at = 3;
+}
+
+// Read GPIO pin request
+message ReadGPIOPinRequest {
+  int32 pin = 1;
+}
+
+message ReadGPIOPinResponse {
+  int32 pin = 1;
+  int32 value = 2; // 0 for LOW, 1 for HIGH
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// Write GPIO pin request
+message WriteGPIOPinRequest {
+  int32 pin = 1;
+  int32 value = 2; // 0 for LOW, 1 for HIGH
+}
+
+message WriteGPIOPinResponse {
+  int32 pin = 1;
+  int32 value = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// PWM configuration request
+message SetGPIOPWMRequest {
+  int32 pin = 1;
+  int32 frequency = 2; // Hz
+  int32 duty_cycle = 3; // 0-100%
+}
+
+message SetGPIOPWMResponse {
+  bool success = 1;
+  string message = 2;
+  int32 pin = 3;
+  int32 frequency = 4;
+  int32 duty_cycle = 5;
+  google.protobuf.Timestamp configured_at = 6;
+}
+
+// List configured pins request
+message ListConfiguredPinsRequest {}
+
+message ListConfiguredPinsResponse {
+  repeated GPIOPinState pins = 1;
+}
+
+// GPIO pin state
+message GPIOPinState {
+  int32 pin = 1;
+  AgentGPIODirection direction = 2;
+  AgentGPIOPullMode pull_mode = 3;
+  int32 value = 4;
+  google.protobuf.Timestamp last_updated = 5;
+}
+
+// GPIO enums for Pi Agent
+enum AgentGPIODirection {
+  AGENT_GPIO_DIRECTION_UNSPECIFIED = 0;
+  AGENT_GPIO_DIRECTION_INPUT = 1;
+  AGENT_GPIO_DIRECTION_OUTPUT = 2;
+}
+
+enum AgentGPIOPullMode {
+  AGENT_GPIO_PULL_MODE_UNSPECIFIED = 0;
+  AGENT_GPIO_PULL_MODE_NONE = 1;
+  AGENT_GPIO_PULL_MODE_UP = 2;
+  AGENT_GPIO_PULL_MODE_DOWN = 3;
+}
+
+// Health and system info
+message AgentHealthRequest {}
+
+message AgentHealthResponse {
+  string status = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string version = 3;
+  string uptime = 4;
+  bool gpio_available = 5;
+}
+
+message GetSystemInfoRequest {}
+
+message GetSystemInfoResponse {
+  string hostname = 1;
+  string platform = 2;
+  string architecture = 3;
+  int32 cpu_cores = 4;
+  int64 memory_total = 5;
+  int64 memory_available = 6;
+  string kernel_version = 7;
+  float load_average_1m = 8;
+  float load_average_5m = 9;
+  float load_average_15m = 10;
+  google.protobuf.Timestamp timestamp = 11;
+}
+
+// System metrics requests and responses
+message GetSystemMetricsRequest {}
+
+message GetSystemMetricsResponse {
+  SystemMetrics metrics = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message StreamSystemMetricsRequest {
+  int32 interval_seconds = 1; // Collection interval in seconds (default: 5)
+}
+
+message SystemMetricsResponse {
+  SystemMetrics metrics = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+// System metrics data structure
+message SystemMetrics {
+  // CPU metrics
+  CPUMetrics cpu = 1;
+  
+  // Memory metrics
+  MemoryMetrics memory = 2;
+  
+  // Disk metrics
+  repeated DiskMetrics disks = 3;
+  
+  // Network metrics
+  repeated NetworkMetrics network = 4;
+  
+  // Thermal metrics (especially important for Raspberry Pi)
+  ThermalMetrics thermal = 5;
+  
+  // System load
+  LoadMetrics load = 6;
+  
+  // Process metrics
+  ProcessMetrics processes = 7;
+}
+
+message CPUMetrics {
+  double usage_percent = 1;           // Overall CPU usage percentage
+  repeated double per_core_usage = 2; // Usage per CPU core
+  double user_percent = 3;            // User space CPU usage
+  double system_percent = 4;          // System/kernel CPU usage
+  double idle_percent = 5;            // Idle CPU percentage
+  double iowait_percent = 6;          // I/O wait percentage
+}
+
+message MemoryMetrics {
+  uint64 total_bytes = 1;        // Total system memory
+  uint64 available_bytes = 2;    // Available memory
+  uint64 used_bytes = 3;         // Used memory
+  uint64 free_bytes = 4;         // Free memory
+  uint64 cached_bytes = 5;       // Cached memory
+  uint64 buffers_bytes = 6;      // Buffer cache
+  double usage_percent = 7;      // Memory usage percentage
+  uint64 swap_total_bytes = 8;   // Total swap space
+  uint64 swap_used_bytes = 9;    // Used swap space
+  double swap_usage_percent = 10; // Swap usage percentage
+}
+
+message DiskMetrics {
+  string device = 1;             // Device name (e.g., /dev/sda1)
+  string mountpoint = 2;         // Mount point (e.g., /)
+  string filesystem = 3;         // Filesystem type (e.g., ext4)
+  uint64 total_bytes = 4;        // Total disk space
+  uint64 used_bytes = 5;         // Used disk space
+  uint64 free_bytes = 6;         // Free disk space
+  double usage_percent = 7;      // Disk usage percentage
+  uint64 inodes_total = 8;       // Total inodes
+  uint64 inodes_used = 9;        // Used inodes
+  uint64 inodes_free = 10;       // Free inodes
+  double inodes_usage_percent = 11; // Inode usage percentage
+}
+
+message NetworkMetrics {
+  string interface = 1;          // Network interface name
+  uint64 bytes_sent = 2;         // Total bytes sent
+  uint64 bytes_recv = 3;         // Total bytes received
+  uint64 packets_sent = 4;       // Total packets sent
+  uint64 packets_recv = 5;       // Total packets received
+  uint64 err_in = 6;            // Input errors
+  uint64 err_out = 7;           // Output errors
+  uint64 drop_in = 8;           // Input drops
+  uint64 drop_out = 9;          // Output drops
+}
+
+message ThermalMetrics {
+  repeated ThermalZone zones = 1; // Thermal zones (CPU, GPU, etc.)
+}
+
+message ThermalZone {
+  string name = 1;               // Zone name (e.g., cpu-thermal)
+  double temperature_celsius = 2; // Current temperature in Celsius
+  double critical_temp = 3;      // Critical temperature threshold
+  string status = 4;             // Thermal zone status
+}
+
+message LoadMetrics {
+  double load1 = 1;              // 1-minute load average
+  double load5 = 2;              // 5-minute load average
+  double load15 = 3;             // 15-minute load average
+}
+
+message ProcessMetrics {
+  uint32 total = 1;              // Total number of processes
+  uint32 running = 2;            // Number of running processes
+  uint32 sleeping = 3;           // Number of sleeping processes
+  uint32 stopped = 4;            // Number of stopped processes
+  uint32 zombie = 5;             // Number of zombie processes
+}

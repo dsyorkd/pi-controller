@@ -1,0 +1,43 @@
+# Task ID: 42
+# Title: Integrate Test Execution and Coverage Reporting into CI/CD
+# Status: todo
+# Dependencies: 1, 2, 3, 36, 37, 38, 39, 40, 41
+# Priority: high
+# Description: Update the existing CI/CD pipeline to run the entire unit test suite on every commit and to generate a code coverage report.
+# Details:
+Add a step in the CI configuration (e.g., GitHub Actions workflow) to execute `go test -v -race -coverprofile=coverage.out ./...`. Add another step to upload the `coverage.out` file to a code coverage service like Codecov or Coveralls.
+
+# Test Strategy:
+CI/CD pipeline configuration. This task validates that all tests are passing and provides visibility into test coverage metrics.
+
+# Subtasks:
+## 1. Create a new 'test' job in the GitHub Actions workflow [pending]
+### Dependencies: None
+### Description: In the `.github/workflows/ci.yml` file, create a new job named `test`. This job should run on `ubuntu-latest`, check out the code, and set up the correct Go version, similar to the existing `build` job.
+### Details:
+Modify `.github/workflows/ci.yml`. Add a new job `test:` alongside the existing `build:` job. It should include the `actions/checkout@v3` and `actions/setup-go@v4` steps. Ensure it's triggered on the same `push` and `pull_request` events.
+
+## 2. Add a step to run Go tests and generate a coverage profile [pending]
+### Dependencies: 42.1
+### Description: Within the new `test` job in `.github/workflows/ci.yml`, add a step that executes the full test suite and generates a code coverage report file.
+### Details:
+Add a `run` step with the command `go test -v -race -coverprofile=coverage.out ./...`. This command will run all tests, check for race conditions, and output the coverage data to a file named `coverage.out`.
+
+## 3. Integrate the Codecov GitHub Action for report uploading [pending]
+### Dependencies: 42.2
+### Description: Add a new step to the `test` job that uses the official Codecov action to upload the generated coverage report.
+### Details:
+After the test execution step, add a new step using `uses: codecov/codecov-action@v3`. This action will handle the process of finding and uploading the coverage report to Codecov.
+
+## 4. Configure the Codecov action to specify the coverage file [pending]
+### Dependencies: 42.3
+### Description: Explicitly configure the Codecov action to use the `coverage.out` file generated in the previous step.
+### Details:
+In the `codecov/codecov-action@v3` step within `.github/workflows/ci.yml`, add a `with` block to specify the coverage file. Use `with: files: ./coverage.out` to ensure the action knows exactly which file to upload.
+
+## 5. Update workflow to make the 'build' job a dependency for the 'test' job [pending]
+### Dependencies: 42.1
+### Description: Modify the `test` job to ensure it only runs after the `build` job has completed successfully. This creates a logical dependency chain in the CI pipeline.
+### Details:
+In the definition of the `test` job in `.github/workflows/ci.yml`, add the `needs: build` key. This will prevent tests from running if the build fails, saving CI resources and providing clearer failure signals.
+

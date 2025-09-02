@@ -1,0 +1,11 @@
+# Task ID: 30
+# Title: Set Up React/TypeScript Project for Web UI
+# Status: todo
+# Dependencies: None
+# Priority: medium
+# Description: Initialize a new frontend project using React and TypeScript for the management dashboard.
+# Details:
+Use `create-react-app` with the TypeScript template or Vite. Set up basic project structure with components, services, and state management (e.g., Zustand or Redux Toolkit). Configure ESLint and Prettier for code quality.
+
+# Test Strategy:
+Run the development server and confirm the default application page loads correctly. Create a simple 'Hello World' component and a unit test for it using Jest and React Testing Library to verify the test setup.

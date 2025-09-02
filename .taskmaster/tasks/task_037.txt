@@ -1,0 +1,43 @@
+# Task ID: 37
+# Title: Write Unit Tests for `internal/api/handlers`
+# Status: todo
+# Dependencies: 36
+# Priority: medium
+# Description: Create unit tests for all HTTP handlers in the `internal/api/handlers` package to ensure they correctly process requests and generate appropriate responses.
+# Details:
+Use the `net/http/httptest` package to create mock HTTP requests and response recorders. Mock the service layer dependencies to test the handler logic, such as request parsing, validation, and response formatting.
+
+# Test Strategy:
+Unit tests for HTTP handlers using `httptest`. The underlying services will be mocked to focus solely on the handler's responsibility.
+
+# Subtasks:
+## 1. Create Mocks for Service Layer Dependencies [pending]
+### Dependencies: None
+### Description: Implement mock objects for the service interfaces found in the `internal/services` package (e.g., `DeploymentService`, `PodService`, `K8sService`). Use the `testify/mock` library to generate these mocks. This foundational step is required to test the handlers in isolation.
+### Details:
+Create a new package, `internal/services/mocks`, or a local `mocks_test.go` file. Define mock structs that embed `mock.Mock` and implement the service interfaces. For example, for `DeploymentService`, create a `MockDeploymentService` with methods like `GetDeployments` and `CreateDeployment` that can be configured to return specific values or errors for testing.
+
+## 2. Write Unit Tests for Health Check Handler [pending]
+### Dependencies: None
+### Description: Create a test file `internal/api/handlers/health_test.go` to test the `GetHealth` handler. This is the simplest handler and will serve to establish the basic testing pattern using `net/http/httptest` and a test Gin engine.
+### Details:
+In `health_test.go`, create a test function. Inside, set up a Gin test router, register the `GetHealth` handler to a route (e.g., `/health`). Create a new `http.Request` using `httptest.NewRequest` and a `httptest.NewRecorder`. Serve the HTTP request and assert that the response status code is `http.StatusOK` and the JSON body is `{"status": "ok"}`.
+
+## 3. Write Unit Tests for Deployment Handlers [pending]
+### Dependencies: 37.1
+### Description: In `internal/api/handlers/deployment_test.go`, write comprehensive unit tests for all deployment-related handlers, such as `GetDeployments` and `CreateDeployment`. Use the mock `DeploymentService` to simulate various backend scenarios.
+### Details:
+Instantiate the `DeploymentHandler` with the `MockDeploymentService`. For `GetDeployments`, test the success case where the mock returns a list of deployments and the error case where it returns an error. For `CreateDeployment`, test valid and invalid JSON input, as well as success and error responses from the mock service. Assert status codes and JSON response bodies for all cases.
+
+## 4. Write Unit Tests for Pod Handlers [pending]
+### Dependencies: 37.1
+### Description: Create `internal/api/handlers/pod_test.go` and implement unit tests for pod-related handlers like `GetPods` and `GetPodLogs`. Utilize the mock `PodService` to test different outcomes.
+### Details:
+Instantiate the `PodHandler` with the mock `PodService`. Test the `GetPods` handler by simulating successful data retrieval and error conditions from the service. For `GetPodLogs`, ensure the handler correctly extracts path parameters (e.g., namespace, pod name) and passes them to the mock service. Validate the HTTP responses accordingly.
+
+## 5. Write Unit Tests for Kubernetes Service Handlers [pending]
+### Dependencies: 37.1
+### Description: In `internal/api/handlers/service_test.go`, write unit tests for handlers that manage Kubernetes Services, such as `GetServices`. Use the mock `K8sService` to simulate interactions with the backend.
+### Details:
+Instantiate the `ServiceHandler` with the mock `K8sService`. Write test cases for `GetServices` that cover both successful retrieval of a list of services and scenarios where the service layer returns an error. Verify that the handler returns the correct HTTP status code and a properly formatted JSON response in each case.
+

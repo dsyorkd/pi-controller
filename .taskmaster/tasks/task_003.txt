@@ -1,0 +1,43 @@
+# Task ID: 3
+# Title: Write Unit Tests for `pkg/k8s` Kubernetes Client Logic
+# Status: done
+# Dependencies: None
+# Priority: medium
+# Description: Develop unit tests for the Kubernetes client logic in the `pkg/k8s` package. The tests should cover interactions with the Kubernetes API for managing resources.
+# Details:
+Utilize the `k8s.io/client-go/kubernetes/fake` client to simulate the Kubernetes API. This avoids the need for a running Kubernetes cluster. Tests should verify resource creation, retrieval, updates, and deletion logic.
+
+# Test Strategy:
+Unit testing using the official fake Kubernetes client. This allows for testing API interactions without external dependencies.
+
+# Subtasks:
+## 1. Set Up Test Suite for `pkg/k8s` and Initialize Fake Client [done]
+### Dependencies: None
+### Description: Create the `pkg/k8s/client_test.go` file. Implement the basic test suite structure and a helper function to initialize the `k8s.Client` with a `fake.NewSimpleClientset` for use in subsequent tests.
+### Details:
+This initial setup will ensure a consistent and clean testing environment for all other test cases. The fake client can be pre-populated with initial Kubernetes objects if needed for specific tests. The file should be in the `pkg/k8s` package.
+
+## 2. Write Unit Test for Resource Creation Logic [done]
+### Dependencies: 3.1
+### Description: Develop a test case for a resource creation function (e.g., `CreateDeployment`). The test should use the fake clientset to create a new resource and then verify that the resource was created successfully by retrieving it and checking its properties.
+### Details:
+Using the setup from the first subtask, define a sample Kubernetes resource (like an `appsv1.Deployment`). Call the corresponding create function in the client and assert that no error is returned. Use the fake client's `Get` action to verify the object exists in the fake API server.
+
+## 3. Write Unit Tests for Resource Retrieval Logic [done]
+### Dependencies: 3.1
+### Description: Create test cases for resource retrieval functions (e.g., `GetDeployment`). Tests should cover both successful retrieval of a pre-existing resource and the expected error when trying to retrieve a non-existent resource.
+### Details:
+For the success case, pre-populate the fake client with a resource and call the `Get...` function, asserting the correct object is returned. For the failure case, use an empty fake client, call the `Get...` function, and assert that an `errors.IsNotFound` error is returned.
+
+## 4. Write Unit Test for Resource Update Logic [done]
+### Dependencies: 3.1
+### Description: Write a test for a resource update function (e.g., `UpdateDeployment`). The test should first create a resource, then update one of its properties, call the update function, and finally verify that the retrieved resource reflects the changes.
+### Details:
+Initialize the fake client with an existing resource. Modify a field in the local copy of the object (e.g., a label or a container image). Call the update function and then use the fake client's `Get` action to confirm the update was persisted correctly.
+
+## 5. Write Unit Test for Resource Deletion Logic [done]
+### Dependencies: 3.1
+### Description: Develop a test case for a resource deletion function (e.g., `DeleteDeployment`). The test should ensure that after calling the delete function, the specified resource is no longer retrievable from the fake Kubernetes API.
+### Details:
+Pre-populate the fake client with a resource. Call the delete function for that resource. Attempt to `Get` the same resource and assert that an `errors.IsNotFound` error is returned, confirming its successful deletion.
+

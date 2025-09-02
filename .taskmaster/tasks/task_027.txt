@@ -1,0 +1,11 @@
+# Task ID: 27
+# Title: Develop K3s Provisioning Scripts and Logic
+# Status: todo
+# Dependencies: 26
+# Priority: medium
+# Description: Create the logic and scripts required to install K3s on a target node and have it join a cluster.
+# Details:
+The provisioner service will use the SSH client to connect to a node. It will execute commands to download and run the official K3s installation script (`curl -sfL https://get.k3s.io | sh -`). It will manage join tokens for adding new nodes to an existing cluster.
+
+# Test Strategy:
+Test against a set of virtual machines (e.g., using Vagrant or cloud VMs). Run the provisioning process and verify that a multi-node K3s cluster is successfully created and all nodes are in a 'Ready' state.

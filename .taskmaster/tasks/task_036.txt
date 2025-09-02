@@ -1,0 +1,43 @@
+# Task ID: 36
+# Title: Implement Comprehensive Unit Tests for `internal/services`
+# Status: in-progress
+# Dependencies: 2, 3
+# Priority: high
+# Description: Write thorough unit tests for the core business logic contained within the `internal/services` package. This is a critical package that orchestrates other components.
+# Details:
+Inject mocks for all external dependencies, such as the storage layer and the Kubernetes client. Focus on testing the business logic of each service method, including success paths, edge cases, and error handling.
+
+# Test Strategy:
+Unit tests with dependency injection and mocking. Interfaces for dependencies like storage and k8s clients should be mocked to test the service logic in complete isolation.
+
+# Subtasks:
+## 1. Create Mock Implementations for Service Dependencies [done]
+### Dependencies: None
+### Description: Establish the foundational testing structure for the `internal/services` package by creating mock implementations for its core dependencies, specifically `storage.Store` and `pkg/k8s.Client`, using the `testify/mock` library.
+### Details:
+In a new `internal/services/mocks_test.go` file, define mock structs for the `storage.Store` and `k8s.Client` interfaces. Implement the necessary methods on these mocks. This will enable dependency injection in the service tests, allowing for precise control over the behavior of external components.
+
+## 2. Write Unit Tests for `DeploymentService` Success Scenarios [pending]
+### Dependencies: 36.1
+### Description: Implement unit tests for the 'happy path' of the `DeploymentService`. These tests will verify the core business logic for creating, retrieving, and deleting deployments when all dependencies function as expected.
+### Details:
+Create a `deployment_service_test.go` file. Using the mock dependencies, write test cases for methods like `CreateDeployment`, `GetDeploymentStatus`, etc. For each test, configure the mocks to return successful responses and assert that the service methods return the correct results and no errors.
+
+## 3. Write Unit Tests for `DeploymentService` Error Handling and Edge Cases [pending]
+### Dependencies: 36.1
+### Description: Test the resilience and error-handling capabilities of the `DeploymentService`. This includes verifying its behavior when dependencies like the Kubernetes client or storage layer return errors, or when edge cases like non-existent resources are encountered.
+### Details:
+In `deployment_service_test.go`, add test cases where the mock `k8s.Client` and `storage.Store` are configured to return errors (e.g., `context.DeadlineExceeded`, `sql.ErrNoRows`). Assert that the service correctly propagates or handles these errors. Test scenarios should include 'deployment not found' and 'failed to update status in storage'.
+
+## 4. Write Unit Tests for `PinService` Success Scenarios [pending]
+### Dependencies: 36.1
+### Description: Implement unit tests for the primary success paths of the `PinService`. These tests will focus on verifying the logic for retrieving pin configurations and updating pin states when the storage dependency operates correctly.
+### Details:
+Create a `pin_service_test.go` file. Use the mock `storage.Store` to test methods like `GetAllPins`, `GetPinByID`, and `UpdatePinState`. Configure the mock to return valid pin models and verify that the service methods correctly process this data and return the expected results without errors.
+
+## 5. Write Unit Tests for `PinService` Error Handling and Edge Cases [pending]
+### Dependencies: 36.1
+### Description: Ensure the `PinService` gracefully handles errors from the storage layer and manages invalid requests, such as attempting to access a non-existent pin.
+### Details:
+In `pin_service_test.go`, add test cases where the mock `storage.Store` is configured to return errors (e.g., `sql.ErrNoRows` when a pin is not found). Assert that the service methods return appropriate, well-defined errors to the caller. Test input validation, such as passing an invalid pin ID.
+

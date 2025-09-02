@@ -1,0 +1,43 @@
+# Task ID: 38
+# Title: Develop Unit Tests for `internal/api/middleware`
+# Status: todo
+# Dependencies: 37
+# Priority: medium
+# Description: Implement unit tests for all HTTP middleware in the `internal/api/middleware` package.
+# Details:
+Use `net/http/httptest` to test the middleware chain. Verify that middleware correctly modifies request contexts, handles authentication/authorization, logs requests, and properly passes control to the next handler.
+
+# Test Strategy:
+Unit tests for middleware using `httptest`. Test that each middleware functions correctly in isolation and properly wraps a mock downstream handler.
+
+# Subtasks:
+## 1. Establish Test Harness and Test `RequestID` Middleware [pending]
+### Dependencies: None
+### Description: Create a reusable test setup for middleware testing using `net/http/httptest`. Implement the first test for the `RequestID` middleware, ensuring it adds a unique ID to the request context and the `X-Request-ID` response header.
+### Details:
+In a new `requestid_test.go` file, create a test function that initializes an `httptest.ResponseRecorder` and a mock `http.Request`. Create a simple `http.HandlerFunc` that does nothing but return `200 OK`. Wrap this handler with the `RequestID` middleware. Serve the HTTP request and assert that the response recorder's headers contain `X-Request-ID` and that a value can be retrieved from the request's context within the mock handler.
+
+## 2. Develop Unit Tests for `Logger` Middleware [pending]
+### Dependencies: 38.1
+### Description: Write unit tests for the logging middleware. Capture the logger's output to verify that request details like method, path, status code, and duration are correctly logged for each request.
+### Details:
+In a new `logger_test.go` file, configure the application's logger to write to an in-memory `bytes.Buffer` instead of stdout for the duration of the test. Wrap a mock handler with the `Logger` middleware. Execute a request and assert that the buffer contains a structured log entry with the correct HTTP method, path, and status code. The mock handler can be used to control the returned status code.
+
+## 3. Develop Unit Tests for `CORS` Middleware [pending]
+### Dependencies: 38.1
+### Description: Implement tests for the CORS middleware. Verify that appropriate `Access-Control-*` headers are set on responses. Include test cases for both standard requests and `OPTIONS` pre-flight requests.
+### Details:
+In a new `cors_test.go` file, create two test cases. The first should simulate a standard `GET` request and assert that the response contains the expected `Access-Control-Allow-Origin` header. The second test should simulate a pre-flight `OPTIONS` request and verify that the response status is `204 No Content` and that the `Access-Control-Allow-Methods` and `Access-Control-Allow-Headers` headers are present and correct.
+
+## 4. Test `Auth` Middleware with Valid Authentication [pending]
+### Dependencies: 38.1
+### Description: Write unit tests for the successful authentication path of the `Auth` middleware. Mock any token validation logic to simulate a valid token, and verify that the request context is updated and control is passed to the next handler.
+### Details:
+In a new `auth_test.go` file, create a test for the happy path. This may require creating a mock token validator or service that the middleware depends on. Send a request with a valid `Authorization: Bearer <mock-token>` header. Verify that the downstream handler is called and that the HTTP status is `200 OK`. If the middleware adds user info to the context, assert its presence within the mock handler.
+
+## 5. Test `Auth` Middleware with Invalid or Missing Authentication [pending]
+### Dependencies: 38.4
+### Description: Implement unit tests for the failure scenarios of the `Auth` middleware. Test cases should include missing, malformed, and invalid/expired tokens. Verify that the middleware returns a `401 Unauthorized` status and does not call the next handler.
+### Details:
+In `auth_test.go`, add test cases for failure conditions. Use a table-driven test approach. Cases should include: 1) no `Authorization` header, 2) a malformed header (e.g., no 'Bearer' prefix), 3) a token that the mock validator rejects. For each case, assert that the response status code is `401 Unauthorized` and that a flag or channel indicates the downstream handler was never called.
+

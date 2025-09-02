@@ -4,13 +4,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // Recovery creates a gin middleware for panic recovery with logrus
-func Recovery(logger *logrus.Logger) gin.HandlerFunc {
+func Recovery(logger logger.Interface) gin.HandlerFunc {
 	return gin.RecoveryWithWriter(gin.DefaultErrorWriter, func(c *gin.Context, recovered interface{}) {
-		logger.WithFields(logrus.Fields{
+		logger.WithFields(map[string]interface{}{
 			"method": c.Request.Method,
 			"path":   c.Request.URL.Path,
 			"ip":     c.ClientIP(),

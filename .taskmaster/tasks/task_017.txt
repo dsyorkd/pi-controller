@@ -1,0 +1,11 @@
+# Task ID: 17
+# Title: Implement Pi Agent GPIO Control Logic
+# Status: todo
+# Dependencies: 16
+# Priority: high
+# Description: Implement the core GPIO control functionality within the Pi Agent, including digital I/O and PWM, using a hardware abstraction library.
+# Details:
+Integrate the `periph.io/x/periph` library for hardware access. Implement gRPC service handlers on the agent to set pin levels (HIGH/LOW), read pin states, and configure PWM output (frequency, duty cycle).
+
+# Test Strategy:
+Requires testing on actual Raspberry Pi hardware. Write a test client to send gRPC requests to the agent and verify pin voltage changes with a multimeter or oscilloscope. Mock the `periph.io` library for unit tests.

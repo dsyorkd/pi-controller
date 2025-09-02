@@ -1,0 +1,11 @@
+# Task ID: 29
+# Title: Implement Full Role-Based Access Control (RBAC)
+# Status: todo
+# Dependencies: 15
+# Priority: high
+# Description: Expand the placeholder RBAC middleware to a fully functional system that controls access to API endpoints based on user roles.
+# Details:
+Define roles (e.g., 'admin', 'viewer') and their associated permissions in the configuration or database. The JWT token will contain a user's roles. The middleware will check if the user's roles grant permission for the requested API endpoint and method.
+
+# Test Strategy:
+Write integration tests for the API. Create tokens for different roles. For each role, test access to permitted and forbidden endpoints, verifying that the correct HTTP status codes (200 OK, 403 Forbidden) are returned.

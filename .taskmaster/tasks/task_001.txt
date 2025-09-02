@@ -1,0 +1,43 @@
+# Task ID: 1
+# Title: Write Unit Tests for Configuration Loading
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Implement unit tests for the `internal/config` package to ensure configuration is loaded and parsed correctly from various sources.
+# Details:
+Test cases should cover loading from environment variables and files. Include tests for default values, missing values, and invalid data types to ensure robust error handling. Mock any file system interactions.
+
+# Test Strategy:
+Unit tests using the standard Go `testing` package. Mock file system reads to test loading from files without actual disk I/O. Use table-driven tests to cover multiple configuration scenarios.
+
+# Subtasks:
+## 1. Create Test File and Test Default Value Loading [done]
+### Dependencies: None
+### Description: Create the test file `internal/config/config_test.go` and implement a basic test case. This test should call the configuration loader with no environment variables or files present and assert that the resulting configuration object contains the expected default values.
+### Details:
+In `internal/config/config_test.go`, create a test function (e.g., `TestLoadConfig_Defaults`) that invokes the `Load()` function. Use the `testify/assert` package to verify that fields like `Server.Port` and `LogLevel` are populated with their hardcoded default values.
+
+## 2. Implement Test for Loading Configuration from Environment Variables [done]
+### Dependencies: None
+### Description: Add a test case to verify that configuration can be loaded correctly from environment variables. This test should ensure that environment variables override the default values.
+### Details:
+Create a new test function (e.g., `TestLoadConfig_FromEnv`). Use `t.Setenv()` (available in Go 1.17+) to set environment variables that match the configuration structure (e.g., `PI_CONTROLLER_SERVER_PORT=9090`). Call the `Load()` function and assert that the configuration struct is populated with the values from the environment variables.
+
+## 3. Implement Test for Loading Configuration from a Mocked File [done]
+### Dependencies: None
+### Description: Write a test to confirm that configuration is loaded correctly from a file. This test must mock the file system to avoid actual disk I/O.
+### Details:
+Since the current implementation likely uses Viper, you can mock file loading by creating a temporary config file in the test. Write a sample YAML or JSON config to a temporary file using `os.CreateTemp`. Set the config path for Viper to look in the temp directory, call `Load()`, and then assert the values are correct. Ensure the temporary file is cleaned up using `t.Cleanup()`.
+
+## 4. Add Test Case for Configuration Source Precedence [done]
+### Dependencies: None
+### Description: Create a test to verify the correct order of precedence for configuration sources. The test should confirm that environment variables override file values, which in turn override default values.
+### Details:
+In a single test function, set a default value, provide a mocked configuration file with a different value for the same key, and set an environment variable with a third value. For example, for `server.port`: default '8080', file '9090', env '9999'. After calling `Load()`, assert that the final value in the config struct is '9999', confirming that environment variables have the highest priority.
+
+## 5. Implement Test for Error Handling with Invalid Configuration Data [done]
+### Dependencies: None
+### Description: Write a test to ensure the configuration loader handles errors gracefully when encountering malformed or invalid data.
+### Details:
+Create a test case where the mocked configuration file contains invalid syntax (e.g., malformed YAML). Call the `Load()` function and use `assert.Error()` to verify that a non-nil error is returned. This ensures the application will fail to start rather than running with a broken or incomplete configuration.
+

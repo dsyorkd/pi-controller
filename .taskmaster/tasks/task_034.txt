@@ -1,0 +1,11 @@
+# Task ID: 34
+# Title: Complete CRUD Operations for All Models
+# Status: todo
+# Dependencies: 13, 14
+# Priority: medium
+# Description: Ensure all database models (Cluster, Node, GPIO, etc.) have complete and tested Create, Read, Update, and Delete operations exposed through the service layer and API.
+# Details:
+Review all models defined in the database layer. For each model, implement the corresponding service methods and Gin API handlers for all CRUD operations. Ensure proper transaction handling is used for operations that modify multiple tables.
+
+# Test Strategy:
+Write integration tests for each API endpoint. For each model, test creating a new entry, retrieving it, updating it, and finally deleting it, verifying the database state and API responses at each step.

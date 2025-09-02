@@ -1,0 +1,11 @@
+# Task ID: 26
+# Title: Implement Secure SSH Client
+# Status: todo
+# Dependencies: None
+# Priority: medium
+# Description: Implement a robust SSH client within the provisioner service for executing commands and transferring files to nodes.
+# Details:
+Use the `golang.org/x/crypto/ssh` package. The client should support key-based authentication, connection pooling, and have built-in retry logic for transient network errors.
+
+# Test Strategy:
+Write unit tests that connect to a mock SSH server. Test command execution, file transfer (SFTP), and error handling for connection failures.

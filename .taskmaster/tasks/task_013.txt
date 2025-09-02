@@ -1,0 +1,11 @@
+# Task ID: 13
+# Title: Implement Structured Logging and Error Handling
+# Status: todo
+# Dependencies: 11
+# Priority: high
+# Description: Refactor the codebase to use a structured logging library (e.g., `slog` or `zerolog`) and establish consistent error handling patterns, including error wrapping.
+# Details:
+Replace all `fmt.Printf` and `log.Println` calls with a configured structured logger. Implement a standard pattern for wrapping errors with context using `fmt.Errorf` with `%w`. Define custom error types for the service layer.
+
+# Test Strategy:
+Unit test error-producing functions to verify that errors are wrapped correctly. Manually inspect application logs during operation to confirm they are structured (e.g., JSON format) and contain contextual information.

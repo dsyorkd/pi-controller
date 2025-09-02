@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 
-	"github.com/spenceryork/pi-controller/internal/config"
-	"github.com/spenceryork/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/storage"
 )
 
 // Server represents the WebSocket server
 type Server struct {
 	config   *config.WebSocketConfig
-	logger   *logrus.Logger
+	logger   logger.Interface
 	database *storage.Database
 	upgrader websocket.Upgrader
 	
@@ -117,7 +117,7 @@ type ErrorMessage struct {
 }
 
 // New creates a new WebSocket server
-func New(cfg *config.WebSocketConfig, logger *logrus.Logger, db *storage.Database) *Server {
+func New(cfg *config.WebSocketConfig, logger logger.Interface, db *storage.Database) *Server {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  cfg.ReadBufferSize,
 		WriteBufferSize: cfg.WriteBufferSize,
@@ -153,7 +153,7 @@ func (s *Server) Start() error {
 		Handler: mux,
 	}
 
-	s.logger.WithFields(logrus.Fields{
+	s.logger.WithFields(map[string]interface{}{
 		"address": s.config.GetAddress(),
 		"path":    s.config.Path,
 	}).Info("Starting WebSocket server")
@@ -459,7 +459,7 @@ func (c *Client) subscribe(topic string) {
 	c.subscriptions[topic] = true
 	c.subMux.Unlock()
 	
-	c.server.logger.WithFields(logrus.Fields{
+	c.server.logger.WithFields(map[string]interface{}{
 		"client_id": c.id,
 		"topic":     topic,
 	}).Debug("Client subscribed to topic")
@@ -471,7 +471,7 @@ func (c *Client) unsubscribe(topic string) {
 	delete(c.subscriptions, topic)
 	c.subMux.Unlock()
 	
-	c.server.logger.WithFields(logrus.Fields{
+	c.server.logger.WithFields(map[string]interface{}{
 		"client_id": c.id,
 		"topic":     topic,
 	}).Debug("Client unsubscribed from topic")

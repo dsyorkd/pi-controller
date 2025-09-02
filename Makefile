@@ -68,21 +68,71 @@ lint: ## Run golangci-lint
 
 install-lint: ## Install golangci-lint
 	@echo "Installing golangci-lint..."
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.54.2
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 # Testing
 test: ## Run tests
 	@echo "Running tests..."
 	go test -v -race -coverprofile=coverage.out ./...
 
+test-unit: ## Run unit tests only
+	@echo "Running unit tests..."
+	go test -v -race -short -coverprofile=coverage-unit.out ./internal/services/... ./pkg/gpio/... ./internal/api/handlers/...
+
+test-integration: ## Run integration tests only
+	@echo "Running integration tests..."
+	go test -v -race -run Integration -coverprofile=coverage-integration.out ./test/integration/...
+
+test-security: ## Run security vulnerability tests
+	@echo "Running security tests..."
+	go test -v -race -run Security -coverprofile=coverage-security.out ./test/security/...
+
+test-gpio: ## Run GPIO hardware simulation tests
+	@echo "Running GPIO tests..."
+	go test -v -race -run GPIO -coverprofile=coverage-gpio.out ./pkg/gpio/...
+
+test-api: ## Run API endpoint tests
+	@echo "Running API tests..."
+	go test -v -race -run API -coverprofile=coverage-api.out ./internal/api/handlers/...
+
+test-benchmarks: ## Run performance benchmarks
+	@echo "Running performance benchmarks..."
+	go test -bench=. -benchmem -run=^$$ ./test/benchmarks/... ./internal/services/... ./pkg/gpio/...
+
+test-security-verbose: ## Run detailed security vulnerability analysis
+	@echo "Running comprehensive security analysis..."
+	go test -v -race -run TestSecurity -coverprofile=coverage-security.out ./test/security/...
+	@echo ""
+	@echo "Security test results above identify critical vulnerabilities."
+	@echo "See test output for detailed recommendations."
+
 test-coverage: test ## Run tests with coverage report
 	@echo "Generating coverage report..."
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
+test-coverage-threshold: test ## Check if coverage meets minimum threshold
+	@echo "Checking coverage threshold..."
+	@go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//' > coverage.tmp
+	@COVERAGE=$$(cat coverage.tmp); if [ "$$COVERAGE" -lt "80" ]; then echo "Coverage $$COVERAGE% is below 80% threshold"; exit 1; else echo "Coverage $$COVERAGE% meets 80% threshold"; fi
+	@rm -f coverage.tmp
+
 benchmark: ## Run benchmarks
 	@echo "Running benchmarks..."
 	go test -bench=. -benchmem ./...
+
+test-fuzz: ## Run fuzzing tests
+	@echo "Running fuzzing tests..."
+	go test -fuzz=. -fuzztime=30s ./...
+
+test-race: ## Run tests with race detection
+	@echo "Running tests with race detection..."
+	go test -race -timeout=30s ./...
+
+test-all: test-unit test-integration test-security test-gpio test-api ## Run all test suites
+	@echo "All test suites completed!"
+
+test-comprehensive: test-all test-benchmarks test-security-verbose ## Run comprehensive test suite including benchmarks
 
 # Build targets
 build: build-controller build-agent ## Build all binaries
@@ -178,12 +228,32 @@ dev: ## Start development environment
 # Database
 db-migrate: ## Run database migrations
 	@echo "Running database migrations..."
-	go run ./cmd/pi-controller migrate
+	go run ./cmd/pi-controller migrate up
 
-db-reset: ## Reset database (WARNING: destroys data)
+db-migrate-up: ## Run pending database migrations
+	@echo "Running pending database migrations..."
+	go run ./cmd/pi-controller migrate up
+
+db-migrate-down: ## Rollback the last database migration
+	@echo "Rolling back last database migration..."
+	go run ./cmd/pi-controller migrate down
+
+db-migrate-status: ## Show database migration status
+	@echo "Showing database migration status..."
+	go run ./cmd/pi-controller migrate status
+
+db-migrate-reset: ## Reset database - drops all tables and reapplies migrations (WARNING: destroys data)
+	@echo "Resetting database - this will destroy all data!"
+	go run ./cmd/pi-controller migrate reset --confirm
+
+db-reset: ## Reset database by removing file and reapplying migrations (WARNING: destroys data)
 	@echo "Resetting database..."
 	rm -f data/pi-controller.db
-	@$(MAKE) db-migrate
+	@$(MAKE) db-migrate-up
+
+db-test-migrations: ## Test migration system with unit tests
+	@echo "Testing migration system..."
+	go test -v ./internal/migrations/...
 
 # Configuration
 config-example: ## Generate example configuration

@@ -1,0 +1,11 @@
+# Task ID: 31
+# Title: Implement Cluster Overview and Node Management UI
+# Status: todo
+# Dependencies: 30
+# Priority: medium
+# Description: Develop the main dashboard UI components for viewing cluster status and managing individual nodes.
+# Details:
+Create a React component to display a list of nodes fetched from the controller's `/api/v1/nodes` REST endpoint. The view should show node status, IP address, and system metrics. Implement a detail view for a single node.
+
+# Test Strategy:
+Use a mock API server (e.g., MSW - Mock Service Worker) to provide data to the UI. Write component tests to verify that the node list and detail views render correctly based on the mock data.

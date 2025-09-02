@@ -1,0 +1,315 @@
+# Pi Controller Phase 2 Implementation PRD
+
+## Executive Summary
+
+This Product Requirements Document outlines the completion of the Pi Controller Phase 1 implementation based on the comprehensive architecture analysis. The current codebase has foundational structures in place but requires significant implementation work to achieve the full vision outlined in ARCHITECTURE.md. This PRD focuses on completing incomplete implementations, fixing code quality issues, and delivering a production-ready system.
+
+## Current State Analysis
+
+### Completed Components
+- Basic project structure with Go modules and build system
+- Database models and SQLite storage layer with encryption support
+- REST API framework with Gin router and basic handlers
+- Configuration management system with YAML support
+- gRPC protobuf definitions and server structure
+- WebSocket server foundation
+- Basic service layer architecture (Cluster, Node, GPIO services)
+- Comprehensive testing framework structure
+- Security middleware and authentication framework
+- Docker build system and multi-architecture support
+
+### Critical Gaps Identified
+
+#### 1. **Pi Agent Implementation** - HIGH PRIORITY
+- **Current State**: Basic CLI structure with placeholder functionality
+- **Required**: Complete node agent with GPIO control, system monitoring, and gRPC communication
+- **Business Impact**: Core functionality for hardware control is missing
+
+#### 2. **Discovery Service Implementation** - HIGH PRIORITY  
+- **Current State**: Mock mDNS discovery with placeholder functions
+- **Required**: Real mDNS discovery, network scanning, and node registration
+- **Business Impact**: Automatic node discovery is critical for usability
+
+#### 3. **GPIO Hardware Integration** - HIGH PRIORITY
+- **Current State**: Service layer exists but no actual hardware control
+- **Required**: Real GPIO pin control, PWM, I2C, SPI interface implementations
+- **Business Impact**: Core value proposition depends on GPIO functionality
+
+#### 4. **Provisioner Engine** - MEDIUM PRIORITY
+- **Current State**: Service methods exist but no actual K3s provisioning
+- **Required**: SSH client, K3s installation scripts, cluster bootstrapping
+- **Business Impact**: Essential for automated cluster management
+
+#### 5. **Kubernetes Integration** - MEDIUM PRIORITY
+- **Current State**: Basic client structure without CRD implementations
+- **Required**: Custom Resource Definitions, controllers, and K8s client integration
+- **Business Impact**: Kubernetes-native GPIO control differentiator
+
+#### 6. **Code Quality Issues** - HIGH PRIORITY
+- **Current State**: Multiple `go vet` errors, missing linter, type mismatches
+- **Required**: Fix all compilation errors, implement proper logging, ensure linting passes
+- **Business Impact**: Production readiness and maintainability
+
+#### 7. **Web UI** - MEDIUM PRIORITY
+- **Current State**: No web interface implementation
+- **Required**: React/TypeScript dashboard for cluster and GPIO management
+- **Business Impact**: User experience and ease of use
+
+#### 8. **Security Implementation** - HIGH PRIORITY
+- **Current State**: Authentication framework exists but incomplete
+- **Required**: Certificate management, secure communication, RBAC implementation
+- **Business Impact**: Production security requirements
+
+## Implementation Phases
+
+### Phase 2.1: Foundation Completion (Sprint 1-2)
+**Goal**: Fix critical code quality issues and complete core infrastructure
+
+#### Tasks:
+1. **Code Quality Fixes**
+   - Fix all `go vet` errors (logger type mismatches, undefined constants, test imports)
+   - Install and configure golangci-lint
+   - Implement proper error handling patterns
+   - Fix test compilation issues
+
+2. **Core Infrastructure**
+   - Complete database migration system
+   - Implement proper logging configuration
+   - Fix configuration validation
+   - Complete middleware security implementation
+
+3. **Service Layer Completion**
+   - Add missing error types and validation
+   - Complete CRUD operations for all models
+   - Implement proper transaction handling
+   - Add comprehensive input validation
+
+### Phase 2.2: Hardware Control Implementation (Sprint 3-4)  
+**Goal**: Deliver working GPIO and hardware control functionality
+
+#### Tasks:
+1. **Pi Agent Implementation**
+   - GPIO pin control (digital, PWM)
+   - I2C/SPI interface support
+   - System metrics collection (CPU, memory, temperature)
+   - gRPC client for controller communication
+   - Hardware capability detection
+
+2. **GPIO Service Enhancement**
+   - Remove mock implementations
+   - Add real hardware communication via agent
+   - Implement GPIO state persistence
+   - Add hardware safety checks and validation
+
+3. **Hardware Integration**
+   - Pin reservation and conflict resolution
+   - Hardware abstraction layer
+   - Device driver interfaces
+   - Safety monitoring and alerts
+
+### Phase 2.3: Network and Discovery (Sprint 5)
+**Goal**: Enable automatic node discovery and network management
+
+#### Tasks:
+1. **mDNS Discovery Implementation**
+   - Real mDNS client/server using hashicorp/mdns
+   - Service announcement and discovery
+   - Node capability advertisement
+   - Network interface detection
+
+2. **Network Scanning**
+   - Subnet discovery and port scanning
+   - Node health checking
+   - Network topology mapping
+   - Connection reliability testing
+
+3. **Node Registration**
+   - Automatic node registration workflow
+   - Certificate generation and distribution
+   - Node authentication and authorization
+   - Cluster membership management
+
+### Phase 2.4: Kubernetes Integration (Sprint 6-7)
+**Goal**: Implement Kubernetes-native GPIO control
+
+#### Tasks:
+1. **Custom Resource Definitions**
+   - GPIOPin, PWMController, I2CDevice CRDs
+   - Schema validation and webhook controllers
+   - Status reporting and reconciliation
+   - Resource quotas and limits
+
+2. **Kubernetes Controllers** 
+   - GPIO resource reconciliation loops
+   - Node-to-resource assignment logic
+   - Hardware state synchronization
+   - Event generation and monitoring
+
+3. **K8s Client Integration**
+   - Cluster connection and authentication
+   - Resource CRUD operations
+   - Watch API implementation
+   - Leader election for HA controllers
+
+### Phase 2.5: Provisioner and Automation (Sprint 8)
+**Goal**: Enable automated cluster provisioning
+
+#### Tasks:
+1. **SSH Client Implementation**
+   - Secure SSH connection management
+   - Key-based authentication
+   - Command execution and file transfer
+   - Connection pooling and retry logic
+
+2. **K3s Provisioning**
+   - K3s binary installation and configuration  
+   - Cluster bootstrap and join token management
+   - Network CNI configuration
+   - Storage and ingress setup
+
+3. **Cluster Lifecycle Management**
+   - Rolling updates and maintenance
+   - Node addition and removal
+   - Backup and disaster recovery
+   - Health monitoring and alerting
+
+### Phase 2.6: Security and Production Readiness (Sprint 9)
+**Goal**: Implement production-grade security and monitoring
+
+#### Tasks:
+1. **Certificate Management**
+   - Root CA and intermediate certificate generation
+   - Automatic certificate rotation
+   - Node identity and authentication
+   - TLS configuration and enforcement
+
+2. **Authentication and Authorization**
+   - JWT token generation and validation
+   - Role-based access control (RBAC)
+   - API key management
+   - Session management and revocation
+
+3. **Security Hardening**
+   - Input sanitization and validation
+   - Rate limiting and DDoS protection
+   - Audit logging and compliance
+   - Vulnerability scanning and patching
+
+### Phase 2.7: Web UI and User Experience (Sprint 10-11)
+**Goal**: Deliver intuitive web-based management interface
+
+#### Tasks:
+1. **React Dashboard Implementation**
+   - Cluster overview and monitoring
+   - Node management interface
+   - GPIO device control panels
+   - Real-time status updates
+
+2. **API Integration**
+   - REST API client implementation
+   - WebSocket real-time updates
+   - Error handling and user feedback
+   - Responsive design for mobile devices
+
+3. **User Experience**
+   - Onboarding and setup wizards
+   - Documentation and help system  
+   - Accessibility compliance
+   - Performance optimization
+
+## Acceptance Criteria
+
+### Core Functionality
+- [ ] Pi agents successfully communicate with controller via gRPC
+- [ ] GPIO pins can be controlled digitally (HIGH/LOW) through API
+- [ ] PWM output functional with configurable frequency and duty cycle
+- [ ] Nodes automatically discovered via mDNS or network scan
+- [ ] K3s clusters can be provisioned automatically via SSH
+- [ ] Kubernetes CRDs deployed and functional
+- [ ] Web UI provides full cluster and GPIO management
+
+### Quality Requirements
+- [ ] All `go vet` and `golangci-lint` checks pass
+- [ ] Test coverage above 80% for all core packages
+- [ ] Security tests pass without critical vulnerabilities
+- [ ] Performance benchmarks meet baseline requirements
+- [ ] Documentation complete for all public APIs
+
+### Production Readiness
+- [ ] TLS encryption enabled for all communications
+- [ ] Authentication and authorization working
+- [ ] Comprehensive logging and monitoring
+- [ ] Graceful shutdown and error recovery
+- [ ] Docker images built for ARM64 and AMD64
+- [ ] Installation scripts and documentation complete
+
+## Technical Specifications
+
+### Performance Requirements
+- Support minimum 10 nodes per cluster
+- GPIO operations complete within 100ms
+- API response times under 200ms (95th percentile)
+- WebSocket updates delivered within 1 second
+- System resources usage under 512MB RAM, 1 CPU core
+
+### Security Requirements
+- All communications encrypted with TLS 1.3
+- Certificate-based node authentication
+- RBAC for API access control
+- Audit logging for all administrative actions
+- No secrets stored in plaintext
+
+### Compatibility Requirements
+- Raspberry Pi 3B+ and newer (ARM64)
+- Raspberry Pi OS Bullseye and newer
+- K3s 1.25+ compatibility
+- Standard GPIO, I2C, SPI interfaces
+- Modern web browsers (Chrome, Firefox, Safari)
+
+## Dependencies and Risk Mitigation
+
+### External Dependencies
+- **hashicorp/mdns** - mDNS discovery implementation
+- **go.k8s.io/client-go** - Kubernetes API client
+- **periph.io/x/periph** - Hardware GPIO access  
+- **golang.org/x/crypto/ssh** - SSH client implementation
+- **React 18+** - Frontend framework
+
+### Technical Risks
+1. **Hardware Access Limitations** - Mitigation: Comprehensive testing on real Pi hardware
+2. **Network Discovery Reliability** - Mitigation: Multiple discovery methods with fallbacks
+3. **GPIO Resource Conflicts** - Mitigation: Reservation system with conflict detection
+4. **K3s Installation Failures** - Mitigation: Robust error handling and rollback procedures
+5. **Security Vulnerabilities** - Mitigation: Regular security audits and automated scanning
+
+### Timeline Risks
+- Hardware testing requires physical Raspberry Pi devices
+- Network testing requires multi-node setup
+- Kubernetes integration testing needs cluster environment
+- Performance testing requires representative workloads
+
+## Success Metrics
+
+### Development Metrics  
+- Zero compilation errors and warnings
+- 100% passing test suite
+- Code coverage above 80%
+- Security scan results with zero critical issues
+
+### Functional Metrics
+- Successful GPIO control on real hardware
+- Node discovery time under 30 seconds
+- Cluster provisioning time under 10 minutes
+- API uptime above 99.9%
+
+### User Adoption Metrics
+- Installation success rate above 95%
+- Time to first GPIO control under 15 minutes
+- User documentation feedback score above 4.5/5
+- Community contribution growth
+
+## Conclusion
+
+This PRD outlines a comprehensive path to complete the Pi Controller implementation from its current foundational state to a production-ready system. The phased approach ensures critical functionality is delivered incrementally while maintaining code quality and security standards. Success requires dedicated focus on hardware integration, distributed systems challenges, and user experience design.
+
+The deliverable will be a robust, secure, and user-friendly platform for managing Raspberry Pi Kubernetes clusters with GPIO-as-a-Service capabilities, fulfilling the original architectural vision while being ready for real-world deployment.

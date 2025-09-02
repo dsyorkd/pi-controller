@@ -1,0 +1,11 @@
+# Task ID: 22
+# Title: Implement Automatic Node Registration Workflow
+# Status: todo
+# Dependencies: 21
+# Priority: high
+# Description: Create a workflow for newly discovered nodes to be automatically registered and authenticated with the controller.
+# Details:
+Upon mDNS discovery, the controller initiates a registration process. This involves generating a client certificate for the new agent, securely transmitting it, and storing the node's identity in the database. The agent will then use this certificate for all future gRPC communication.
+
+# Test Strategy:
+Set up a fresh agent on the network. Monitor the controller and agent logs to trace the discovery, certificate generation, and secure communication handshake. Verify the node appears as 'registered' or 'active' in the controller's database.

@@ -1,0 +1,43 @@
+# Task ID: 40
+# Title: Implement Unit Tests for `pkg/gpio` Controller
+# Status: todo
+# Dependencies: None
+# Priority: low
+# Description: Write unit tests for the GPIO controller logic in the `pkg/gpio` package.
+# Details:
+Since tests cannot interact with physical hardware, create a mock interface for the underlying GPIO library (e.g., `periph.io`). Test the logic for setting pin states, reading pin values, and handling errors from the mocked hardware layer.
+
+# Test Strategy:
+Unit testing with a mocked hardware abstraction layer. This will verify the controller's logic without requiring physical hardware.
+
+# Subtasks:
+## 1. Define and Implement a Mock for the `periph.io/gpio` Pin Interface [pending]
+### Dependencies: None
+### Description: Create a mock implementation of the `periph.io/x/conn/v3/gpio.PinIO` interface using `testify/mock`. This mock will be used to simulate hardware behavior and will be the foundation for all subsequent tests in the package.
+### Details:
+In `pkg/gpio/controller_test.go`, define a `mockPin` struct that embeds `mock.Mock`. Implement all methods of the `gpio.PinIO` interface on this struct, such as `Name()`, `Number()`, `Function()`, `Halt()`, `Out()`, and `Read()`. Each method should call the corresponding mock functions (e.g., `m.Called(level)`).
+
+## 2. Test `NewController` Initialization and Pin Discovery [pending]
+### Dependencies: 40.1
+### Description: Write unit tests for the `NewController` constructor function. These tests should verify both successful initialization and failure scenarios, such as when a requested pin cannot be found by the underlying hardware layer.
+### Details:
+Use a mocked `gpioreg.ByName` function or a similar mechanism to return either the `mockPin` instance or an error. Assert that `NewController` correctly populates its internal pin map on success and returns a descriptive error when a pin is not found.
+
+## 3. Test Pin Output Logic (e.g., `SetPinHigh`, `SetPinLow`) [pending]
+### Dependencies: 40.1, 40.2
+### Description: Implement unit tests for the controller methods that set the state of a GPIO pin. The tests must verify that the correct calls are made to the underlying mock pin and that errors are handled properly.
+### Details:
+For each output function, create a test case. Use the `mockPin`'s `On("Out", ...)` method to set expectations. For example, when testing `SetPinHigh`, expect a call to `Out(gpio.High)`. Verify that the function returns no error on success. Also, test the case where the mock is configured to return an error from `Out()` and assert that the controller function propagates this error.
+
+## 4. Test Pin Input Logic (e.g., `ReadPin`) [pending]
+### Dependencies: 40.1, 40.2
+### Description: Write unit tests for the controller method that reads the state of a GPIO pin. The tests should cover reading both high and low states, as well as error conditions.
+### Details:
+Configure the `mockPin` to return specific values from its `Read()` method. For example, use `On("Read").Return(gpio.High, nil)` and assert that the controller's `ReadPin` method returns `true` and `nil`. Create a separate test case for `gpio.Low`. Also, test the scenario where the mock's `Read()` method returns an error and assert the controller handles it correctly.
+
+## 5. Test Error Handling for Invalid Pin Identifiers [pending]
+### Dependencies: 40.2
+### Description: Create tests to ensure the controller behaves correctly when asked to operate on a pin identifier that was not configured during initialization or is otherwise unknown.
+### Details:
+Instantiate a controller with a valid set of pins (e.g., "GPIO1"). Then, call methods like `SetPinHigh` or `ReadPin` with an invalid identifier (e.g., "GPIO99"). Assert that these calls do not interact with the mock and return a specific, identifiable error (e.g., `ErrPinNotFound`).
+

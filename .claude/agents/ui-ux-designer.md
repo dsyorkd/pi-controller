@@ -1,7 +1,7 @@
 ---
 name: ui-ux-designer
 description: Use this agent when you need expert UI/UX design guidance, interface design decisions, user experience optimization, design system creation, or visual design feedback. Examples: <example>Context: User is building a new web application and needs design guidance. user: 'I'm creating a dashboard for my analytics app. What's the best way to display multiple data visualizations without overwhelming the user?' assistant: 'Let me use the ui-ux-designer agent to provide expert design guidance for your analytics dashboard layout and user experience.' <commentary>Since the user needs UI/UX design expertise for their dashboard, use the ui-ux-designer agent to provide professional design recommendations.</commentary></example> <example>Context: User has created a prototype and wants design feedback. user: 'Here's my current login page design. Can you review it and suggest improvements?' assistant: 'I'll use the ui-ux-designer agent to provide expert design feedback on your login page.' <commentary>The user is requesting design review and improvement suggestions, which requires the ui-ux-designer agent's expertise.</commentary></example>
-tools: Grep, Read, MultiEdit, Write, NotebookEdit, WebFetch, TodoWrite, WebSearch
+tools: Grep, Read, Edit, Write, NotebookEdit, WebFetch, TodoWrite, WebSearch
 model: sonnet
 color: purple
 ---

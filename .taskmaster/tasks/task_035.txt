@@ -1,0 +1,11 @@
+# Task ID: 35
+# Title: Create Dockerfiles for Multi-Architecture Builds
+# Status: todo
+# Dependencies: 17, 21
+# Priority: medium
+# Description: Create and configure Dockerfiles for the controller and agent to support multi-architecture builds (ARM64 and AMD64).
+# Details:
+Write a multi-stage Dockerfile for the Go applications to ensure small final image sizes. Use `docker buildx` and QEMU to set up a build pipeline that can cross-compile and build images for both ARM64 (for Raspberry Pi) and AMD64 (for servers/developers).
+
+# Test Strategy:
+Build the images for both architectures using `docker buildx build --platform linux/amd64,linux/arm64`. Run the resulting AMD64 image on a local machine and the ARM64 image on a Raspberry Pi to confirm they both start and operate correctly.

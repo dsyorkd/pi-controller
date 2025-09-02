@@ -1,0 +1,11 @@
+# Task ID: 33
+# Title: Implement User Authentication Flow in Web UI
+# Status: todo
+# Dependencies: 29, 31
+# Priority: medium
+# Description: Build the login page and handle the authentication flow, including JWT storage and authenticated API requests.
+# Details:
+Create a login form that sends credentials to the controller's auth endpoint. Upon successful login, store the received JWT securely (e.g., in an HttpOnly cookie or local storage). Implement an API client (e.g., using Axios) that automatically attaches the JWT to the `Authorization` header for all subsequent requests.
+
+# Test Strategy:
+Mock the authentication API. Write tests for the login component to check for successful login (token is stored, user is redirected) and failed login (error message is displayed). Test that the API client correctly attaches the auth header.

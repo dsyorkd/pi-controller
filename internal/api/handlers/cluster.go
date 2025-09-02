@@ -5,67 +5,56 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 
-	"github.com/spenceryork/pi-controller/internal/models"
-	"github.com/spenceryork/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/services"
 )
 
 // ClusterHandler handles cluster-related API operations
 type ClusterHandler struct {
-	database *storage.Database
-	logger   *logrus.Logger
+	service *services.ClusterService
+	logger  logger.Interface
 }
 
 // NewClusterHandler creates a new cluster handler
-func NewClusterHandler(db *storage.Database, logger *logrus.Logger) *ClusterHandler {
+func NewClusterHandler(service *services.ClusterService, logger logger.Interface) *ClusterHandler {
 	return &ClusterHandler{
-		database: db,
-		logger:   logger,
+		service: service,
+		logger:  logger.WithField("handler", "cluster"),
 	}
 }
 
-// CreateClusterRequest represents the request to create a cluster
-type CreateClusterRequest struct {
-	Name           string `json:"name" binding:"required"`
-	Description    string `json:"description"`
-	Version        string `json:"version"`
-	MasterEndpoint string `json:"master_endpoint"`
-}
-
-// UpdateClusterRequest represents the request to update a cluster
-type UpdateClusterRequest struct {
-	Name           *string                `json:"name,omitempty"`
-	Description    *string                `json:"description,omitempty"`
-	Status         *models.ClusterStatus  `json:"status,omitempty"`
-	Version        *string                `json:"version,omitempty"`
-	MasterEndpoint *string                `json:"master_endpoint,omitempty"`
-}
+// Request and response types are now defined in the services package
 
 // List returns all clusters
 func (h *ClusterHandler) List(c *gin.Context) {
-	var clusters []models.Cluster
-	
-	result := h.database.DB().Preload("Nodes").Find(&clusters)
-	if result.Error != nil {
-		h.logger.WithError(result.Error).Error("Failed to list clusters")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": "Failed to retrieve clusters",
-		})
+	// Parse query parameters
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	opts := services.ClusterListOptions{
+		Limit:        limit,
+		Offset:       offset,
+	}
+
+	clusters, total, err := h.service.List(opts)
+	if err != nil {
+		h.handleServiceError(c, err, "Failed to list clusters")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"clusters": clusters,
 		"count":    len(clusters),
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
 	})
 }
 
 // Create creates a new cluster
 func (h *ClusterHandler) Create(c *gin.Context) {
-	var req CreateClusterRequest
+	var req services.CreateClusterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Bad Request",
@@ -74,21 +63,9 @@ func (h *ClusterHandler) Create(c *gin.Context) {
 		return
 	}
 
-	cluster := models.Cluster{
-		Name:           req.Name,
-		Description:    req.Description,
-		Version:        req.Version,
-		MasterEndpoint: req.MasterEndpoint,
-		Status:         models.ClusterStatusPending,
-	}
-
-	result := h.database.DB().Create(&cluster)
-	if result.Error != nil {
-		h.logger.WithError(result.Error).Error("Failed to create cluster")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": "Failed to create cluster",
-		})
+	cluster, err := h.service.Create(req)
+	if err != nil {
+		h.handleServiceError(c, err, "Failed to create cluster")
 		return
 	}
 
@@ -107,22 +84,9 @@ func (h *ClusterHandler) Get(c *gin.Context) {
 		return
 	}
 
-	var cluster models.Cluster
-	result := h.database.DB().Preload("Nodes").First(&cluster, uint(id))
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "Not Found",
-				"message": "Cluster not found",
-			})
-			return
-		}
-		
-		h.logger.WithError(result.Error).Error("Failed to get cluster")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error", 
-			"message": "Failed to retrieve cluster",
-		})
+	cluster, err := h.service.GetByID(uint(id))
+	if err != nil {
+		h.handleServiceError(c, err, "Failed to get cluster")
 		return
 	}
 
@@ -140,7 +104,7 @@ func (h *ClusterHandler) Update(c *gin.Context) {
 		return
 	}
 
-	var req UpdateClusterRequest
+	var req services.UpdateClusterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Bad Request",
@@ -149,49 +113,9 @@ func (h *ClusterHandler) Update(c *gin.Context) {
 		return
 	}
 
-	var cluster models.Cluster
-	result := h.database.DB().First(&cluster, uint(id))
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "Not Found",
-				"message": "Cluster not found",
-			})
-			return
-		}
-		
-		h.logger.WithError(result.Error).Error("Failed to find cluster for update")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": "Failed to retrieve cluster",
-		})
-		return
-	}
-
-	// Update fields if provided
-	if req.Name != nil {
-		cluster.Name = *req.Name
-	}
-	if req.Description != nil {
-		cluster.Description = *req.Description
-	}
-	if req.Status != nil {
-		cluster.Status = *req.Status
-	}
-	if req.Version != nil {
-		cluster.Version = *req.Version
-	}
-	if req.MasterEndpoint != nil {
-		cluster.MasterEndpoint = *req.MasterEndpoint
-	}
-
-	result = h.database.DB().Save(&cluster)
-	if result.Error != nil {
-		h.logger.WithError(result.Error).Error("Failed to update cluster")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": "Failed to update cluster",
-		})
+	cluster, err := h.service.Update(uint(id), req)
+	if err != nil {
+		h.handleServiceError(c, err, "Failed to update cluster")
 		return
 	}
 
@@ -210,21 +134,8 @@ func (h *ClusterHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	result := h.database.DB().Delete(&models.Cluster{}, uint(id))
-	if result.Error != nil {
-		h.logger.WithError(result.Error).Error("Failed to delete cluster")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": "Failed to delete cluster",
-		})
-		return
-	}
-
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "Not Found",
-			"message": "Cluster not found",
-		})
+	if err := h.service.Delete(uint(id)); err != nil {
+		h.handleServiceError(c, err, "Failed to delete cluster")
 		return
 	}
 
@@ -243,14 +154,9 @@ func (h *ClusterHandler) ListNodes(c *gin.Context) {
 		return
 	}
 
-	var nodes []models.Node
-	result := h.database.DB().Where("cluster_id = ?", uint(id)).Find(&nodes)
-	if result.Error != nil {
-		h.logger.WithError(result.Error).Error("Failed to list cluster nodes")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": "Failed to retrieve cluster nodes",
-		})
+	nodes, err := h.service.GetNodes(uint(id))
+	if err != nil {
+		h.handleServiceError(c, err, "Failed to list cluster nodes")
 		return
 	}
 
@@ -272,48 +178,54 @@ func (h *ClusterHandler) Status(c *gin.Context) {
 		return
 	}
 
-	var cluster models.Cluster
-	result := h.database.DB().Preload("Nodes").First(&cluster, uint(id))
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "Not Found",
-				"message": "Cluster not found",
-			})
-			return
-		}
-		
-		h.logger.WithError(result.Error).Error("Failed to get cluster status")
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Internal Server Error",
-			"message": "Failed to retrieve cluster status",
+	status, err := h.service.GetStatus(uint(id))
+	if err != nil {
+		h.handleServiceError(c, err, "Failed to get cluster status")
+		return
+	}
+
+	c.JSON(http.StatusOK, status)
+}
+
+// handleServiceError handles service layer errors and maps them to appropriate HTTP responses
+func (h *ClusterHandler) handleServiceError(c *gin.Context, err error, message string) {
+	h.logger.WithError(err).Error(message)
+
+	if services.IsNotFound(err) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "Not Found",
+			"message": "Cluster not found",
 		})
 		return
 	}
 
-	// Calculate node statistics
-	var readyNodes, totalNodes int
-	for _, node := range cluster.Nodes {
-		totalNodes++
-		if node.IsReady() {
-			readyNodes++
-		}
+	if services.IsAlreadyExists(err) {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "Conflict",
+			"message": "Cluster with that name already exists",
+		})
+		return
 	}
 
-	status := gin.H{
-		"cluster_id":     cluster.ID,
-		"name":           cluster.Name,
-		"status":         cluster.Status,
-		"version":        cluster.Version,
-		"master_endpoint": cluster.MasterEndpoint,
-		"nodes": gin.H{
-			"total": totalNodes,
-			"ready": readyNodes,
-		},
-		"healthy":    cluster.IsHealthy(),
-		"created_at": cluster.CreatedAt,
-		"updated_at": cluster.UpdatedAt,
+	if err == services.ErrHasAssociatedResources {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "Conflict",
+			"message": "Cannot delete cluster with associated nodes",
+		})
+		return
 	}
 
-	c.JSON(http.StatusOK, status)
+	if services.IsValidationFailed(err) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Validation Failed",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Default to internal server error
+	c.JSON(http.StatusInternalServerError, gin.H{
+		"error":   "Internal Server Error",
+		"message": message,
+	})
 }

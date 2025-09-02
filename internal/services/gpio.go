@@ -1,0 +1,447 @@
+package services
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+
+	"github.com/dsyorkd/pi-controller/internal/errors"
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/models"
+	"github.com/dsyorkd/pi-controller/internal/storage"
+)
+
+// GPIOService handles GPIO device business logic
+type GPIOService struct {
+	db     *storage.Database
+	logger logger.Interface
+}
+
+// NewGPIOService creates a new GPIO service
+func NewGPIOService(db *storage.Database, logger logger.Interface) *GPIOService {
+	return &GPIOService{
+		db:     db,
+		logger: logger.WithField("service", "gpio"),
+	}
+}
+
+// CreateGPIODeviceRequest represents the request to create a GPIO device
+type CreateGPIODeviceRequest struct {
+	Name        string                   `json:"name" validate:"required,min=1,max=100"`
+	Description string                   `json:"description" validate:"max=500"`
+	NodeID      uint                     `json:"node_id" validate:"required"`
+	PinNumber   int                      `json:"pin_number" validate:"required,min=0,max=40"`
+	Direction   models.GPIODirection     `json:"direction" validate:"required,oneof=input output"`
+	PullMode    models.GPIOPullMode      `json:"pull_mode" validate:"oneof=none up down"`
+	DeviceType  models.GPIODeviceType    `json:"device_type" validate:"oneof=digital analog pwm spi i2c"`
+	Config      models.GPIOConfig        `json:"config"`
+}
+
+// UpdateGPIODeviceRequest represents the request to update a GPIO device
+type UpdateGPIODeviceRequest struct {
+	Name        *string                  `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
+	Description *string                  `json:"description,omitempty" validate:"omitempty,max=500"`
+	Direction   *models.GPIODirection    `json:"direction,omitempty" validate:"omitempty,oneof=input output"`
+	PullMode    *models.GPIOPullMode     `json:"pull_mode,omitempty" validate:"omitempty,oneof=none up down"`
+	Status      *models.GPIOStatus       `json:"status,omitempty" validate:"omitempty,oneof=active inactive error"`
+	Config      *models.GPIOConfig       `json:"config,omitempty"`
+}
+
+// GPIOListOptions represents options for listing GPIO devices
+type GPIOListOptions struct {
+	NodeID     *uint
+	DeviceType *models.GPIODeviceType
+	Direction  *models.GPIODirection
+	Status     *models.GPIOStatus
+	Limit      int
+	Offset     int
+}
+
+// GPIOReadingFilter represents filtering options for GPIO readings
+type GPIOReadingFilter struct {
+	DeviceID  uint
+	StartTime *time.Time
+	EndTime   *time.Time
+	Limit     int
+	Offset    int
+}
+
+// List returns a paginated list of GPIO devices
+func (s *GPIOService) List(opts GPIOListOptions) ([]models.GPIODevice, int64, error) {
+	var devices []models.GPIODevice
+	var total int64
+
+	query := s.db.DB().Model(&models.GPIODevice{})
+
+	// Apply filters
+	if opts.NodeID != nil {
+		query = query.Where("node_id = ?", *opts.NodeID)
+	}
+	if opts.DeviceType != nil {
+		query = query.Where("device_type = ?", *opts.DeviceType)
+	}
+	if opts.Direction != nil {
+		query = query.Where("direction = ?", *opts.Direction)
+	}
+	if opts.Status != nil {
+		query = query.Where("status = ?", *opts.Status)
+	}
+
+	// Get total count
+	if err := query.Count(&total).Error; err != nil {
+		s.logger.WithError(err).Error("Failed to count GPIO devices")
+		return nil, 0, errors.Wrapf(err, "failed to count GPIO devices")
+	}
+
+	// Apply pagination
+	if opts.Limit > 0 {
+		query = query.Limit(opts.Limit)
+	}
+	if opts.Offset > 0 {
+		query = query.Offset(opts.Offset)
+	}
+
+	// Include relationships
+	query = query.Preload("Node")
+
+	// Execute query
+	if err := query.Find(&devices).Error; err != nil {
+		s.logger.WithError(err).Error("Failed to fetch GPIO devices")
+		return nil, 0, errors.Wrapf(err, "failed to fetch GPIO devices")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"count": len(devices),
+		"total": total,
+	}).Debug("Fetched GPIO devices")
+
+	return devices, total, nil
+}
+
+// GetByID returns a GPIO device by ID
+func (s *GPIOService) GetByID(id uint) (*models.GPIODevice, error) {
+	var device models.GPIODevice
+
+	if err := s.db.DB().Preload("Node").First(&device, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, ErrNotFound
+		}
+		s.logger.WithFields(map[string]interface{}{
+			"id":    id,
+			"error": err,
+		}).Error("Failed to fetch GPIO device")
+		return nil, errors.Wrapf(err, "failed to fetch GPIO device")
+	}
+
+	return &device, nil
+}
+
+// GetByNodeAndPin returns a GPIO device by node ID and pin number
+func (s *GPIOService) GetByNodeAndPin(nodeID uint, pinNumber int) (*models.GPIODevice, error) {
+	var device models.GPIODevice
+
+	if err := s.db.DB().Preload("Node").Where("node_id = ? AND pin_number = ?", nodeID, pinNumber).First(&device).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, ErrNotFound
+		}
+		s.logger.WithFields(map[string]interface{}{
+			"node_id":    nodeID,
+			"pin_number": pinNumber,
+			"error":      err,
+		}).Error("Failed to fetch GPIO device by node and pin")
+		return nil, errors.Wrapf(err, "failed to fetch GPIO device")
+	}
+
+	return &device, nil
+}
+
+// Create creates a new GPIO device
+func (s *GPIOService) Create(req CreateGPIODeviceRequest) (*models.GPIODevice, error) {
+	// Validate node exists
+	var node models.Node
+	if err := s.db.DB().First(&node, req.NodeID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, errors.Wrapf(ErrNotFound, "node with ID %d not found", req.NodeID)
+		}
+		return nil, errors.Wrapf(err, "failed to validate node")
+	}
+
+	// Check if pin is already in use on this node
+	if _, err := s.GetByNodeAndPin(req.NodeID, req.PinNumber); err != ErrNotFound {
+		if err == nil {
+			return nil, errors.Wrapf(ErrAlreadyExists, "pin %d is already in use on node %d", req.PinNumber, req.NodeID)
+		}
+		return nil, err
+	}
+
+	device := models.GPIODevice{
+		Name:        req.Name,
+		Description: req.Description,
+		NodeID:      req.NodeID,
+		PinNumber:   req.PinNumber,
+		Direction:   req.Direction,
+		PullMode:    req.PullMode,
+		DeviceType:  req.DeviceType,
+		Status:      models.GPIOStatusActive,
+		Config:      req.Config,
+	}
+
+	if err := s.db.DB().Create(&device).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"name":       req.Name,
+			"node_id":    req.NodeID,
+			"pin_number": req.PinNumber,
+			"error":      err,
+		}).Error("Failed to create GPIO device")
+		return nil, errors.Wrapf(err, "failed to create GPIO device")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"id":         device.ID,
+		"name":       device.Name,
+		"node_id":    device.NodeID,
+		"pin_number": device.PinNumber,
+	}).Info("GPIO device created successfully")
+
+	return &device, nil
+}
+
+// Update updates an existing GPIO device
+func (s *GPIOService) Update(id uint, req UpdateGPIODeviceRequest) (*models.GPIODevice, error) {
+	device, err := s.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update fields
+	if req.Name != nil {
+		device.Name = *req.Name
+	}
+	if req.Description != nil {
+		device.Description = *req.Description
+	}
+	if req.Direction != nil {
+		device.Direction = *req.Direction
+	}
+	if req.PullMode != nil {
+		device.PullMode = *req.PullMode
+	}
+	if req.Status != nil {
+		device.Status = *req.Status
+	}
+	if req.Config != nil {
+		device.Config = *req.Config
+	}
+
+	if err := s.db.DB().Save(device).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"id":    id,
+			"error": err,
+		}).Error("Failed to update GPIO device")
+		return nil, errors.Wrapf(err, "failed to update GPIO device")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"id":   device.ID,
+		"name": device.Name,
+	}).Info("GPIO device updated successfully")
+
+	return device, nil
+}
+
+// Delete deletes a GPIO device
+func (s *GPIOService) Delete(id uint) error {
+	device, err := s.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Delete associated readings first
+	if err := s.db.DB().Where("device_id = ?", id).Delete(&models.GPIOReading{}).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"error":     err,
+		}).Error("Failed to delete GPIO readings")
+		return errors.Wrapf(err, "failed to delete GPIO readings")
+	}
+
+	// Delete the device
+	if err := s.db.DB().Delete(&models.GPIODevice{}, id).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"id":    id,
+			"error": err,
+		}).Error("Failed to delete GPIO device")
+		return errors.Wrapf(err, "failed to delete GPIO device")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"id":   id,
+		"name": device.Name,
+	}).Info("GPIO device deleted successfully")
+
+	return nil
+}
+
+// Read reads the current value of a GPIO device
+func (s *GPIOService) Read(id uint) (*models.GPIODevice, error) {
+	device, err := s.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if !device.IsActive() {
+		return nil, errors.Wrapf(ErrValidationFailed, "GPIO device %d is not active", id)
+	}
+
+	// TODO: Implement actual GPIO reading from hardware
+	// For now, we'll just return the current stored value
+	// In a real implementation, this would:
+	// 1. Connect to the node's agent via gRPC
+	// 2. Request a GPIO read operation
+	// 3. Update the device value and create a reading record
+
+	// Create a reading record
+	reading := models.GPIOReading{
+		DeviceID:  device.ID,
+		Value:     float64(device.Value),
+		Timestamp: time.Now(),
+	}
+
+	if err := s.db.DB().Create(&reading).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"error":     err,
+		}).Error("Failed to create GPIO reading")
+		return nil, errors.Wrapf(err, "failed to create GPIO reading")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"device_id": id,
+		"value":     device.Value,
+	}).Debug("GPIO device read successfully")
+
+	return device, nil
+}
+
+// Write writes a value to a GPIO device
+func (s *GPIOService) Write(id uint, value int) error {
+	device, err := s.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	if !device.IsActive() {
+		return errors.Wrapf(ErrValidationFailed, "GPIO device %d is not active", id)
+	}
+
+	if !device.IsOutput() {
+		return errors.Wrapf(ErrValidationFailed, "GPIO device %d is not configured as output", id)
+	}
+
+	// TODO: Implement actual GPIO writing to hardware
+	// For now, we'll just update the stored value
+	// In a real implementation, this would:
+	// 1. Connect to the node's agent via gRPC
+	// 2. Send a GPIO write command
+	// 3. Update the device value upon success
+
+	// Update device value
+	device.SetValue(value)
+	if err := s.db.DB().Save(device).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"value":     value,
+			"error":     err,
+		}).Error("Failed to update GPIO device value")
+		return errors.Wrapf(err, "failed to update GPIO device value")
+	}
+
+	// Create a reading record
+	reading := models.GPIOReading{
+		DeviceID:  device.ID,
+		Value:     float64(value),
+		Timestamp: time.Now(),
+	}
+
+	if err := s.db.DB().Create(&reading).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"value":     value,
+			"error":     err,
+		}).Error("Failed to create GPIO reading after write")
+		// Don't return error here as the write was successful
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"device_id": id,
+		"value":     value,
+	}).Info("GPIO device written successfully")
+
+	return nil
+}
+
+// GetReadings returns GPIO readings for a device with optional filtering
+func (s *GPIOService) GetReadings(filter GPIOReadingFilter) ([]models.GPIOReading, int64, error) {
+	var readings []models.GPIOReading
+	var total int64
+
+	query := s.db.DB().Model(&models.GPIOReading{}).Where("device_id = ?", filter.DeviceID)
+
+	// Apply time range filters
+	if filter.StartTime != nil {
+		query = query.Where("timestamp >= ?", *filter.StartTime)
+	}
+	if filter.EndTime != nil {
+		query = query.Where("timestamp <= ?", *filter.EndTime)
+	}
+
+	// Get total count
+	if err := query.Count(&total).Error; err != nil {
+		s.logger.WithError(err).Error("Failed to count GPIO readings")
+		return nil, 0, errors.Wrapf(err, "failed to count GPIO readings")
+	}
+
+	// Apply pagination and ordering
+	query = query.Order("timestamp DESC")
+	if filter.Limit > 0 {
+		query = query.Limit(filter.Limit)
+	}
+	if filter.Offset > 0 {
+		query = query.Offset(filter.Offset)
+	}
+
+	// Execute query
+	if err := query.Find(&readings).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": filter.DeviceID,
+			"error":     err,
+		}).Error("Failed to fetch GPIO readings")
+		return nil, 0, errors.Wrapf(err, "failed to fetch GPIO readings")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"device_id": filter.DeviceID,
+		"count":     len(readings),
+		"total":     total,
+	}).Debug("Fetched GPIO readings")
+
+	return readings, total, nil
+}
+
+// CleanupOldReadings removes GPIO readings older than the specified duration
+func (s *GPIOService) CleanupOldReadings(olderThan time.Duration) (int64, error) {
+	cutoffTime := time.Now().Add(-olderThan)
+
+	result := s.db.DB().Where("timestamp < ?", cutoffTime).Delete(&models.GPIOReading{})
+	if result.Error != nil {
+		s.logger.WithError(result.Error).Error("Failed to cleanup old GPIO readings")
+		return 0, errors.Wrapf(result.Error, "failed to cleanup old GPIO readings")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"deleted_count": result.RowsAffected,
+		"cutoff_time":   cutoffTime,
+	}).Info("Cleaned up old GPIO readings")
+
+	return result.RowsAffected, nil
+}

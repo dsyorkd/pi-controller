@@ -6,39 +6,72 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 
-	"github.com/spenceryork/pi-controller/internal/api/handlers"
-	"github.com/spenceryork/pi-controller/internal/api/middleware"
-	"github.com/spenceryork/pi-controller/internal/config"
-	"github.com/spenceryork/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/api/handlers"
+	"github.com/dsyorkd/pi-controller/internal/api/middleware"
+	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/services"
+	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/sirupsen/logrus"
 )
 
 // Server represents the REST API server
 type Server struct {
-	config   *config.APIConfig
-	logger   *logrus.Logger
-	database *storage.Database
-	router   *gin.Engine
-	server   *http.Server
+	config         *config.APIConfig
+	logger         logger.Interface
+	database       *storage.Database
+	clusterService *services.ClusterService
+	nodeService    *services.NodeService
+	gpioService    *services.GPIOService
+	authManager    *middleware.AuthManager
+	validator      *middleware.Validator
+	rateLimiter    *middleware.RateLimiter
+	router         *gin.Engine
+	server         *http.Server
 }
 
 // New creates a new API server instance
-func New(cfg *config.APIConfig, logger *logrus.Logger, db *storage.Database) *Server {
-	// Set Gin mode based on environment
-	if logger.Level == logrus.DebugLevel {
-		gin.SetMode(gin.DebugMode)
-	} else {
-		gin.SetMode(gin.ReleaseMode)
-	}
+func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Server {
+	// Set Gin mode based on environment  
+	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
 
 	router := gin.New()
 
+	// Initialize services
+	clusterService := services.NewClusterService(db, log)
+	nodeService := services.NewNodeService(db, log)
+	gpioService := services.NewGPIOService(db, log)
+
+	// Initialize authentication manager if auth is enabled
+	var authManager *middleware.AuthManager
+	if cfg.AuthEnabled {
+		authConfig := middleware.DefaultAuthConfig()
+		var err error
+		authManager, err = middleware.NewAuthManager(authConfig, log)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to initialize authentication manager")
+		}
+	}
+
+	// Initialize validator for input validation
+	validator := middleware.NewValidator(middleware.DefaultValidationConfig(), log)
+
+	// Initialize rate limiter with default secure configuration
+	logrusLogger := logrus.New()
+	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), logrusLogger)
+
 	s := &Server{
-		config:   cfg,
-		logger:   logger,
-		database: db,
-		router:   router,
+		config:         cfg,
+		logger:         log,
+		database:       db,
+		clusterService: clusterService,
+		nodeService:    nodeService,
+		gpioService:    gpioService,
+		authManager:    authManager,
+		validator:      validator,
+		rateLimiter:    rateLimiter,
+		router:         router,
 	}
 
 	s.setupRoutes()
@@ -51,6 +84,8 @@ func (s *Server) setupRoutes() {
 	s.router.Use(middleware.Logger(s.logger))
 	s.router.Use(middleware.Recovery(s.logger))
 	s.router.Use(middleware.RequestID())
+	s.router.Use(s.validator.ValidateRequest()) // Add input validation
+	s.router.Use(s.rateLimiter.RateLimit())     // Add rate limiting
 	
 	if s.config.CORSEnabled {
 		s.router.Use(middleware.CORS())
@@ -64,56 +99,71 @@ func (s *Server) setupRoutes() {
 	v1 := s.router.Group("/api/v1")
 	{
 		// Authentication middleware for protected routes
-		if s.config.AuthEnabled {
-			v1.Use(middleware.Auth())
+		if s.config.AuthEnabled && s.authManager != nil {
+			v1.Use(s.authManager.Auth())
 		}
 
 		// Cluster management
-		clusterHandler := handlers.NewClusterHandler(s.database, s.logger)
+		clusterHandler := handlers.NewClusterHandler(s.clusterService, s.logger)
 		clusters := v1.Group("/clusters")
 		{
-			clusters.GET("", clusterHandler.List)
-			clusters.POST("", clusterHandler.Create)
-			clusters.GET("/:id", clusterHandler.Get)
-			clusters.PUT("/:id", clusterHandler.Update)
-			clusters.DELETE("/:id", clusterHandler.Delete)
-			clusters.GET("/:id/nodes", clusterHandler.ListNodes)
-			clusters.GET("/:id/status", clusterHandler.Status)
+			// Read operations - require viewer role
+			clusters.GET("", s.requireRole("viewer"), clusterHandler.List)
+			clusters.GET("/:id", s.requireRole("viewer"), clusterHandler.Get)
+			clusters.GET("/:id/nodes", s.requireRole("viewer"), clusterHandler.ListNodes)
+			clusters.GET("/:id/status", s.requireRole("viewer"), clusterHandler.Status)
+			
+			// Write operations - require operator role
+			clusters.POST("", s.requireRole("operator"), clusterHandler.Create)
+			clusters.PUT("/:id", s.requireRole("operator"), clusterHandler.Update)
+			
+			// Delete operations - require admin role
+			clusters.DELETE("/:id", s.requireRole("admin"), clusterHandler.Delete)
 		}
 
 		// Node management
-		nodeHandler := handlers.NewNodeHandler(s.database, s.logger)
+		nodeHandler := handlers.NewNodeHandler(s.nodeService, s.logger)
 		nodes := v1.Group("/nodes")
 		{
-			nodes.GET("", nodeHandler.List)
-			nodes.POST("", nodeHandler.Create)
-			nodes.GET("/:id", nodeHandler.Get)
-			nodes.PUT("/:id", nodeHandler.Update)
-			nodes.DELETE("/:id", nodeHandler.Delete)
-			nodes.GET("/:id/gpio", nodeHandler.ListGPIO)
-			nodes.POST("/:id/provision", nodeHandler.Provision)
-			nodes.POST("/:id/deprovision", nodeHandler.Deprovision)
+			// Read operations - require viewer role
+			nodes.GET("", s.requireRole("viewer"), nodeHandler.List)
+			nodes.GET("/:id", s.requireRole("viewer"), nodeHandler.Get)
+			nodes.GET("/:id/gpio", s.requireRole("viewer"), nodeHandler.ListGPIO)
+			
+			// Write operations - require operator role
+			nodes.POST("", s.requireRole("operator"), nodeHandler.Create)
+			nodes.PUT("/:id", s.requireRole("operator"), nodeHandler.Update)
+			nodes.POST("/:id/provision", s.requireRole("operator"), nodeHandler.Provision)
+			nodes.POST("/:id/deprovision", s.requireRole("operator"), nodeHandler.Deprovision)
+			
+			// Delete operations - require admin role
+			nodes.DELETE("/:id", s.requireRole("admin"), nodeHandler.Delete)
 		}
 
 		// GPIO management
-		gpioHandler := handlers.NewGPIOHandler(s.database, s.logger)
+		gpioHandler := handlers.NewGPIOHandler(s.gpioService, s.logger)
 		gpio := v1.Group("/gpio")
 		{
-			gpio.GET("", gpioHandler.List)
-			gpio.POST("", gpioHandler.Create)
-			gpio.GET("/:id", gpioHandler.Get)
-			gpio.PUT("/:id", gpioHandler.Update)
-			gpio.DELETE("/:id", gpioHandler.Delete)
-			gpio.POST("/:id/read", gpioHandler.Read)
-			gpio.POST("/:id/write", gpioHandler.Write)
-			gpio.GET("/:id/readings", gpioHandler.GetReadings)
+			// Read operations - require viewer role
+			gpio.GET("", s.requireRole("viewer"), gpioHandler.List)
+			gpio.GET("/:id", s.requireRole("viewer"), gpioHandler.Get)
+			gpio.GET("/:id/readings", s.requireRole("viewer"), gpioHandler.GetReadings)
+			gpio.POST("/:id/read", s.requireRole("viewer"), gpioHandler.Read)
+			
+			// Write operations - require operator role (GPIO control is sensitive)
+			gpio.POST("", s.requireRole("operator"), gpioHandler.Create)
+			gpio.PUT("/:id", s.requireRole("operator"), gpioHandler.Update)
+			gpio.POST("/:id/write", s.requireRole("operator"), gpioHandler.Write)
+			
+			// Delete operations - require admin role
+			gpio.DELETE("/:id", s.requireRole("admin"), gpioHandler.Delete)
 		}
 
-		// System information
+		// System information - require viewer role
 		system := v1.Group("/system")
 		{
-			system.GET("/info", handlers.SystemInfo)
-			system.GET("/metrics", handlers.SystemMetrics)
+			system.GET("/info", s.requireRole("viewer"), handlers.SystemInfo)
+			system.GET("/metrics", s.requireRole("viewer"), handlers.SystemMetrics)
 		}
 	}
 }
@@ -156,4 +206,16 @@ func (s *Server) Stop(ctx context.Context) error {
 // Router returns the underlying Gin router for testing
 func (s *Server) Router() *gin.Engine {
 	return s.router
+}
+
+// requireRole creates a middleware that requires a specific role, only if auth is enabled
+func (s *Server) requireRole(role string) gin.HandlerFunc {
+	// Return a no-op middleware if auth is disabled or authManager is nil
+	if !s.config.AuthEnabled || s.authManager == nil {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+	
+	return s.authManager.RequireRole(role)
 }

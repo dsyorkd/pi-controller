@@ -1,0 +1,11 @@
+# Task ID: 23
+# Title: Define and Apply Kubernetes Custom Resource Definitions (CRDs)
+# Status: todo
+# Dependencies: None
+# Priority: medium
+# Description: Define the schemas for `GPIOPin`, `PWMController`, and `I2CDevice` CRDs and create the necessary YAML files to apply them to a Kubernetes cluster.
+# Details:
+Use the `kubebuilder` or `Operator SDK` framework to scaffold the CRD definitions. Define the `spec` for desired state (e.g., pin mode, PWM duty cycle) and `status` for observed state (e.g., current pin level).
+
+# Test Strategy:
+Apply the generated CRD YAML files to a test K3s cluster using `kubectl apply -f`. Verify that the new resources can be created, listed, and described using `kubectl get gpiopins`.

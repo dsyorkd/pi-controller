@@ -1,0 +1,11 @@
+# Task ID: 16
+# Title: Implement Pi Agent gRPC Client Communication
+# Status: todo
+# Dependencies: 13
+# Priority: high
+# Description: Implement the gRPC client within the Pi Agent to establish communication with the Pi Controller server.
+# Details:
+Use the existing protobuf definitions to generate gRPC client code. Implement logic for the agent to connect to the controller, handle connection retries with exponential backoff, and send a registration or heartbeat message.
+
+# Test Strategy:
+Create a mock gRPC server to test the agent's client. Verify that the agent can connect, send messages, and handle server disconnections gracefully.

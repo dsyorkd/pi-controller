@@ -1,0 +1,11 @@
+# Task ID: 12
+# Title: Install and Configure `golangci-lint`
+# Status: todo
+# Dependencies: 11
+# Priority: high
+# Description: Integrate `golangci-lint` into the project to enforce a consistent and high-quality coding standard. Configure the linter with a standard set of rules.
+# Details:
+Add a `.golangci.yml` configuration file to the project root. Enable linters such as `errcheck`, `govet`, `staticcheck`, `unused`, and `gofmt`. Integrate the linter into the CI/CD pipeline to fail builds on linting errors.
+
+# Test Strategy:
+Run `golangci-lint run` on the codebase. The command should execute successfully. Create a sample pull request with a linting error to verify that the CI check fails as expected.
