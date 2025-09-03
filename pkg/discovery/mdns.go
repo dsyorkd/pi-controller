@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/hashicorp/mdns"
 	"github.com/sirupsen/logrus"
 )
 
@@ -276,68 +278,128 @@ func (s *Service) runMDNSDiscovery(ctx context.Context) {
 
 // performMDNSDiscovery performs a single mDNS discovery cycle
 func (s *Service) performMDNSDiscovery() {
-	// TODO: Implement actual mDNS discovery
-	// This would typically use libraries like github.com/hashicorp/mdns
-	// For now, this is a mock implementation
-
 	s.logger.Debug("Performing mDNS discovery scan")
 
-	// Mock discovery: simulate finding nodes
-	mockNodes := []Node{
-		{
-			ID:          "mdns-pi-001",
-			Name:        "raspberrypi-001",
-			IPAddress:   "192.168.1.101",
-			Port:        s.config.Port,
-			ServiceType: s.config.ServiceType,
-			TXTRecords: map[string]string{
-				"version":      "1.0.0",
-				"capabilities": "gpio,monitoring",
-				"model":        "Raspberry Pi 4",
-			},
-			LastSeen:     time.Now(),
-			Capabilities: []string{"gpio", "monitoring"},
-		},
-		{
-			ID:          "mdns-pi-002",
-			Name:        "raspberrypi-002",
-			IPAddress:   "192.168.1.102",
-			Port:        s.config.Port,
-			ServiceType: s.config.ServiceType,
-			TXTRecords: map[string]string{
-				"version":      "1.0.0",
-				"capabilities": "gpio,monitoring",
-				"model":        "Raspberry Pi 3",
-			},
-			LastSeen:     time.Now(),
-			Capabilities: []string{"gpio", "monitoring"},
-		},
+	// Channel to receive discovered services
+	entriesCh := make(chan *mdns.ServiceEntry, 16)
+	
+	// Start the discovery in a goroutine
+	go func() {
+		defer close(entriesCh)
+		
+		// Set up discovery parameters
+		params := mdns.DefaultParams(s.config.ServiceType)
+		params.Timeout = s.timeout
+		params.Entries = entriesCh
+
+		// Perform the query
+		if err := mdns.Query(params); err != nil {
+			s.logger.WithError(err).Error("mDNS query failed")
+			return
+		}
+	}()
+
+	// Collect discovered nodes
+	discoveredNodes := make([]*Node, 0)
+	
+	// Read from the entries channel
+	for entry := range entriesCh {
+		node := s.createNodeFromEntry(entry)
+		if node != nil {
+			discoveredNodes = append(discoveredNodes, node)
+		}
 	}
 
+	// Update our internal node registry
+	s.processDiscoveredNodes(discoveredNodes)
+}
+
+// createNodeFromEntry creates a Node from an mDNS service entry
+func (s *Service) createNodeFromEntry(entry *mdns.ServiceEntry) *Node {
+	if entry == nil || entry.AddrV4 == nil {
+		return nil
+	}
+
+	// Extract TXT records
+	txtRecords := make(map[string]string)
+	var capabilities []string
+	
+	for _, txt := range entry.InfoFields {
+		if len(txt) > 0 {
+			// Parse key=value pairs in TXT records
+			if strings.Contains(txt, "=") {
+				parts := strings.SplitN(txt, "=", 2)
+				if len(parts) == 2 {
+					key, value := parts[0], parts[1]
+					txtRecords[key] = value
+					
+					// Special handling for capabilities
+					if key == "capabilities" {
+						capabilities = strings.Split(value, ",")
+					}
+				}
+			} else {
+				// Handle single value TXT records
+				txtRecords[txt] = ""
+			}
+		}
+	}
+
+	// Use the IPv4 address (AddrV4 is net.IP)
+	ipAddr := entry.AddrV4
+	
+	// Generate a unique ID based on hostname and IP
+	nodeID := fmt.Sprintf("mdns-%s-%s", entry.Name, ipAddr.String())
+
+	node := &Node{
+		ID:           nodeID,
+		Name:         entry.Name,
+		IPAddress:    ipAddr.String(),
+		Port:         entry.Port,
+		ServiceType:  s.config.ServiceType,
+		TXTRecords:   txtRecords,
+		LastSeen:     time.Now(),
+		Capabilities: capabilities,
+	}
+
+	return node
+}
+
+// processDiscoveredNodes updates the internal registry with discovered nodes
+func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, node := range mockNodes {
+	for _, node := range discoveredNodes {
 		existingNode, exists := s.nodes[node.ID]
 		if exists {
-			// Update existing node
+			// Update existing node timestamp and capabilities
 			existingNode.LastSeen = node.LastSeen
+			existingNode.TXTRecords = node.TXTRecords
+			existingNode.Capabilities = node.Capabilities
+			
 			s.emitEvent(NodeEvent{
 				Type: NodeUpdated,
-				Node: node,
+				Node: *existingNode,
 			})
+			
+			s.logger.WithFields(logrus.Fields{
+				"id":         node.ID,
+				"ip_address": node.IPAddress,
+			}).Debug("Updated existing node via mDNS")
 		} else {
 			// New node discovered
-			s.nodes[node.ID] = &node
+			s.nodes[node.ID] = node
 			s.emitEvent(NodeEvent{
 				Type: NodeDiscovered,
-				Node: node,
+				Node: *node,
 			})
 
 			s.logger.WithFields(logrus.Fields{
 				"id":         node.ID,
 				"name":       node.Name,
 				"ip_address": node.IPAddress,
+				"port":       node.Port,
 			}).Info("Discovered new node via mDNS")
 		}
 	}

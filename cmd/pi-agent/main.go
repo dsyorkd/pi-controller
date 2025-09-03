@@ -15,6 +15,7 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/grpc/client"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/pkg/discovery"
 	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
@@ -190,6 +191,39 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		structuredLogger.WithField("address", agentServer.GetAddress()).Info("Agent GPIO gRPC server started")
 	}
 
+	// Start mDNS advertiser to announce this agent
+	var advertiser *discovery.Advertiser
+	if cfg.Discovery.Enabled && cfg.AgentServer.EnableGPIO {
+		advertiserConfig := discovery.DefaultAdvertiserConfig()
+		advertiserConfig.ServiceName = nodeInfo.Name
+		advertiserConfig.ServiceType = cfg.Discovery.ServiceType
+		advertiserConfig.Port = cfg.AgentServer.Port
+		advertiserConfig.TXTRecords = map[string]string{
+			"version":      version,
+			"capabilities": "gpio,monitoring",
+			"model":        nodeInfo.Model,
+			"arch":         nodeInfo.Architecture,
+			"node_id":      nodeInfo.ID,
+		}
+
+		// Create a logrus logger for advertiser
+		logrusLogger := logrus.New()
+		logrusLogger.SetLevel(logrus.InfoLevel)
+		logrusLogger.SetFormatter(&logrus.JSONFormatter{})
+
+		advertiser = discovery.NewAdvertiser(advertiserConfig, logrusLogger)
+		if err := advertiser.Start(ctx); err != nil {
+			structuredLogger.WithError(err).Error("Failed to start mDNS advertiser")
+			// Don't fail the agent if advertiser fails - it's not critical
+		} else {
+			structuredLogger.WithFields(map[string]interface{}{
+				"service_name": advertiserConfig.ServiceName,
+				"service_type": advertiserConfig.ServiceType,
+				"port":         advertiserConfig.Port,
+			}).Info("mDNS advertiser started")
+		}
+	}
+
 	structuredLogger.Info("Pi Agent started successfully")
 
 	// Main agent loop
@@ -220,6 +254,13 @@ func runAgent(cmd *cobra.Command, args []string) error {
 			if err := grpcClient.UpdateNodeStatus(ctx, registeredNode.Id,
 				pb.NodeStatus_NODE_STATUS_MAINTENANCE); err != nil {
 				structuredLogger.WithError(err).Warn("Failed to update node status to maintenance")
+			}
+
+			// Stop the mDNS advertiser if it's running
+			if advertiser != nil {
+				if err := advertiser.Stop(); err != nil {
+					structuredLogger.WithError(err).Error("Error stopping mDNS advertiser")
+				}
 			}
 
 			// Stop the agent server if it's running

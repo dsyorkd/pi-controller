@@ -1,0 +1,182 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: gpiopins.gpio.pi-controller.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+spec:
+  group: gpio.pi-controller.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        description: GPIOPin is the Schema for the gpiopins API
+        properties:
+          apiVersion:
+            type: string
+            description: 'APIVersion defines the versioned schema of this representation of an object.'
+          kind:
+            type: string
+            description: 'Kind is a string value representing the REST resource this object represents.'
+          metadata:
+            type: object
+          spec:
+            type: object
+            description: GPIOPinSpec defines the desired state of GPIOPin
+            properties:
+              nodeSelector:
+                type: object
+                description: NodeSelector specifies which node this GPIO pin should be managed on
+                additionalProperties:
+                  type: string
+              pinNumber:
+                type: integer
+                description: PinNumber is the GPIO pin number on the target node
+                minimum: 0
+                maximum: 40
+              mode:
+                type: string
+                description: Mode specifies the pin mode (input, output, pwm)
+                enum:
+                - input
+                - output
+                - pwm
+              direction:
+                type: string
+                description: Direction specifies the pin direction for input/output modes
+                enum:
+                - in
+                - out
+              initialValue:
+                type: string
+                description: InitialValue sets the initial pin value for output mode
+                enum:
+                - low
+                - high
+              pullMode:
+                type: string
+                description: PullMode configures internal pull resistors for input mode
+                enum:
+                - none
+                - up
+                - down
+              debounceMs:
+                type: integer
+                description: DebounceMs sets debounce time in milliseconds for input mode
+                minimum: 0
+                maximum: 1000
+              pwmFrequency:
+                type: integer
+                description: PWMFrequency sets the PWM frequency in Hz (PWM mode only)
+                minimum: 1
+                maximum: 100000
+              pwmDutyCycle:
+                type: number
+                description: PWMDutyCycle sets the PWM duty cycle as percentage (0-100)
+                minimum: 0
+                maximum: 100
+            required:
+            - nodeSelector
+            - pinNumber
+            - mode
+          status:
+            type: object
+            description: GPIOPinStatus defines the observed state of GPIOPin
+            properties:
+              phase:
+                type: string
+                description: Phase represents the current lifecycle phase
+                enum:
+                - Pending
+                - Configuring
+                - Ready
+                - Failed
+              nodeId:
+                type: string
+                description: NodeID is the ID of the node managing this pin
+              currentValue:
+                type: string
+                description: CurrentValue is the current pin state (high/low)
+                enum:
+                - low
+                - high
+              actualMode:
+                type: string
+                description: ActualMode is the currently configured pin mode
+                enum:
+                - input
+                - output
+                - pwm
+              actualFrequency:
+                type: integer
+                description: ActualFrequency is the currently configured PWM frequency
+              actualDutyCycle:
+                type: number
+                description: ActualDutyCycle is the currently configured PWM duty cycle
+              lastUpdated:
+                type: string
+                format: date-time
+                description: LastUpdated is the timestamp of the last status update
+              conditions:
+                type: array
+                description: Conditions represent the current service state
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      description: Type of condition
+                    status:
+                      type: string
+                      description: Status of the condition (True, False, Unknown)
+                      enum:
+                      - "True"
+                      - "False"
+                      - "Unknown"
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                      description: Last time the condition transitioned
+                    reason:
+                      type: string
+                      description: Reason for the condition's last transition
+                    message:
+                      type: string
+                      description: Human readable message indicating details
+                  required:
+                  - type
+                  - status
+              message:
+                type: string
+                description: Message provides additional information about the current state
+    additionalPrinterColumns:
+    - name: Node
+      type: string
+      jsonPath: .status.nodeId
+    - name: Pin
+      type: integer
+      jsonPath: .spec.pinNumber
+    - name: Mode
+      type: string
+      jsonPath: .spec.mode
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Current Value
+      type: string
+      jsonPath: .status.currentValue
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: gpiopins
+    singular: gpiopin
+    kind: GPIOPin
+    shortNames:
+    - gpio
+    categories:
+    - pi-controller

@@ -1,0 +1,11 @@
+# Dependencies
+node_modules
+dist
+build
+
+# Generated files
+coverage
+*.log
+
+# Config files
+.env*

@@ -1,0 +1,149 @@
+---
+# Example 1: Temperature and humidity sensor (SHT30)
+apiVersion: gpio.pi-controller.io/v1
+kind: I2CDevice
+metadata:
+  name: sht30-temp-humidity
+  namespace: sensors
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: pi-node-03
+  busNumber: 1
+  address: "0x44"
+  deviceType: sensor
+  registers:
+  - address: "0x2C"
+    name: measurement-command
+    mode: write-only
+    dataType: uint16
+    initialValue: "0x06"  # High repeatability measurement
+  - address: "0x00"
+    name: temperature-data
+    mode: read-only
+    dataType: uint16
+    pollInterval: "2s"
+  - address: "0x03"
+    name: humidity-data
+    mode: read-only
+    dataType: uint16
+    pollInterval: "2s"
+  configuration:
+    clockSpeed: 100000
+    timeout: "500ms"
+    retries: 3
+---
+# Example 2: 16-channel PWM driver (PCA9685)
+apiVersion: gpio.pi-controller.io/v1
+kind: I2CDevice
+metadata:
+  name: pca9685-pwm-driver
+  namespace: automation
+spec:
+  nodeSelector:
+    application: servo-control
+  busNumber: 1
+  address: "0x40"
+  deviceType: gpio-expander
+  registers:
+  - address: "0x00"
+    name: mode1
+    mode: read-write
+    dataType: uint8
+    initialValue: "0x00"  # Normal mode
+  - address: "0x01"
+    name: mode2
+    mode: read-write
+    dataType: uint8
+    initialValue: "0x04"  # Output change on STOP command
+  - address: "0xFE"
+    name: prescaler
+    mode: read-write
+    dataType: uint8
+    initialValue: "0x79"  # ~50Hz PWM frequency
+  - address: "0x06"
+    name: led0-on-low
+    mode: read-write
+    dataType: uint8
+    pollInterval: "5s"
+  configuration:
+    clockSpeed: 400000
+    timeout: "1s"
+    retries: 2
+---
+# Example 3: Real-time clock (DS3231)
+apiVersion: gpio.pi-controller.io/v1
+kind: I2CDevice
+metadata:
+  name: ds3231-rtc
+  namespace: system
+spec:
+  nodeSelector:
+    node-role: master
+  busNumber: 1
+  address: "0x68"
+  deviceType: rtc
+  registers:
+  - address: "0x00"
+    name: seconds
+    mode: read-write
+    dataType: uint8
+    pollInterval: "1s"
+  - address: "0x01"
+    name: minutes
+    mode: read-write
+    dataType: uint8
+    pollInterval: "1s"
+  - address: "0x02"
+    name: hours
+    mode: read-write
+    dataType: uint8
+    pollInterval: "1s"
+  - address: "0x11"
+    name: temperature-msb
+    mode: read-only
+    dataType: int8
+    pollInterval: "10s"
+  - address: "0x12"
+    name: temperature-lsb
+    mode: read-only
+    dataType: uint8
+    pollInterval: "10s"
+  configuration:
+    clockSpeed: 100000
+    timeout: "2s"
+    retries: 5
+---
+# Example 4: OLED Display (SSD1306)
+apiVersion: gpio.pi-controller.io/v1
+kind: I2CDevice
+metadata:
+  name: ssd1306-oled-display
+  namespace: display
+spec:
+  nodeSelector:
+    zone: dashboard
+  busNumber: 1
+  address: "0x3C"
+  deviceType: display
+  registers:
+  - address: "0x00"
+    name: command-register
+    mode: write-only
+    dataType: uint8
+  - address: "0x40"
+    name: data-register
+    mode: write-only
+    dataType: uint8
+  - address: "0x8D"
+    name: charge-pump
+    mode: write-only
+    dataType: uint8
+    initialValue: "0x14"  # Enable charge pump
+  - address: "0xAF"
+    name: display-on
+    mode: write-only
+    dataType: uint8
+  configuration:
+    clockSpeed: 400000
+    timeout: "1s"
+    retries: 3

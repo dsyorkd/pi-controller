@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/dsyorkd/pi-controller/internal/api"
@@ -17,8 +18,11 @@ import (
 	grpcserver "github.com/dsyorkd/pi-controller/internal/grpc/server"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/migrations"
+	"github.com/dsyorkd/pi-controller/internal/models"
+	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	"github.com/dsyorkd/pi-controller/internal/websocket"
+	"github.com/dsyorkd/pi-controller/pkg/discovery"
 )
 
 var (
@@ -148,7 +152,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Start servers
 	var wg sync.WaitGroup
-	serverErrors := make(chan error, 3)
+	serverErrors := make(chan error, 4)
 
 	// Start REST API server
 	apiServer := api.New(&cfg.API, log, db)
@@ -187,6 +191,61 @@ func runServer(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	// Start Discovery Service
+	var discoveryService *discovery.Service
+	if cfg.Discovery.Enabled {
+		discoveryConfig := &discovery.Config{
+			Enabled:     cfg.Discovery.Enabled,
+			Method:      cfg.Discovery.Method,
+			Interface:   cfg.Discovery.Interface,
+			Port:        cfg.Discovery.Port,
+			Interval:    cfg.Discovery.Interval,
+			Timeout:     cfg.Discovery.Timeout,
+			StaticNodes: cfg.Discovery.StaticNodes,
+			ServiceName: cfg.Discovery.ServiceName,
+			ServiceType: cfg.Discovery.ServiceType,
+		}
+
+		// Create a logrus logger for discovery service
+		logrusLogger := logrus.New()
+		logrusLogger.SetLevel(logrus.InfoLevel)
+		logrusLogger.SetFormatter(&logrus.JSONFormatter{})
+
+		discoveryService, err = discovery.NewService(discoveryConfig, logrusLogger)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create discovery service")
+		}
+
+		// Add event handler to process discovered nodes
+		discoveryService.AddEventHandler(func(event discovery.NodeEvent) {
+			log.WithFields(map[string]interface{}{
+				"type":       event.Type,
+				"node_id":    event.Node.ID,
+				"node_name":  event.Node.Name,
+				"ip_address": event.Node.IPAddress,
+				"port":       event.Node.Port,
+			}).Info("Node discovery event")
+
+			// Handle automatic node registration
+			if err := handleNodeDiscoveryEvent(event, db, log); err != nil {
+				log.WithError(err).WithFields(map[string]interface{}{
+					"type":       event.Type,
+					"node_id":    event.Node.ID,
+					"ip_address": event.Node.IPAddress,
+				}).Error("Failed to handle node discovery event")
+			}
+		})
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			log.Info("Starting discovery service")
+			if err := discoveryService.Start(context.Background()); err != nil {
+				serverErrors <- errors.Wrapf(err, "Discovery service error")
+			}
+		}()
+	}
+
 	log.Info("All servers started successfully")
 
 	// Wait for shutdown signal or server error
@@ -220,6 +279,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	// Stop discovery service
+	if discoveryService != nil {
+		go func() {
+			if err := discoveryService.Stop(); err != nil {
+				log.WithError(err).Error("Error stopping discovery service")
+			}
+		}()
+	}
+
 	// Wait for all servers to stop or timeout
 	done := make(chan struct{})
 	go func() {
@@ -235,6 +303,226 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info("Pi Controller shutdown complete")
+	return nil
+}
+
+// handleNodeDiscoveryEvent processes node discovery events and automatically registers new nodes
+func handleNodeDiscoveryEvent(event discovery.NodeEvent, db *storage.Database, log *logger.Logger) error {
+	switch event.Type {
+	case discovery.NodeDiscovered:
+		return handleNodeRegistration(event, db, log)
+	case discovery.NodeLost:
+		return handleNodeLost(event, db, log)
+	case discovery.NodeUpdated:
+		return handleNodeUpdate(event, db, log)
+	default:
+		log.WithField("event_type", event.Type).Debug("Ignoring unhandled discovery event type")
+		return nil
+	}
+}
+
+// handleNodeRegistration processes new node discovery and registration
+func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log *logger.Logger) error {
+
+	node := event.Node
+	log.WithFields(map[string]interface{}{
+		"node_id":    node.ID,
+		"node_name":  node.Name,
+		"ip_address": node.IPAddress,
+		"port":       node.Port,
+	}).Info("Processing automatic node registration")
+
+	// Create node service
+	nodeService := services.NewNodeService(db, log)
+
+	// Check if node already exists by IP address
+	existingNode, err := nodeService.GetByIPAddress(node.IPAddress)
+	if err != nil && err != services.ErrNotFound {
+		return errors.Wrapf(err, "failed to check for existing node")
+	}
+
+	if existingNode != nil {
+		// Node already exists, update last seen timestamp
+		if err := nodeService.UpdateLastSeen(existingNode.ID); err != nil {
+			return errors.Wrapf(err, "failed to update last seen for existing node")
+		}
+		
+		log.WithFields(map[string]interface{}{
+			"node_id":      existingNode.ID,
+			"node_name":    existingNode.Name,
+			"ip_address":   existingNode.IPAddress,
+			"discovery_id": node.ID,
+		}).Info("Updated existing node last seen timestamp")
+		
+		return nil
+	}
+
+	// Extract node information from TXT records
+	architecture := node.TXTRecords["arch"]
+	model := node.TXTRecords["model"]
+	version := node.TXTRecords["version"]
+	nodeIdFromTXT := node.TXTRecords["node_id"]
+	
+	// Use discovery node_id if available from TXT records, otherwise use discovery ID
+	nodeName := node.Name
+	if nodeIdFromTXT != "" {
+		nodeName = nodeIdFromTXT
+	}
+
+	// Default role to worker - could be enhanced to detect master nodes
+	role := models.NodeRoleWorker
+
+	// Create new node registration request
+	createReq := services.CreateNodeRequest{
+		Name:         nodeName,
+		IPAddress:    node.IPAddress,
+		MACAddress:   "", // Not available from mDNS discovery
+		Role:         role,
+		Architecture: architecture,
+		Model:        model,
+		CPUCores:     1, // Default, will be updated when node connects
+		Memory:       1024 * 1024 * 1024, // Default 1GB, will be updated when node connects
+	}
+
+	// Create the new node
+	newNode, err := nodeService.Create(createReq)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create new node")
+	}
+
+	log.WithFields(map[string]interface{}{
+		"node_id":      newNode.ID,
+		"node_name":    newNode.Name,
+		"ip_address":   newNode.IPAddress,
+		"discovery_id": node.ID,
+		"architecture": architecture,
+		"model":        model,
+		"version":      version,
+	}).Info("Successfully registered new node from discovery")
+
+	// TODO: Generate and distribute client certificates for secure gRPC communication
+	// This will be implemented in a future task (Task 28: Certificate Authority)
+	
+	return nil
+}
+
+// handleNodeLost processes node lost events and updates node status
+func handleNodeLost(event discovery.NodeEvent, db *storage.Database, log *logger.Logger) error {
+	node := event.Node
+	
+	log.WithFields(map[string]interface{}{
+		"node_id":    node.ID,
+		"ip_address": node.IPAddress,
+	}).Info("Processing node lost event")
+
+	// Create node service
+	nodeService := services.NewNodeService(db, log)
+
+	// Find existing node by IP address
+	existingNode, err := nodeService.GetByIPAddress(node.IPAddress)
+	if err != nil {
+		if err == services.ErrNotFound {
+			log.WithField("ip_address", node.IPAddress).Debug("Node lost event for unknown node, ignoring")
+			return nil
+		}
+		return errors.Wrapf(err, "failed to find node for lost event")
+	}
+
+	// Update node status to unknown since it's no longer responding
+	updateReq := services.UpdateNodeRequest{
+		Status: &[]models.NodeStatus{models.NodeStatusUnknown}[0],
+	}
+
+	_, err = nodeService.Update(existingNode.ID, updateReq)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update node status on lost event")
+	}
+
+	log.WithFields(map[string]interface{}{
+		"node_id":      existingNode.ID,
+		"node_name":    existingNode.Name,
+		"ip_address":   existingNode.IPAddress,
+		"new_status":   models.NodeStatusUnknown,
+	}).Info("Updated node status due to lost event")
+
+	return nil
+}
+
+// handleNodeUpdate processes node update events and refreshes node information
+func handleNodeUpdate(event discovery.NodeEvent, db *storage.Database, log *logger.Logger) error {
+	node := event.Node
+	
+	log.WithFields(map[string]interface{}{
+		"node_id":    node.ID,
+		"ip_address": node.IPAddress,
+	}).Debug("Processing node update event")
+
+	// Create node service
+	nodeService := services.NewNodeService(db, log)
+
+	// Find existing node by IP address
+	existingNode, err := nodeService.GetByIPAddress(node.IPAddress)
+	if err != nil {
+		if err == services.ErrNotFound {
+			// Node doesn't exist yet, treat as discovery
+			log.WithField("ip_address", node.IPAddress).Info("Node update event for unknown node, treating as discovery")
+			return handleNodeRegistration(event, db, log)
+		}
+		return errors.Wrapf(err, "failed to find node for update event")
+	}
+
+	// Update last seen timestamp and any changed TXT record information
+	if err := nodeService.UpdateLastSeen(existingNode.ID); err != nil {
+		return errors.Wrapf(err, "failed to update last seen for updated node")
+	}
+
+	// Extract updated node information from TXT records
+	architecture := node.TXTRecords["arch"]
+	model := node.TXTRecords["model"]
+	
+	updateReq := services.UpdateNodeRequest{}
+	hasUpdates := false
+
+	// Update architecture if it has changed
+	if architecture != "" && architecture != existingNode.Architecture {
+		updateReq.Architecture = &architecture
+		hasUpdates = true
+	}
+
+	// Update model if it has changed
+	if model != "" && model != existingNode.Model {
+		updateReq.Model = &model
+		hasUpdates = true
+	}
+
+	// If the node was marked as unknown, update it back to discovered status
+	if existingNode.Status == models.NodeStatusUnknown {
+		status := models.NodeStatusDiscovered
+		updateReq.Status = &status
+		hasUpdates = true
+	}
+
+	// Apply updates if any
+	if hasUpdates {
+		_, err = nodeService.Update(existingNode.ID, updateReq)
+		if err != nil {
+			return errors.Wrapf(err, "failed to update node information")
+		}
+
+		log.WithFields(map[string]interface{}{
+			"node_id":      existingNode.ID,
+			"node_name":    existingNode.Name,
+			"ip_address":   existingNode.IPAddress,
+			"architecture": architecture,
+			"model":        model,
+		}).Info("Updated node information from discovery update")
+	} else {
+		log.WithFields(map[string]interface{}{
+			"node_id":      existingNode.ID,
+			"ip_address":   existingNode.IPAddress,
+		}).Debug("Node update event processed, no changes detected")
+	}
+
 	return nil
 }
 

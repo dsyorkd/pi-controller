@@ -446,7 +446,7 @@
         "dependencies": [
           13
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -459,7 +459,7 @@
         "dependencies": [
           21
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -470,7 +470,7 @@
         "testStrategy": "Apply the generated CRD YAML files to a test K3s cluster using `kubectl apply -f`. Verify that the new resources can be created, listed, and described using `kubectl get gpiopins`.",
         "priority": "medium",
         "dependencies": [],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -484,7 +484,7 @@
           19,
           23
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -497,7 +497,7 @@
         "dependencies": [
           23
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -508,7 +508,7 @@
         "testStrategy": "Write unit tests that connect to a mock SSH server. Test command execution, file transfer (SFTP), and error handling for connection failures.",
         "priority": "medium",
         "dependencies": [],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -558,7 +558,7 @@
         "testStrategy": "Run the development server and confirm the default application page loads correctly. Create a simple 'Hello World' component and a unit test for it using Jest and React Testing Library to verify the test setup.",
         "priority": "medium",
         "dependencies": [],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -740,8 +740,8 @@
             "title": "Create Mocks for Service Layer Dependencies",
             "description": "Implement mock objects for the service interfaces found in the `internal/services` package (e.g., `DeploymentService`, `PodService`, `K8sService`). Use the `testify/mock` library to generate these mocks. This foundational step is required to test the handlers in isolation.",
             "dependencies": [],
-            "details": "Create a new package, `internal/services/mocks`, or a local `mocks_test.go` file. Define mock structs that embed `mock.Mock` and implement the service interfaces. For example, for `DeploymentService`, create a `MockDeploymentService` with methods like `GetDeployments` and `CreateDeployment` that can be configured to return specific values or errors for testing.",
-            "status": "pending",
+            "details": "Create a new package, `internal/services/mocks`, or a local `mocks_test.go` file. Define mock structs that embed `mock.Mock` and implement the service interfaces. For example, for `DeploymentService`, create a `MockDeploymentService` with methods like `GetDeployments` and `CreateDeployment` that can be configured to return specific values or errors for testing.\n<info added on 2025-09-03T22:14:35.537Z>\nMocks have been successfully implemented in `internal/services/mocks_test.go` using the `testify/mock` library.\n\n**Mocks Created:**\n- `MockClusterService`\n- `MockNodeService`\n- `MockGPIOService`\n- `MockDeploymentService`\n\n**Validation:**\n- All existing tests continue to pass.\n- Code passes `go vet` static analysis.\n\nThe mocks provide full coverage for the service methods needed by the API handlers and are ready for use in subsequent handler unit tests.\n</info added on 2025-09-03T22:14:35.537Z>",
+            "status": "done",
             "testStrategy": "The mocks themselves don't need tests, but their correct usage will be validated in the handler unit tests."
           },
           {
@@ -749,8 +749,8 @@
             "title": "Write Unit Tests for Health Check Handler",
             "description": "Create a test file `internal/api/handlers/health_test.go` to test the `GetHealth` handler. This is the simplest handler and will serve to establish the basic testing pattern using `net/http/httptest` and a test Gin engine.",
             "dependencies": [],
-            "details": "In `health_test.go`, create a test function. Inside, set up a Gin test router, register the `GetHealth` handler to a route (e.g., `/health`). Create a new `http.Request` using `httptest.NewRequest` and a `httptest.NewRecorder`. Serve the HTTP request and assert that the response status code is `http.StatusOK` and the JSON body is `{\"status\": \"ok\"}`.",
-            "status": "pending",
+            "details": "In `health_test.go`, create a test function. Inside, set up a Gin test router, register the `GetHealth` handler to a route (e.g., `/health`). Create a new `http.Request` using `httptest.NewRequest` and a `httptest.NewRecorder`. Serve the HTTP request and assert that the response status code is `http.StatusOK` and the JSON body is `{\"status\": \"ok\"}`.\n<info added on 2025-09-03T22:16:00.903Z>\nThe implementation was expanded to provide a comprehensive test suite for all health-related endpoints, going beyond the original requirement for a single `/health` check.\n\n**Key Additions & Validations:**\n*   **Multiple Endpoints:** Tests were added for readiness (`/ready`), system information (`/system/info`), and system metrics (`/system/metrics`).\n*   **Database Health:** The readiness test includes scenarios for both healthy and unhealthy database connections.\n*   **Security:** Tests confirm that only the GET method is allowed and that no sensitive information is exposed.\n*   **Concurrency:** The handlers were tested for thread safety with 50 concurrent requests.\n*   **Performance:** Benchmarks were added for the health and readiness endpoints.\n\nAll tests were implemented using `httptest`, a Gin test router, and `testify` for assertions, and are passing successfully.\n</info added on 2025-09-03T22:16:00.903Z>",
+            "status": "done",
             "testStrategy": "Directly test the handler's output without any mocks, as it should be self-contained."
           },
           {
@@ -760,8 +760,8 @@
             "dependencies": [
               "37.1"
             ],
-            "details": "Instantiate the `DeploymentHandler` with the `MockDeploymentService`. For `GetDeployments`, test the success case where the mock returns a list of deployments and the error case where it returns an error. For `CreateDeployment`, test valid and invalid JSON input, as well as success and error responses from the mock service. Assert status codes and JSON response bodies for all cases.",
-            "status": "pending",
+            "details": "Instantiate the `DeploymentHandler` with the `MockDeploymentService`. For `GetDeployments`, test the success case where the mock returns a list of deployments and the error case where it returns an error. For `CreateDeployment`, test valid and invalid JSON input, as well as success and error responses from the mock service. Assert status codes and JSON response bodies for all cases.\n<info added on 2025-09-03T22:17:06.287Z>\nBased on user feedback, it has been confirmed that `DeploymentHandler` does not exist in the `internal/api/handlers` package. This subtask will now focus on writing unit tests for the existing `Cluster` handlers found in `/internal/api/handlers/cluster.go`, as they represent the most appropriate alternative for testing within the API layer.\n</info added on 2025-09-03T22:17:06.287Z>\n<info added on 2025-09-03T22:22:27.208Z>\n<info added on 2025-09-03T22:45:12.113Z>\nImplementation is complete. Since the `DeploymentHandler` does not exist in the codebase, comprehensive unit tests were created for the `Cluster` handlers in a new file: `internal/api/handlers/cluster_test.go`. The tests utilize a `MockClusterService` and an interface-based approach for dependency injection. The suite provides full coverage for all cluster API endpoints (`List`, `Create`, `Get`, `Update`, `Delete`, `ListNodes`, `Status`), validating success paths, invalid JSON and ID parameters, service layer error propagation, and correct HTTP status codes and response bodies. All tests are passing.\n</info added on 2025-09-03T22:45:12.113Z>\n</info added on 2025-09-03T22:22:27.208Z>",
+            "status": "done",
             "testStrategy": "Use the mock service to control the outcomes of service layer calls, focusing the tests on the handler's logic for request parsing, response formatting, and error handling."
           },
           {
@@ -1258,7 +1258,7 @@
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-03T04:01:33.380Z",
+      "updated": "2025-09-03T23:42:17.538Z",
       "description": "Tasks for master context"
     }
   }

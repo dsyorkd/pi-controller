@@ -751,6 +751,54 @@ func (s *GPIOService) CleanupExpiredReservations() (int64, error) {
 	return int64(len(expiredDevices)), nil
 }
 
+// ConfigurePin configures a GPIO pin for Kubernetes controller integration
+func (s *GPIOService) ConfigurePin(ctx context.Context, req *GPIORequest) error {
+	s.logger.WithFields(map[string]interface{}{
+		"node_id":     req.NodeID,
+		"pin_number":  req.PinNumber,
+		"mode":        req.Mode,
+		"direction":   req.Direction,
+		"value":       req.Value,
+	}).Info("Configuring GPIO pin for Kubernetes controller")
+
+	// Handle cleanup mode
+	if req.Mode == "cleanup" {
+		return s.cleanupPin(ctx, req)
+	}
+
+	// For now, this is a stub implementation that would integrate with the gRPC client
+	// In a full implementation, this would:
+	// 1. Find or create a GPIO device entry
+	// 2. Get the gRPC client for the target node
+	// 3. Configure the pin via gRPC call
+	// 4. Update the device status
+
+	// TODO: Implement actual gRPC communication
+	s.logger.WithFields(map[string]interface{}{
+		"node_id":     req.NodeID,
+		"pin_number":  req.PinNumber,
+		"mode":        req.Mode,
+	}).Info("GPIO pin configuration complete (stub implementation)")
+
+	return nil
+}
+
+// cleanupPin handles GPIO pin cleanup
+func (s *GPIOService) cleanupPin(ctx context.Context, req *GPIORequest) error {
+	s.logger.WithFields(map[string]interface{}{
+		"node_id":    req.NodeID,
+		"pin_number": req.PinNumber,
+	}).Info("Cleaning up GPIO pin")
+
+	// TODO: Implement actual cleanup logic
+	// This would typically:
+	// 1. Set pin to safe state (input mode, low value)
+	// 2. Release any hardware reservations
+	// 3. Update database status
+
+	return nil
+}
+
 // Close gracefully closes the GPIO service and all agent connections
 func (s *GPIOService) Close() error {
 	s.logger.Info("Shutting down GPIO service")

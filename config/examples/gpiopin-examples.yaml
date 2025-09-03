@@ -1,0 +1,58 @@
+---
+# Example 1: Simple LED control - GPIO pin 18 as output
+apiVersion: gpio.pi-controller.io/v1
+kind: GPIOPin
+metadata:
+  name: led-gpio18
+  namespace: default
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: pi-node-01
+  pinNumber: 18
+  mode: output
+  direction: out
+  initialValue: low
+---
+# Example 2: Button input with pull-up resistor - GPIO pin 24
+apiVersion: gpio.pi-controller.io/v1
+kind: GPIOPin
+metadata:
+  name: button-gpio24
+  namespace: default
+spec:
+  nodeSelector:
+    node-role: worker
+  pinNumber: 24
+  mode: input
+  direction: in
+  pullMode: up
+  debounceMs: 50
+---
+# Example 3: PWM output for servo control - GPIO pin 12
+apiVersion: gpio.pi-controller.io/v1
+kind: GPIOPin
+metadata:
+  name: servo-pwm-gpio12
+  namespace: default
+spec:
+  nodeSelector:
+    kubernetes.io/arch: arm64
+  pinNumber: 12
+  mode: pwm
+  pwmFrequency: 50
+  pwmDutyCycle: 7.5
+---
+# Example 4: Motion sensor input - GPIO pin 23
+apiVersion: gpio.pi-controller.io/v1
+kind: GPIOPin
+metadata:
+  name: motion-sensor-gpio23
+  namespace: iot-sensors
+spec:
+  nodeSelector:
+    zone: outdoor
+  pinNumber: 23
+  mode: input
+  direction: in
+  pullMode: down
+  debounceMs: 100
