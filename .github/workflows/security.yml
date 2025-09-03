@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.22"
 
 jobs:
   # Dependency vulnerability scanning
@@ -37,6 +37,11 @@ jobs:
             echo "Make is already installed"
           fi
 
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -51,10 +56,10 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
-      - name: Run Nancy (Sonatype dependency scan)
+      - name: Run Additional Vulnerability Scan with OSV-Scanner
         run: |
-          go install github.com/sonatypecommunity/nancy@latest
-          go list -json -m all | nancy sleuth
+          go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+          osv-scanner --lockfile=go.mod .
 
       - name: Generate SBOM (Software Bill of Materials)
         run: |
@@ -90,6 +95,11 @@ jobs:
           else
             echo "Make is already installed"
           fi
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
 
       - name: Set up Go
         uses: actions/setup-go@v4
