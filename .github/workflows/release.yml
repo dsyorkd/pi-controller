@@ -15,11 +15,11 @@ on:
       prerelease:
         description: 'Is this a prerelease?'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 env:
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.22"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -100,24 +100,34 @@ jobs:
           - goos: linux
             goarch: arm64
             name: linux-arm64
-          - goos: linux
-            goarch: arm
-            goarm: 7
-            name: linux-armv7
-          # macOS builds
-          - goos: darwin
-            goarch: amd64
-            name: darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            name: darwin-arm64
+          # - goos: linux
+          #   goarch: arm
+          #   goarm: 7
+          #   name: linux-armv7
+          # # macOS builds
+          # - goos: darwin
+          #   goarch: amd64
+          #   name: darwin-amd64
+          # - goos: darwin
+          #   goarch: arm64
+          #   name: darwin-arm64
           # Windows builds
-          - goos: windows
-            goarch: amd64
-            name: windows-amd64
+          # - goos: windows
+          #   goarch: amd64
+          #   name: windows-amd64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@v4

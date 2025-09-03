@@ -36,7 +36,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.22"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -59,77 +59,52 @@ jobs:
             goarch: arm64
             name: linux-arm64
             primary: true
-          - goos: linux
-            goarch: arm
-            goarm: 7
-            name: linux-armv7
-            primary: true
-          - goos: linux
-            goarch: arm
-            goarm: 6
-            name: linux-armv6
-            primary: true
+          # - goos: linux
+          #   goarch: arm
+          #   goarm: 7
+          #   name: linux-armv7
+          #   primary: true
+          # - goos: linux
+          #   goarch: arm
+          #   goarm: 6
+          #   name: linux-armv6
+          #   primary: true
           
           # macOS builds
-          - goos: darwin
-            goarch: amd64
-            name: darwin-amd64
-            primary: false
-          - goos: darwin
-            goarch: arm64
-            name: darwin-arm64
-            primary: false
+          # - goos: darwin
+          #   goarch: amd64
+          #   name: darwin-amd64
+          #   primary: false
+          # - goos: darwin
+          #   goarch: arm64
+          #   name: darwin-arm64
+          #   primary: false
           
           # Windows builds
-          - goos: windows
-            goarch: amd64
-            name: windows-amd64
-            primary: false
-          - goos: windows
-            goarch: arm64
-            name: windows-arm64
-            primary: false
+          # - goos: windows
+          #   goarch: amd64
+          #   name: windows-amd64
+          #   primary: false
+          # - goos: windows
+          #   goarch: arm64
+          #   name: windows-arm64
+          #   primary: false
           
           # BSD variants
-          - goos: freebsd
-            goarch: amd64
-            name: freebsd-amd64
-            primary: false
-          - goos: openbsd
-            goarch: amd64
-            name: openbsd-amd64
-            primary: false
-          - goos: netbsd
-            goarch: amd64
-            name: netbsd-amd64
-            primary: false
+          # - goos: freebsd
+          #   goarch: amd64
+          #   name: freebsd-amd64
+          #   primary: false
+          # - goos: openbsd
+          #   goarch: amd64
+          #   name: openbsd-amd64
+          #   primary: false
+          # - goos: netbsd
+          #   goarch: amd64
+          #   name: netbsd-amd64
+          #   primary: false
           
-          # Additional architectures (if requested)
-          - goos: linux
-            goarch: mips
-            name: linux-mips
-            primary: false
-            experimental: true
-          - goos: linux
-            goarch: mips64
-            name: linux-mips64
-            primary: false
-            experimental: true
-          - goos: linux
-            goarch: ppc64le
-            name: linux-ppc64le
-            primary: false
-            experimental: true
-          - goos: linux
-            goarch: s390x
-            name: linux-s390x
-            primary: false
-            experimental: true
-          - goos: linux
-            goarch: riscv64
-            name: linux-riscv64
-            primary: false
-            experimental: true
+
 
     steps:
       - name: Skip experimental builds
@@ -140,7 +115,15 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
-
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
       - name: Set up Go
         uses: actions/setup-go@v4
         with:

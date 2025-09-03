@@ -27,6 +27,16 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -188,6 +198,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
+          
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
