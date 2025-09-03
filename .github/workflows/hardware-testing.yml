@@ -45,7 +45,7 @@ concurrency:
   cancel-in-progress: false # Don't cancel hardware tests
 
 env:
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.24"
   TEST_DURATION: ${{ github.event.inputs.duration || '10' }}
   GPIO_TEST_PINS: ${{ github.event.inputs.gpio_pins || '18,19' }}
 
