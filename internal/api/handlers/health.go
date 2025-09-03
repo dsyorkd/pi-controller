@@ -80,11 +80,11 @@ func SystemInfo(c *gin.Context) {
 	runtime.ReadMemStats(&m)
 
 	info := gin.H{
-		"go_version":     runtime.Version(),
-		"go_os":          runtime.GOOS,
-		"go_arch":        runtime.GOARCH,
-		"cpu_count":      runtime.NumCPU(),
-		"goroutines":     runtime.NumGoroutine(),
+		"go_version": runtime.Version(),
+		"go_os":      runtime.GOOS,
+		"go_arch":    runtime.GOARCH,
+		"cpu_count":  runtime.NumCPU(),
+		"goroutines": runtime.NumGoroutine(),
 		"memory": gin.H{
 			"alloc":        m.Alloc,
 			"total_alloc":  m.TotalAlloc,
@@ -96,9 +96,9 @@ func SystemInfo(c *gin.Context) {
 			"heap_objects": m.HeapObjects,
 		},
 		"gc": gin.H{
-			"num_gc":        m.NumGC,
-			"pause_total":   m.PauseTotalNs,
-			"last_gc":       time.Unix(0, int64(m.LastGC)).Format(time.RFC3339),
+			"num_gc":      m.NumGC,
+			"pause_total": m.PauseTotalNs,
+			"last_gc":     time.Unix(0, int64(m.LastGC)).Format(time.RFC3339),
 		},
 		"timestamp": time.Now(),
 		"uptime":    time.Since(startTime).String(),

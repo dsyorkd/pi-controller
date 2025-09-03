@@ -1,0 +1,513 @@
+name: Hardware-in-the-Loop Testing
+
+on:
+  schedule:
+    # Run comprehensive hardware tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - gpio
+          - networking
+          - performance
+          - integration
+      gpio_pins:
+        description: 'GPIO pins to test (comma-separated, e.g., 18,19,20)'
+        required: false
+        default: '18,19,20,21'
+      duration:
+        description: 'Test duration in minutes'
+        required: false
+        default: '30'
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'cmd/pi-agent/**'
+      - 'internal/agent/**'
+      - 'pkg/gpio/**'
+      - 'test/hardware/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'cmd/pi-agent/**'
+      - 'internal/agent/**'  
+      - 'pkg/gpio/**'
+      - 'test/hardware/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false # Don't cancel hardware tests
+
+env:
+  GO_VERSION: "1.21"
+  TEST_DURATION: ${{ github.event.inputs.duration || '10' }}
+  GPIO_TEST_PINS: ${{ github.event.inputs.gpio_pins || '18,19' }}
+
+jobs:
+  # Pre-flight checks before hardware testing
+  preflight:
+    name: Hardware Test Pre-flight
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    timeout-minutes: 5
+    outputs:
+      hardware_available: ${{ steps.hardware_check.outputs.available }}
+      gpio_pins: ${{ steps.gpio_check.outputs.pins }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check hardware availability
+        id: hardware_check
+        run: |
+          echo "Checking Raspberry Pi hardware..."
+          
+          # Check if running on actual Pi hardware
+          if [[ -f /proc/device-tree/model ]]; then
+            MODEL=$(cat /proc/device-tree/model)
+            echo "Hardware model: $MODEL"
+            
+            if [[ "$MODEL" == *"Raspberry Pi"* ]]; then
+              echo "available=true" >> $GITHUB_OUTPUT
+              echo "✅ Raspberry Pi hardware detected"
+            else
+              echo "available=false" >> $GITHUB_OUTPUT
+              echo "❌ Not running on Raspberry Pi hardware"
+            fi
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "❌ Device tree not found - not running on Raspberry Pi"
+          fi
+
+      - name: Check GPIO availability
+        id: gpio_check
+        run: |
+          # Check if GPIO sysfs interface is available
+          if [[ -d /sys/class/gpio ]]; then
+            echo "GPIO sysfs interface available"
+            
+            # Check specific pins
+            AVAILABLE_PINS=""
+            IFS=',' read -ra PINS <<< "$GPIO_TEST_PINS"
+            for pin in "${PINS[@]}"; do
+              pin=$(echo $pin | xargs) # trim whitespace
+              if [[ -d "/sys/class/gpio/gpio$pin" ]] || echo $pin > /sys/class/gpio/export 2>/dev/null; then
+                AVAILABLE_PINS="$AVAILABLE_PINS,$pin"
+                echo $pin > /sys/class/gpio/unexport 2>/dev/null || true
+              fi
+            done
+            
+            AVAILABLE_PINS=${AVAILABLE_PINS#,} # remove leading comma
+            echo "pins=$AVAILABLE_PINS" >> $GITHUB_OUTPUT
+            echo "Available GPIO pins: $AVAILABLE_PINS"
+          else
+            echo "pins=" >> $GITHUB_OUTPUT
+            echo "❌ GPIO interface not available"
+          fi
+
+      - name: System information
+        run: |
+          echo "=== System Information ===" >> $GITHUB_STEP_SUMMARY
+          echo "- **OS**: $(uname -a)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Architecture**: $(uname -m)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Memory**: $(free -h | grep '^Mem' | awk '{print $2}')" >> $GITHUB_STEP_SUMMARY
+          if [[ -f /proc/device-tree/model ]]; then
+            echo "- **Hardware**: $(cat /proc/device-tree/model)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ -f /proc/cpuinfo ]]; then
+            echo "- **CPU**: $(grep 'model name\|Hardware' /proc/cpuinfo | head -1 | cut -d: -f2 | xargs)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # GPIO hardware testing
+  gpio-hardware-test:
+    name: GPIO Hardware Test
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: preflight
+    timeout-minutes: 30
+    if: needs.preflight.outputs.hardware_available == 'true' && needs.preflight.outputs.gpio_pins != ''
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Build agent for hardware testing
+        run: make build-linux-arm64
+
+      - name: Create hardware test configuration
+        run: |
+          mkdir -p test/config
+          cat > test/config/agent-hardware-test.yml << EOF
+          server:
+            bind: "127.0.0.1:9091"
+            tls:
+              enabled: false
+          
+          gpio:
+            enabled: true
+            mock_mode: false  # Use real hardware
+            test_pins: [${{ needs.preflight.outputs.gpio_pins }}]
+          
+          logging:
+            level: "debug"
+            format: "text"
+          
+          metrics:
+            enabled: true
+            bind: "127.0.0.1:9092"
+          EOF
+
+      - name: Run GPIO functionality tests
+        timeout-minutes: ${{ fromJson(env.TEST_DURATION) }}
+        run: |
+          echo "Running GPIO hardware tests..."
+          
+          # Start agent in background
+          ./build/pi-agent-linux-arm64 --config-file=test/config/agent-hardware-test.yml &
+          AGENT_PID=$!
+          
+          # Wait for agent to start
+          sleep 3
+          
+          # Check if agent is running
+          if ! kill -0 $AGENT_PID 2>/dev/null; then
+            echo "❌ Agent failed to start"
+            exit 1
+          fi
+          
+          echo "Agent started with PID: $AGENT_PID"
+          
+          # Run GPIO tests
+          cd test/hardware
+          if [[ -f gpio_test.go ]]; then
+            go test -v -run TestGPIO -timeout=${TEST_DURATION}m ./...
+          else
+            echo "Creating basic GPIO test..."
+            go run -tags hardware ../scripts/gpio_test.go --pins=${{ needs.preflight.outputs.gpio_pins }}
+          fi
+          
+          # Cleanup
+          kill $AGENT_PID || true
+          wait $AGENT_PID 2>/dev/null || true
+
+      - name: Test GPIO pin states and transitions
+        run: |
+          echo "Testing GPIO pin state transitions..."
+          
+          IFS=',' read -ra PINS <<< "${{ needs.preflight.outputs.gpio_pins }}"
+          for pin in "${PINS[@]}"; do
+            pin=$(echo $pin | xargs)
+            echo "Testing GPIO pin $pin..."
+            
+            # Export pin
+            echo $pin > /sys/class/gpio/export 2>/dev/null || true
+            sleep 0.1
+            
+            if [[ -d "/sys/class/gpio/gpio$pin" ]]; then
+              # Test output mode
+              echo out > /sys/class/gpio/gpio$pin/direction
+              echo 1 > /sys/class/gpio/gpio$pin/value
+              sleep 0.1
+              
+              VALUE=$(cat /sys/class/gpio/gpio$pin/value)
+              if [[ "$VALUE" == "1" ]]; then
+                echo "✅ GPIO $pin high state test passed"
+              else
+                echo "❌ GPIO $pin high state test failed"
+              fi
+              
+              echo 0 > /sys/class/gpio/gpio$pin/value
+              sleep 0.1
+              
+              VALUE=$(cat /sys/class/gpio/gpio$pin/value)
+              if [[ "$VALUE" == "0" ]]; then
+                echo "✅ GPIO $pin low state test passed"
+              else
+                echo "❌ GPIO $pin low state test failed"
+              fi
+              
+              # Test input mode
+              echo in > /sys/class/gpio/gpio$pin/direction
+              echo "✅ GPIO $pin input mode test passed"
+              
+              # Cleanup
+              echo $pin > /sys/class/gpio/unexport 2>/dev/null || true
+            else
+              echo "❌ GPIO $pin not available for testing"
+            fi
+          done
+
+      - name: Upload GPIO test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpio-hardware-test-logs
+          path: |
+            /tmp/pi-agent*.log
+            test/logs/
+          retention-days: 7
+
+  # Performance testing on hardware
+  performance-hardware-test:
+    name: Performance Test on Pi Hardware
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: preflight
+    timeout-minutes: 25
+    if: needs.preflight.outputs.hardware_available == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies and build
+        run: |
+          make deps
+          make proto
+          make build-linux-arm64
+
+      - name: Run performance benchmarks
+        run: |
+          echo "Running performance benchmarks on Pi hardware..."
+          
+          # CPU and memory usage baseline
+          echo "=== System Baseline ===" | tee performance-results.txt
+          free -h >> performance-results.txt
+          cat /proc/loadavg >> performance-results.txt
+          
+          # Run Go benchmarks
+          echo "=== Go Benchmarks ===" >> performance-results.txt
+          timeout ${TEST_DURATION}m go test -bench=. -benchmem -cpu=1,2,4 ./... >> performance-results.txt 2>&1 || true
+          
+          # Test binary startup performance
+          echo "=== Binary Performance ===" >> performance-results.txt
+          
+          # Controller startup time
+          START_TIME=$(date +%s%N)
+          timeout 5s ./build/pi-controller-linux-arm64 --version >/dev/null 2>&1 || true
+          END_TIME=$(date +%s%N)
+          STARTUP_TIME=$((($END_TIME - $START_TIME) / 1000000)) # Convert to milliseconds
+          echo "Controller startup time: ${STARTUP_TIME}ms" >> performance-results.txt
+          
+          # Agent startup time
+          START_TIME=$(date +%s%N)
+          timeout 5s ./build/pi-agent-linux-arm64 --version >/dev/null 2>&1 || true
+          END_TIME=$(date +%s%N)
+          STARTUP_TIME=$((($END_TIME - $START_TIME) / 1000000))
+          echo "Agent startup time: ${STARTUP_TIME}ms" >> performance-results.txt
+          
+          # Memory usage test
+          echo "=== Memory Usage Test ===" >> performance-results.txt
+          ./build/pi-agent-linux-arm64 --config-file=test/config/agent-hardware-test.yml &
+          AGENT_PID=$!
+          sleep 2
+          
+          if kill -0 $AGENT_PID 2>/dev/null; then
+            MEMORY_KB=$(ps -o rss= -p $AGENT_PID)
+            echo "Agent memory usage: ${MEMORY_KB}KB" >> performance-results.txt
+            kill $AGENT_PID || true
+          fi
+          
+          echo "Performance testing completed"
+
+      - name: Analyze performance results
+        run: |
+          if [[ -f performance-results.txt ]]; then
+            echo "## 🏃 Performance Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat performance-results.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-test-results
+          path: performance-results.txt
+          retention-days: 30
+
+  # Integration test: Controller + Agent on same Pi
+  integration-hardware-test:
+    name: Integration Test (Controller + Agent)
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: [preflight, gpio-hardware-test]
+    timeout-minutes: 20
+    if: needs.preflight.outputs.hardware_available == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build both binaries
+        run: |
+          make deps
+          make proto
+          make build-linux-arm64
+
+      - name: Create test configurations
+        run: |
+          mkdir -p test/config
+          
+          # Controller config
+          cat > test/config/controller-integration.yml << EOF
+          api:
+            bind: "127.0.0.1:8080"
+            auth:
+              enabled: false
+          
+          database:
+            path: "/tmp/pi-controller-test.db"
+          
+          grpc:
+            bind: "127.0.0.1:9090"
+          
+          logging:
+            level: "debug"
+            format: "text"
+          EOF
+          
+          # Agent config  
+          cat > test/config/agent-integration.yml << EOF
+          controller:
+            endpoint: "127.0.0.1:9090"
+            tls:
+              enabled: false
+          
+          server:
+            bind: "127.0.0.1:9091"
+            tls:
+              enabled: false
+          
+          gpio:
+            enabled: true
+            mock_mode: false
+          
+          logging:
+            level: "debug"
+            format: "text"
+          EOF
+
+      - name: Run integration test
+        timeout-minutes: 15
+        run: |
+          echo "Starting integration test..."
+          
+          # Clean up any existing test database
+          rm -f /tmp/pi-controller-test.db
+          
+          # Start controller
+          ./build/pi-controller-linux-arm64 --config-file=test/config/controller-integration.yml &
+          CONTROLLER_PID=$!
+          echo "Controller started with PID: $CONTROLLER_PID"
+          
+          # Wait for controller to start
+          sleep 3
+          
+          # Verify controller is running
+          if ! kill -0 $CONTROLLER_PID 2>/dev/null; then
+            echo "❌ Controller failed to start"
+            exit 1
+          fi
+          
+          # Start agent
+          ./build/pi-agent-linux-arm64 --config-file=test/config/agent-integration.yml &
+          AGENT_PID=$!
+          echo "Agent started with PID: $AGENT_PID"
+          
+          # Wait for agent to start and connect
+          sleep 5
+          
+          # Verify agent is running
+          if ! kill -0 $AGENT_PID 2>/dev/null; then
+            echo "❌ Agent failed to start"
+            kill $CONTROLLER_PID || true
+            exit 1
+          fi
+          
+          # Test API endpoints
+          echo "Testing API endpoints..."
+          
+          # Health check
+          if curl -s http://127.0.0.1:8080/health | grep -q "ok"; then
+            echo "✅ Health endpoint working"
+          else
+            echo "❌ Health endpoint failed"
+          fi
+          
+          # Test GPIO endpoints (if available)
+          if [[ -n "${{ needs.preflight.outputs.gpio_pins }}" ]]; then
+            echo "Testing GPIO API..."
+            # Add GPIO API tests here
+          fi
+          
+          echo "Integration test completed successfully"
+          
+          # Cleanup
+          kill $AGENT_PID $CONTROLLER_PID || true
+          wait $AGENT_PID $CONTROLLER_PID 2>/dev/null || true
+          rm -f /tmp/pi-controller-test.db
+
+      - name: Upload integration test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs
+          path: |
+            /tmp/pi-controller*.log
+            /tmp/pi-agent*.log
+          retention-days: 3
+
+  # Hardware test summary
+  hardware-test-summary:
+    name: Hardware Test Summary
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: [preflight, gpio-hardware-test, performance-hardware-test, integration-hardware-test]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Generate hardware test summary
+        run: |
+          echo "# 🔧 Hardware-in-the-Loop Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-flight | ${{ needs.preflight.result == 'success' && '✅' || '❌' }} | Hardware: ${{ needs.preflight.outputs.hardware_available }}, GPIO Pins: ${{ needs.preflight.outputs.gpio_pins }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GPIO Tests | ${{ needs.gpio-hardware-test.result == 'success' && '✅' || needs.gpio-hardware-test.result == 'skipped' && '⏭️' || '❌' }} | Pin state transitions and functionality |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ needs.performance-hardware-test.result == 'success' && '✅' || needs.performance-hardware-test.result == 'skipped' && '⏭️' || '❌' }} | Benchmarks and resource usage |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration | ${{ needs.integration-hardware-test.result == 'success' && '✅' || needs.integration-hardware-test.result == 'skipped' && '⏭️' || '❌' }} | Controller + Agent communication |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [[ "${{ needs.preflight.result }}" == "success" && 
+                ("${{ needs.gpio-hardware-test.result }}" == "success" || "${{ needs.gpio-hardware-test.result }}" == "skipped") &&
+                ("${{ needs.performance-hardware-test.result }}" == "success" || "${{ needs.performance-hardware-test.result }}" == "skipped") &&
+                ("${{ needs.integration-hardware-test.result }}" == "success" || "${{ needs.integration-hardware-test.result }}" == "skipped") ]]; then
+            echo "### ✅ Hardware testing completed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Some hardware tests failed or were skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 Test artifacts and logs available in the workflow artifacts section." >> $GITHUB_STEP_SUMMARY

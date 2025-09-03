@@ -1,0 +1,375 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+  workflow_dispatch: # Allow manual triggering
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.22"
+  GOLANGCI_LINT_VERSION: "v1.54"
+
+jobs:
+  # Quick validation job using Ubuntu self-hosted runner
+  validate:
+    name: Code Validation
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Format check
+        run: |
+          make fmt
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Code is not properly formatted. Run 'make fmt' locally."
+            git diff
+            exit 1
+          fi
+
+      - name: Vet check
+        run: make vet
+
+      - name: Install golangci-lint
+        run: make install-lint
+
+      - name: Lint
+        run: make lint
+
+  # Unit and integration tests on Ubuntu runner
+  test:
+    name: Tests
+    runs-on: [self-hosted, ubuntu]
+    needs: validate
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Run integration tests
+        run: make test-integration
+
+      - name: Run API tests
+        run: make test-api
+
+      - name: Run security tests
+        run: make test-security
+
+      - name: Generate test coverage
+        run: make test-coverage
+
+      - name: Check coverage threshold
+        run: make test-coverage-threshold
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # Build job for multiple architectures
+  build:
+    name: Build Binaries
+    runs-on: [self-hosted, ubuntu]
+    needs: validate
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            name: linux-amd64
+          - goos: linux
+            goarch: arm64
+            name: linux-arm64
+          - goos: linux
+            goarch: arm
+            name: linux-arm
+          - goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          make build
+          # Rename binaries to include architecture
+          cd build
+          for binary in pi-controller-* pi-agent-*; do
+            if [[ -f "$binary" ]]; then
+              base_name=${binary%-*}
+              mv "$binary" "${base_name}-${{ matrix.name }}"
+            fi
+          done
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.name }}
+          path: build/*
+          retention-days: 7
+
+  # Hardware-in-the-loop testing on Raspberry Pi
+  hardware-test:
+    name: Hardware Tests (Pi)
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: [validate, test]
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'hw-test')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Build for Raspberry Pi
+        run: make build-linux-arm64
+
+      - name: Run GPIO hardware simulation tests
+        run: make test-gpio
+        continue-on-error: true # GPIO tests might fail if hardware not connected
+
+      - name: Test pi-agent on actual hardware
+        run: |
+          # Start pi-agent in background for hardware testing
+          timeout 30s ./build/pi-agent-linux-arm64 --config-file=test/config/agent-test.yml &
+          AGENT_PID=$!
+          sleep 5
+          
+          # Test if agent responds to basic health checks
+          if pgrep -f pi-agent; then
+            echo "Pi Agent started successfully on hardware"
+            # Add more hardware-specific tests here
+            kill $AGENT_PID || true
+          else
+            echo "Pi Agent failed to start on hardware"
+            exit 1
+          fi
+
+      - name: Upload hardware test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardware-test-logs
+          path: |
+            /tmp/pi-*.log
+            test/logs/
+          retention-days: 3
+
+  # Database migration tests
+  migration-test:
+    name: Database Migration Tests
+    runs-on: [self-hosted, ubuntu]
+    needs: validate
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Test database migrations
+        run: make db-test-migrations
+
+      - name: Test migration up/down cycle
+        run: |
+          make db-migrate-up
+          make db-migrate-status
+          make db-migrate-down
+          make db-migrate-status
+          make db-migrate-up
+
+  # Performance and race condition tests
+  performance-test:
+    name: Performance & Race Tests
+    runs-on: [self-hosted, ubuntu]
+    needs: [validate, test]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Run race condition tests
+        run: make test-race
+
+      - name: Run benchmarks
+        run: make test-benchmarks
+
+      - name: Run fuzzing tests
+        run: timeout 5m make test-fuzz || true # Fuzzing may timeout
+
+  # Final comprehensive test suite
+  comprehensive-test:
+    name: Comprehensive Test Suite
+    runs-on: [self-hosted, ubuntu]
+    needs: [test, build, migration-test, performance-test]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Run comprehensive test suite
+        run: make test-comprehensive
+
+      - name: Generate final coverage report
+        run: make test-coverage
+
+      - name: Upload comprehensive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-results
+          path: |
+            coverage.out
+            coverage.html
+            test-results.xml
+            benchmark-results.txt
+          retention-days: 7
+
+  # Status check job - runs after all tests complete
+  status-check:
+    name: CI Status Check
+    runs-on: [self-hosted, ubuntu]
+    needs: [validate, test, build, migration-test, performance-test, comprehensive-test]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Check job statuses
+        run: |
+          echo "Validate: ${{ needs.validate.result }}"
+          echo "Test: ${{ needs.test.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          echo "Migration Test: ${{ needs.migration-test.result }}"
+          echo "Performance Test: ${{ needs.performance-test.result }}"
+          echo "Comprehensive Test: ${{ needs.comprehensive-test.result }}"
+          
+          # Check if any critical job failed
+          if [[ "${{ needs.validate.result }}" == "failure" || 
+                "${{ needs.test.result }}" == "failure" || 
+                "${{ needs.build.result }}" == "failure" ]]; then
+            echo "Critical CI jobs failed!"
+            exit 1
+          fi
+          
+          echo "CI pipeline completed successfully!"
+
+      - name: Post status to commit
+        if: github.event_name == 'push'
+        run: |
+          echo "CI Status: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Code validation: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Builds: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Hardware tests: ${{ needs.hardware-test.result == 'success' && '✅' || '⚠️' }}" >> $GITHUB_STEP_SUMMARY

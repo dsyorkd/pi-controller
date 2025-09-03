@@ -56,7 +56,7 @@ func TestGPIOController_Initialize(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Cleanup
 				err = controller.Close()
 				assert.NoError(t, err)
@@ -163,7 +163,7 @@ func TestGPIOController_ConfigurePin(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify pin state
 				state, err := controller.GetPinState(tt.pinConfig.Pin, "test-user")
 				require.NoError(t, err)
@@ -178,9 +178,9 @@ func TestGPIOController_ConfigurePin(t *testing.T) {
 // TestGPIOController_Security_PinRestrictions tests GPIO security restrictions
 func TestGPIOController_Security_PinRestrictions(t *testing.T) {
 	config := &Config{
-		MockMode:       true,
-		AllowedPins:    []int{18, 19, 20},
-		RestrictedPins: []int{0, 1, 2, 3, 14, 15}, // System critical pins
+		MockMode:        true,
+		AllowedPins:     []int{18, 19, 20},
+		RestrictedPins:  []int{0, 1, 2, 3, 14, 15}, // System critical pins
 		DefaultPullMode: PullNone,
 	}
 
@@ -206,7 +206,7 @@ func TestGPIOController_Security_PinRestrictions(t *testing.T) {
 			description: "Pin 0 is typically reserved for system use",
 		},
 		{
-			name:        "system critical pin 1", 
+			name:        "system critical pin 1",
 			pin:         1,
 			shouldFail:  true,
 			description: "Pin 1 is typically reserved for system use",
@@ -326,7 +326,7 @@ func TestGPIOController_WritePin(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the value was written
 				state, err := controller.GetPinState(tt.pin, "test-user")
 				require.NoError(t, err)

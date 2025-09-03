@@ -24,7 +24,7 @@ func setupTestAuthManager() *AuthManager {
 		RequireHTTPS:       false,
 		EnableAuditLog:     true,
 	}
-	
+
 	log := logger.Default()
 	authManager, _ := NewAuthManager(config, log)
 	return authManager
@@ -114,12 +114,12 @@ func TestAuthManager_GenerateAndValidateToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			token, err := authManager.GenerateToken(tt.userID, tt.role, tt.tokenType)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
-			
+
 			require.NoError(t, err)
 			assert.NotEmpty(t, token)
 
@@ -172,7 +172,7 @@ func TestAuth_NoAuthorizationHeader(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -210,7 +210,7 @@ func TestAuth_InvalidAuthorizationHeaderFormat(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			assert.Equal(t, http.StatusUnauthorized, w.Code)
-			
+
 			var response map[string]interface{}
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			require.NoError(t, err)
@@ -229,7 +229,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -251,7 +251,7 @@ func TestAuth_ValidToken_AccessGranted(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -341,7 +341,7 @@ func TestRBAC_RolePermissions(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedCode, w.Code)
-			
+
 			if tt.expectedCode == http.StatusForbidden {
 				var response map[string]interface{}
 				err = json.Unmarshal(w.Body.Bytes(), &response)
@@ -361,11 +361,11 @@ func TestAuth_ExpiredToken(t *testing.T) {
 		RequireHTTPS:      false,
 		EnableAuditLog:    true,
 	}
-	
+
 	log := logger.Default()
 	authManager, err := NewAuthManager(config, log)
 	require.NoError(t, err)
-	
+
 	router := setupTestRouter(authManager)
 
 	// Generate token
@@ -381,7 +381,7 @@ func TestAuth_ExpiredToken(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	
+
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -398,7 +398,7 @@ func TestAuth_PublicEndpoint_NoAuthRequired(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -413,11 +413,11 @@ func TestAuth_HTTPSRequired(t *testing.T) {
 		RequireHTTPS:      true,
 		EnableAuditLog:    true,
 	}
-	
+
 	log := logger.Default()
 	authManager, err := NewAuthManager(config, log)
 	require.NoError(t, err)
-	
+
 	router := setupTestRouter(authManager)
 
 	w := httptest.NewRecorder()
@@ -425,7 +425,7 @@ func TestAuth_HTTPSRequired(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUpgradeRequired, w.Code)
-	
+
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -443,11 +443,11 @@ func TestAuth_IPWhitelist(t *testing.T) {
 		RequireHTTPS:      false,
 		EnableAuditLog:    true,
 	}
-	
+
 	log := logger.Default()
 	authManager, err := NewAuthManager(config, log)
 	require.NoError(t, err)
-	
+
 	router := setupTestRouter(authManager)
 
 	// Test with IP not in whitelist (default test IP is usually 192.0.2.1)
@@ -456,7 +456,7 @@ func TestAuth_IPWhitelist(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
-	
+
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
@@ -467,7 +467,7 @@ func TestAuth_IPWhitelist(t *testing.T) {
 func TestGenerateSecureAPIKey(t *testing.T) {
 	apiKey, err := GenerateSecureAPIKey()
 	require.NoError(t, err)
-	
+
 	assert.NotEmpty(t, apiKey)
 	assert.True(t, strings.HasPrefix(apiKey, "pk_"))
 	assert.Equal(t, 67, len(apiKey)) // 3 (prefix) + 64 (hex encoded 32 bytes)
@@ -519,17 +519,17 @@ func TestContextHelpers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	
+
 	// Test empty context
 	assert.Empty(t, GetUserID(c))
 	assert.Empty(t, GetUserRole(c))
 	assert.Empty(t, GetTokenType(c))
-	
+
 	// Set context values
 	c.Set(UserIDKey, "user123")
 	c.Set(UserRoleKey, RoleAdmin)
 	c.Set(TokenTypeKey, TokenTypeAccess)
-	
+
 	// Test with values
 	assert.Equal(t, "user123", GetUserID(c))
 	assert.Equal(t, RoleAdmin, GetUserRole(c))

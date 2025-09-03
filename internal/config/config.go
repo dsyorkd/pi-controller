@@ -15,34 +15,34 @@ import (
 type Config struct {
 	// Application settings
 	App AppConfig `yaml:"app"`
-	
+
 	// Database configuration
 	Database storage.Config `yaml:"database"`
-	
+
 	// API server configuration
 	API APIConfig `yaml:"api"`
-	
-	// gRPC server configuration  
+
+	// gRPC server configuration
 	GRPC GRPCConfig `yaml:"grpc"`
-	
+
 	// WebSocket configuration
 	WebSocket WebSocketConfig `yaml:"websocket"`
-	
+
 	// Logging configuration
 	Log LogConfig `yaml:"log"`
-	
+
 	// Kubernetes configuration
 	Kubernetes KubernetesConfig `yaml:"kubernetes"`
-	
+
 	// GPIO configuration
 	GPIO GPIOConfig `yaml:"gpio"`
-	
+
 	// Discovery configuration
 	Discovery DiscoveryConfig `yaml:"discovery"`
-	
+
 	// gRPC client configuration (for Pi Agent)
 	GRPCClient GRPCClientConfig `yaml:"grpc_client"`
-	
+
 	// Pi Agent gRPC server configuration
 	AgentServer AgentServerConfig `yaml:"agent_server"`
 }
@@ -108,27 +108,27 @@ type KubernetesConfig struct {
 
 // GPIOConfig contains GPIO service settings
 type GPIOConfig struct {
-	Enabled           bool     `yaml:"enabled"`
-	MockMode          bool     `yaml:"mock_mode"`
-	SampleInterval    string   `yaml:"sample_interval"`
-	RetentionPeriod   string   `yaml:"retention_period"`
-	AllowedPins       []int    `yaml:"allowed_pins"`
-	RestrictedPins    []int    `yaml:"restricted_pins"`
-	DefaultDirection  string   `yaml:"default_direction"`
-	DefaultPullMode   string   `yaml:"default_pull_mode"`
+	Enabled          bool   `yaml:"enabled"`
+	MockMode         bool   `yaml:"mock_mode"`
+	SampleInterval   string `yaml:"sample_interval"`
+	RetentionPeriod  string `yaml:"retention_period"`
+	AllowedPins      []int  `yaml:"allowed_pins"`
+	RestrictedPins   []int  `yaml:"restricted_pins"`
+	DefaultDirection string `yaml:"default_direction"`
+	DefaultPullMode  string `yaml:"default_pull_mode"`
 }
 
 // DiscoveryConfig contains node discovery settings
 type DiscoveryConfig struct {
-	Enabled         bool     `yaml:"enabled"`
-	Method          string   `yaml:"method"` // mdns, scan, static
-	Interface       string   `yaml:"interface"`
-	Port            int      `yaml:"port"`
-	Interval        string   `yaml:"interval"`
-	Timeout         string   `yaml:"timeout"`
-	StaticNodes     []string `yaml:"static_nodes"`
-	ServiceName     string   `yaml:"service_name"`
-	ServiceType     string   `yaml:"service_type"`
+	Enabled     bool     `yaml:"enabled"`
+	Method      string   `yaml:"method"` // mdns, scan, static
+	Interface   string   `yaml:"interface"`
+	Port        int      `yaml:"port"`
+	Interval    string   `yaml:"interval"`
+	Timeout     string   `yaml:"timeout"`
+	StaticNodes []string `yaml:"static_nodes"`
+	ServiceName string   `yaml:"service_name"`
+	ServiceType string   `yaml:"service_type"`
 }
 
 // GRPCClientConfig contains gRPC client settings for Pi Agent
@@ -136,31 +136,31 @@ type GRPCClientConfig struct {
 	// Server connection
 	ServerAddress string `yaml:"server_address"`
 	ServerPort    int    `yaml:"server_port"`
-	
+
 	// Connection settings
 	ConnectionTimeout string `yaml:"connection_timeout"`
 	RequestTimeout    string `yaml:"request_timeout"`
 	MaxMessageSize    int    `yaml:"max_message_size"`
-	
+
 	// Retry configuration
-	MaxRetries        int    `yaml:"max_retries"`
-	InitialRetryDelay string `yaml:"initial_retry_delay"`
-	MaxRetryDelay     string `yaml:"max_retry_delay"`
+	MaxRetries        int     `yaml:"max_retries"`
+	InitialRetryDelay string  `yaml:"initial_retry_delay"`
+	MaxRetryDelay     string  `yaml:"max_retry_delay"`
 	RetryMultiplier   float64 `yaml:"retry_multiplier"`
-	
+
 	// Heartbeat settings
 	HeartbeatInterval string `yaml:"heartbeat_interval"`
 	HeartbeatTimeout  string `yaml:"heartbeat_timeout"`
-	
+
 	// Keep-alive settings
 	KeepAliveTime    string `yaml:"keepalive_time"`
 	KeepAliveTimeout string `yaml:"keepalive_timeout"`
-	
+
 	// Security
 	Insecure bool   `yaml:"insecure"`
 	TLSCert  string `yaml:"tls_cert"`
 	TLSKey   string `yaml:"tls_key"`
-	
+
 	// Node information
 	NodeID   string `yaml:"node_id"`
 	NodeName string `yaml:"node_name"`
@@ -171,10 +171,10 @@ type AgentServerConfig struct {
 	// Server settings
 	Address string `yaml:"address"`
 	Port    int    `yaml:"port"`
-	
+
 	// Service settings
 	EnableGPIO bool `yaml:"enable_gpio"`
-	
+
 	// Security
 	TLSCertFile string `yaml:"tls_cert_file"`
 	TLSKeyFile  string `yaml:"tls_key_file"`
@@ -184,7 +184,7 @@ type AgentServerConfig struct {
 func Load(configPath string) (*Config, error) {
 	// Start with defaults
 	config := getDefaults()
-	
+
 	// Load config file if provided or found
 	var configFile string
 	if configPath != "" {
@@ -193,11 +193,11 @@ func Load(configPath string) (*Config, error) {
 		// Search for config file in standard locations
 		searchPaths := []string{
 			"./pi-controller.yaml",
-			"./config/pi-controller.yaml", 
+			"./config/pi-controller.yaml",
 			"/etc/pi-controller/pi-controller.yaml",
 			filepath.Join(os.Getenv("HOME"), ".pi-controller", "pi-controller.yaml"),
 		}
-		
+
 		for _, path := range searchPaths {
 			if _, err := os.Stat(path); err == nil {
 				configFile = path
@@ -205,27 +205,27 @@ func Load(configPath string) (*Config, error) {
 			}
 		}
 	}
-	
+
 	// Read and parse config file if found
 	if configFile != "" {
 		data, err := os.ReadFile(configFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
 		}
-		
+
 		if err := yaml.Unmarshal(data, &config); err != nil {
 			return nil, fmt.Errorf("failed to parse config file %s: %w", configFile, err)
 		}
 	}
-	
+
 	// Apply environment variable overrides
 	applyEnvOverrides(&config)
-	
+
 	// Validate and set derived values
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -236,18 +236,18 @@ func (c *Config) validate() error {
 		if err := os.MkdirAll(c.App.DataDir, 0755); err != nil {
 			return fmt.Errorf("failed to create data directory: %w", err)
 		}
-		
+
 		// Set database path relative to data directory if not absolute
 		if !filepath.IsAbs(c.Database.Path) {
 			c.Database.Path = filepath.Join(c.App.DataDir, c.Database.Path)
 		}
 	}
-	
+
 	// Validate log level
 	if _, err := logrus.ParseLevel(c.Log.Level); err != nil {
 		return fmt.Errorf("invalid log level '%s': %w", c.Log.Level, err)
 	}
-	
+
 	// Validate port ranges
 	if c.API.Port < 1 || c.API.Port > 65535 {
 		return fmt.Errorf("invalid API port: %d", c.API.Port)
@@ -258,7 +258,7 @@ func (c *Config) validate() error {
 	if c.WebSocket.Port < 1 || c.WebSocket.Port > 65535 {
 		return fmt.Errorf("invalid WebSocket port: %d", c.WebSocket.Port)
 	}
-	
+
 	return nil
 }
 
@@ -268,7 +268,7 @@ func getDefaults() Config {
 	if env == "" {
 		env = os.Getenv("ENVIRONMENT")
 	}
-	
+
 	// Use secure production defaults unless explicitly set to development
 	if env == "development" || env == "dev" {
 		return getDevelopmentDefaults()
@@ -279,13 +279,13 @@ func getDefaults() Config {
 // getDevelopmentDefaults returns development-friendly defaults (less secure, easier setup)
 func getDevelopmentDefaults() Config {
 	config := getProductionDefaults()
-	
+
 	// Disable TLS for development ease
 	config.API.TLSCertFile = ""
 	config.API.TLSKeyFile = ""
 	config.GRPC.TLSCertFile = ""
 	config.GRPC.TLSKeyFile = ""
-	
+
 	return config
 }
 
@@ -314,7 +314,7 @@ func getProductionDefaults() Config {
 			TLSCertFile:  "/etc/pi-controller/tls/server.crt", // Default TLS cert path for production
 			TLSKeyFile:   "/etc/pi-controller/tls/server.key", // Default TLS key path for production
 			CORSEnabled:  true,
-			AuthEnabled:  true,  // Enable authentication by default for security
+			AuthEnabled:  true, // Enable authentication by default for security
 		},
 		GRPC: GRPCConfig{
 			Host:        "0.0.0.0",
@@ -350,7 +350,7 @@ func getProductionDefaults() Config {
 			SampleInterval:   "1s",
 			RetentionPeriod:  "24h",
 			AllowedPins:      []int{2, 3, 4, 17, 27, 22, 10, 9, 11, 5, 6, 13, 19, 26, 18, 23, 24, 25, 8, 7, 12, 16, 20, 21}, // Safe GPIO pins
-			RestrictedPins:   []int{0, 1, 14, 15}, // System critical pins (I2C, UART)
+			RestrictedPins:   []int{0, 1, 14, 15},                                                                           // System critical pins (I2C, UART)
 			DefaultDirection: "input",
 			DefaultPullMode:  "none",
 		},

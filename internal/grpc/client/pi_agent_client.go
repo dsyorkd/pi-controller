@@ -32,10 +32,10 @@ type PiAgentClientManagerInterface interface {
 
 // PiAgentClient provides a gRPC client interface for communicating with Pi Agents
 type PiAgentClient struct {
-	conn   *grpc.ClientConn
-	client pb.PiAgentServiceClient
-	logger logger.Interface
-	nodeID uint
+	conn    *grpc.ClientConn
+	client  pb.PiAgentServiceClient
+	logger  logger.Interface
+	nodeID  uint
 	address string
 }
 
@@ -91,7 +91,7 @@ func (m *PiAgentClientManager) GetClient(node *models.Node) (PiAgentClientInterf
 func (m *PiAgentClientManager) createClient(node *models.Node) (*PiAgentClient, error) {
 	// Pi Agent typically runs on port 9091
 	address := fmt.Sprintf("%s:9091", node.IPAddress)
-	
+
 	m.logger.WithFields(map[string]interface{}{
 		"node_id": node.ID,
 		"address": address,
@@ -101,7 +101,7 @@ func (m *PiAgentClientManager) createClient(node *models.Node) (*PiAgentClient, 
 	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, address, 
+	conn, err := grpc.DialContext(ctx, address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
@@ -165,11 +165,11 @@ func (c *PiAgentClient) IsConnected() bool {
 	if c.conn == nil {
 		return false
 	}
-	
+
 	// Test connection with a quick health check (with short timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	
+
 	_, err := c.client.AgentHealth(ctx, &pb.AgentHealthRequest{})
 	return err == nil
 }
@@ -238,9 +238,9 @@ func (c *PiAgentClient) WriteGPIOPin(ctx context.Context, pinNumber int, value i
 	}
 
 	c.logger.WithFields(map[string]interface{}{
-		"pin":           pinNumber,
-		"value":         value,
-		"actual_value":  resp.Value,
+		"pin":          pinNumber,
+		"value":        value,
+		"actual_value": resp.Value,
 	}).Debug("GPIO pin written successfully")
 
 	return nil

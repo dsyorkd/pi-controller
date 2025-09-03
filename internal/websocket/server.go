@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/gorilla/websocket"
 
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/storage"
@@ -20,16 +20,16 @@ type Server struct {
 	logger   logger.Interface
 	database *storage.Database
 	upgrader websocket.Upgrader
-	
+
 	// Client management
 	clients    map[*Client]bool
 	clientsMux sync.RWMutex
-	
+
 	// Message broadcasting
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
-	
+
 	// Shutdown
 	shutdown chan struct{}
 }
@@ -40,7 +40,7 @@ type Client struct {
 	conn   *websocket.Conn
 	send   chan []byte
 	id     string
-	
+
 	// Subscription management
 	subscriptions map[string]bool
 	subMux        sync.RWMutex
@@ -94,12 +94,12 @@ type NodeStatusMessage struct {
 
 // ClusterStatusMessage represents a cluster status update
 type ClusterStatusMessage struct {
-	ClusterID uint      `json:"cluster_id"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	NodesReady int      `json:"nodes_ready"`
-	NodesTotal int      `json:"nodes_total"`
-	Timestamp time.Time `json:"timestamp"`
+	ClusterID  uint      `json:"cluster_id"`
+	Name       string    `json:"name"`
+	Status     string    `json:"status"`
+	NodesReady int       `json:"nodes_ready"`
+	NodesTotal int       `json:"nodes_total"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 // SystemMetricsMessage represents system metrics
@@ -165,14 +165,14 @@ func (s *Server) Start() error {
 func (s *Server) Stop(ctx context.Context) error {
 	s.logger.Info("Shutting down WebSocket server")
 	close(s.shutdown)
-	
+
 	// Close all client connections
 	s.clientsMux.RLock()
 	for client := range s.clients {
 		client.conn.Close()
 	}
 	s.clientsMux.RUnlock()
-	
+
 	return nil
 }
 
@@ -187,9 +187,9 @@ func (s *Server) run() {
 			s.clientsMux.Lock()
 			s.clients[client] = true
 			s.clientsMux.Unlock()
-			
+
 			s.logger.WithField("client_id", client.id).Debug("Client connected")
-			
+
 			// Send welcome message
 			welcome := Message{
 				Type:      MessageTypePong,
@@ -204,7 +204,7 @@ func (s *Server) run() {
 				close(client.send)
 			}
 			s.clientsMux.Unlock()
-			
+
 			s.logger.WithField("client_id", client.id).Debug("Client disconnected")
 
 		case message := <-s.broadcast:
@@ -315,7 +315,7 @@ func (s *Server) BroadcastGPIOReading(reading GPIOReadingMessage) {
 		Payload:   payload,
 		Timestamp: time.Now(),
 	}
-	
+
 	s.BroadcastToTopic("gpio", msg)
 }
 
@@ -327,7 +327,7 @@ func (s *Server) BroadcastNodeStatus(status NodeStatusMessage) {
 		Payload:   payload,
 		Timestamp: time.Now(),
 	}
-	
+
 	s.BroadcastToTopic("nodes", msg)
 }
 
@@ -339,7 +339,7 @@ func (s *Server) BroadcastClusterStatus(status ClusterStatusMessage) {
 		Payload:   payload,
 		Timestamp: time.Now(),
 	}
-	
+
 	s.BroadcastToTopic("clusters", msg)
 }
 
@@ -351,7 +351,7 @@ func (s *Server) BroadcastSystemMetrics(metrics SystemMetricsMessage) {
 		Payload:   payload,
 		Timestamp: time.Now(),
 	}
-	
+
 	s.BroadcastToTopic("system", msg)
 }
 
@@ -458,7 +458,7 @@ func (c *Client) subscribe(topic string) {
 	c.subMux.Lock()
 	c.subscriptions[topic] = true
 	c.subMux.Unlock()
-	
+
 	c.server.logger.WithFields(map[string]interface{}{
 		"client_id": c.id,
 		"topic":     topic,
@@ -470,7 +470,7 @@ func (c *Client) unsubscribe(topic string) {
 	c.subMux.Lock()
 	delete(c.subscriptions, topic)
 	c.subMux.Unlock()
-	
+
 	c.server.logger.WithFields(map[string]interface{}{
 		"client_id": c.id,
 		"topic":     topic,
@@ -491,13 +491,13 @@ func (c *Client) sendError(code int, message string) {
 		Message: message,
 	}
 	payload, _ := json.Marshal(errMsg)
-	
+
 	msg := Message{
 		Type:      MessageTypeError,
 		Payload:   payload,
 		Timestamp: time.Now(),
 	}
-	
+
 	c.server.sendToClient(c, msg)
 }
 

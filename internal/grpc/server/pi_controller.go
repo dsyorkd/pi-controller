@@ -82,9 +82,9 @@ func (s *PiControllerServer) GetCluster(ctx context.Context, req *pb.GetClusterR
 // ListClusters retrieves all clusters
 func (s *PiControllerServer) ListClusters(ctx context.Context, req *pb.ListClustersRequest) (*pb.ListClustersResponse, error) {
 	var clusters []models.Cluster
-	
+
 	query := s.database.DB().Preload("Nodes")
-	
+
 	// Apply pagination if specified
 	if req.PageSize > 0 {
 		offset := 0
@@ -167,7 +167,7 @@ func (s *PiControllerServer) ReadGPIO(ctx context.Context, req *pb.ReadGPIOReque
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Require at least viewer role for GPIO read operations
 	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (s *PiControllerServer) ReadGPIO(ctx context.Context, req *pb.ReadGPIOReque
 
 	// TODO: Implement actual GPIO read operation
 	// For now, return the stored value
-	
+
 	// Record the reading
 	reading := models.GPIOReading{
 		DeviceID:  device.ID,
@@ -222,7 +222,7 @@ func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIOReq
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Require at least operator role for GPIO write operations (more privileged than read)
 	if err := s.requireRole(claims, middleware.RoleOperator); err != nil {
 		return nil, err
@@ -247,7 +247,7 @@ func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIOReq
 	}
 
 	// TODO: Implement actual GPIO write operation
-	
+
 	// Update the device value
 	device.SetValue(int(req.Value))
 	result = s.database.DB().Save(&device)

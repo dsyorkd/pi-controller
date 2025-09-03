@@ -1,0 +1,36 @@
+# Pi Controller Code Owners
+# This file defines who must review and approve changes to specific parts of the codebase
+
+# Global owners - must approve any changes
+* @dsyorkd
+
+# CI/CD and GitHub workflows
+/.github/ @dsyorkd
+/scripts/ @dsyorkd
+/Makefile @dsyorkd
+
+# Core application code
+/cmd/ @dsyorkd
+/internal/ @dsyorkd
+/pkg/ @dsyorkd
+
+# Protocol definitions - require extra review for breaking changes
+/proto/ @dsyorkd
+
+# Configuration and deployment
+/config/ @dsyorkd
+/docker/ @dsyorkd
+
+# Documentation
+/docs/ @dsyorkd
+README.md @dsyorkd
+ARCHITECTURE.md @dsyorkd
+
+# Security-sensitive files
+/internal/api/middleware/ @dsyorkd
+/internal/config/ @dsyorkd
+/test/security/ @dsyorkd
+
+# Database and migrations
+/internal/storage/ @dsyorkd
+/internal/migrations/ @dsyorkd

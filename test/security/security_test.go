@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -38,11 +38,11 @@ type SecurityTestSuite struct {
 func (suite *SecurityTestSuite) SetupSuite() {
 	_, cleanup := testutils.SetupTestDBFile(suite.T())
 	appLogger := logger.Default()
-	
+
 	var err error
 	suite.db, err = storage.NewForTest(appLogger)
 	require.NoError(suite.T(), err)
-	
+
 	suite.cleanup = cleanup
 
 	logrusLogger := logrus.New()
@@ -119,7 +119,7 @@ func (suite *SecurityTestSuite) TestSecurity_NoAuthentication() {
 			description: "Anyone can create clusters without authentication",
 		},
 		{
-			name:        "Unauthenticated cluster deletion", 
+			name:        "Unauthenticated cluster deletion",
 			method:      "DELETE",
 			endpoint:    "/api/v1/clusters/1",
 			severity:    "CRITICAL",
@@ -168,7 +168,7 @@ func (suite *SecurityTestSuite) TestSecurity_NoAuthentication() {
 
 			// All these should return 401 Unauthorized if properly secured
 			// Currently they return various success codes - THIS IS THE VULNERABILITY
-			suite.T().Logf("[%s VULNERABILITY] %s - Status: %d, Description: %s", 
+			suite.T().Logf("[%s VULNERABILITY] %s - Status: %d, Description: %s",
 				tt.severity, tt.name, w.Code, tt.description)
 
 			// Document the security issue
@@ -217,7 +217,7 @@ func (suite *SecurityTestSuite) TestSecurity_InputValidation() {
 		},
 		{
 			name:     "Command injection in hostname",
-			method:   "POST", 
+			method:   "POST",
 			endpoint: "/api/v1/nodes",
 			payload: map[string]interface{}{
 				"name":       "cmd-injection",
@@ -277,7 +277,7 @@ func (suite *SecurityTestSuite) TestSecurity_InputValidation() {
 			w := httptest.NewRecorder()
 			suite.router.ServeHTTP(w, req)
 
-			suite.T().Logf("[%s VULNERABILITY] %s - Status: %d, Description: %s", 
+			suite.T().Logf("[%s VULNERABILITY] %s - Status: %d, Description: %s",
 				tt.severity, tt.name, w.Code, tt.description)
 
 			// Input validation should reject malicious inputs
@@ -294,7 +294,7 @@ func (suite *SecurityTestSuite) TestSecurity_GPIOSafety() {
 	// Setup test data
 	cluster := testutils.CreateTestCluster(suite.T())
 	require.NoError(suite.T(), suite.db.DB().Create(cluster).Error)
-	
+
 	node := testutils.CreateTestNode(suite.T(), cluster.ID)
 	require.NoError(suite.T(), suite.db.DB().Create(node).Error)
 
@@ -372,7 +372,7 @@ func (suite *SecurityTestSuite) TestSecurity_GPIOSafety() {
 			w := httptest.NewRecorder()
 			suite.router.ServeHTTP(w, req)
 
-			suite.T().Logf("[%s GPIO SAFETY] %s - Pin: %d, Status: %d, Description: %s", 
+			suite.T().Logf("[%s GPIO SAFETY] %s - Pin: %d, Status: %d, Description: %s",
 				tt.severity, tt.name, tt.pinNumber, w.Code, tt.description)
 
 			// Critical pins should be rejected
@@ -408,7 +408,7 @@ func (suite *SecurityTestSuite) TestSecurity_DatabaseSecurity() {
 	// Test SQL injection possibilities
 	suite.Run("SQL injection vulnerability", func() {
 		maliciousName := "'; DROP TABLE clusters; --"
-		
+
 		createReq := services.CreateClusterRequest{
 			Name:        maliciousName,
 			Description: "SQL injection test",
@@ -462,11 +462,11 @@ func (suite *SecurityTestSuite) TestSecurity_TLSAndEncryption() {
 		require.NoError(suite.T(), suite.db.DB().Create(cluster).Error)
 
 		createReq := services.CreateNodeRequest{
-			Name:        "unencrypted-node",
-			IPAddress:   "10.0.0.100", // Internal network IP
-			MACAddress:  "02:00:00:00:10:00",
-			Role:        models.NodeRoleWorker,
-			ClusterID:   &cluster.ID,
+			Name:       "unencrypted-node",
+			IPAddress:  "10.0.0.100", // Internal network IP
+			MACAddress: "02:00:00:00:10:00",
+			Role:       models.NodeRoleWorker,
+			ClusterID:  &cluster.ID,
 		}
 
 		body, err := json.Marshal(createReq)
@@ -504,7 +504,7 @@ func (suite *SecurityTestSuite) TestSecurity_RateLimiting() {
 		}
 
 		suite.T().Logf("Rate limiting test: %d/%d requests succeeded", successCount, requestCount)
-		
+
 		if successCount == requestCount {
 			suite.T().Log("SECURITY ISSUE: No rate limiting detected - vulnerable to DoS attacks")
 			suite.T().Log("An attacker could overwhelm the system with requests")
@@ -515,7 +515,7 @@ func (suite *SecurityTestSuite) TestSecurity_RateLimiting() {
 		// Test rapid GPIO operations that could damage hardware
 		cluster := testutils.CreateTestCluster(suite.T())
 		require.NoError(suite.T(), suite.db.DB().Create(cluster).Error)
-		
+
 		node := testutils.CreateTestNode(suite.T(), cluster.ID)
 		require.NoError(suite.T(), suite.db.DB().Create(node).Error)
 
@@ -583,22 +583,22 @@ func (suite *SecurityTestSuite) TestSecurity_InformationDisclosure() {
 
 			if w.Code == http.StatusOK {
 				responseBody := w.Body.String()
-				
+
 				suite.T().Logf("[%s INFO DISCLOSURE] %s", tt.severity, tt.description)
-				
+
 				// Check for potentially sensitive information
 				sensitivePatterns := []string{
 					"go_version", "go_os", "go_arch", "memory", "heap",
 					"cpu_count", "goroutines", "uptime",
 				}
-				
+
 				foundPatterns := []string{}
 				for _, pattern := range sensitivePatterns {
 					if strings.Contains(responseBody, pattern) {
 						foundPatterns = append(foundPatterns, pattern)
 					}
 				}
-				
+
 				if len(foundPatterns) > 0 {
 					suite.T().Logf("Information disclosed: %v", foundPatterns)
 				}
@@ -632,9 +632,9 @@ func (suite *SecurityTestSuite) TestSecurity_CORSVulnerabilities() {
 		if corsHeaders["Access-Control-Allow-Origin"] == "*" {
 			suite.T().Log("SECURITY ISSUE: CORS allows all origins (*)")
 		}
-		
+
 		if corsHeaders["Access-Control-Allow-Credentials"] == "true" &&
-		   corsHeaders["Access-Control-Allow-Origin"] == "*" {
+			corsHeaders["Access-Control-Allow-Origin"] == "*" {
 			suite.T().Log("CRITICAL CORS ISSUE: Credentials allowed with wildcard origin")
 		}
 	})
@@ -652,7 +652,7 @@ func (suite *SecurityTestSuite) TestSecurity_SessionManagement() {
 		// Check for session-related headers
 		sessionHeaders := []string{
 			"Set-Cookie",
-			"Authorization", 
+			"Authorization",
 			"X-Auth-Token",
 			"Session-ID",
 		}
@@ -681,7 +681,7 @@ func TestSecurity(t *testing.T) {
 func TestSecurity_VulnerabilitySummary(t *testing.T) {
 	t.Log("=== PI-CONTROLLER SECURITY VULNERABILITY SUMMARY ===")
 	t.Log("")
-	
+
 	t.Log("CRITICAL VULNERABILITIES:")
 	t.Log("1. NO AUTHENTICATION - All API endpoints accessible without credentials")
 	t.Log("2. NO TLS ENCRYPTION - All data transmitted in plain text")
@@ -689,19 +689,19 @@ func TestSecurity_VulnerabilitySummary(t *testing.T) {
 	t.Log("4. SYSTEM CRITICAL PINS ACCESSIBLE - Pins 0,1,14,15 could crash system")
 	t.Log("5. UNENCRYPTED DATABASE - Sensitive data stored without encryption")
 	t.Log("")
-	
+
 	t.Log("HIGH VULNERABILITIES:")
 	t.Log("1. NO INPUT VALIDATION - SQL injection, XSS, command injection possible")
 	t.Log("2. NO RATE LIMITING - Vulnerable to DoS attacks")
 	t.Log("3. DANGEROUS DELETE OPERATIONS - Anyone can delete clusters/nodes")
 	t.Log("")
-	
+
 	t.Log("MEDIUM/LOW VULNERABILITIES:")
 	t.Log("1. INFORMATION DISCLOSURE - System details exposed")
 	t.Log("2. CORS MISCONFIGURATION - Potential cross-origin issues")
 	t.Log("3. NO SESSION MANAGEMENT - Stateless but insecure")
 	t.Log("")
-	
+
 	t.Log("RECOMMENDATIONS:")
 	t.Log("1. IMPLEMENT AUTHENTICATION (JWT, API keys, or OAuth)")
 	t.Log("2. ENABLE TLS/HTTPS for all communications")

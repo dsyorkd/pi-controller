@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/dsyorkd/pi-controller/internal/api"
 	"github.com/dsyorkd/pi-controller/internal/api/middleware"
 	"github.com/dsyorkd/pi-controller/internal/config"
@@ -19,6 +17,8 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
 	"github.com/dsyorkd/pi-controller/pkg/gpio"
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -27,32 +27,32 @@ import (
 // SecurityFixesTestSuite tests that our security fixes are working correctly
 type SecurityFixesTestSuite struct {
 	suite.Suite
-	server          *api.Server
-	db              *storage.Database
-	cleanup         func()
-	authManager     *middleware.AuthManager
-	validator       *middleware.Validator
-	rateLimiter     *middleware.RateLimiter
-	securityMW      *middleware.SecurityMiddleware
-	encryptedStore  *storage.EncryptedStorage
+	server         *api.Server
+	db             *storage.Database
+	cleanup        func()
+	authManager    *middleware.AuthManager
+	validator      *middleware.Validator
+	rateLimiter    *middleware.RateLimiter
+	securityMW     *middleware.SecurityMiddleware
+	encryptedStore *storage.EncryptedStorage
 }
 
 // SetupSuite sets up the secured test environment
 func (suite *SecurityFixesTestSuite) SetupSuite() {
 	_, cleanup := testutils.SetupTestDBFile(suite.T())
-	
+
 	// Create database with default configuration
 	// Note: Encryption features are not yet implemented
 	dbConfig := storage.DefaultConfig()
-	
+
 	// Create loggers for the test
 	appLogger := logger.Default()
 	logrusLogger := logrus.New()
 	logrusLogger.SetLevel(logrus.WarnLevel)
-	
+
 	secureDB, err := storage.New(dbConfig, appLogger)
 	require.NoError(suite.T(), err)
-	
+
 	suite.db = secureDB
 	suite.cleanup = cleanup
 
@@ -251,7 +251,7 @@ func (suite *SecurityFixesTestSuite) TestInputValidation() {
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			assert.Equal(suite.T(), http.StatusBadRequest, w.Code, 
+			assert.Equal(suite.T(), http.StatusBadRequest, w.Code,
 				"SQL injection payload should be blocked: %s", payload)
 		}
 	})
@@ -279,7 +279,7 @@ func (suite *SecurityFixesTestSuite) TestInputValidation() {
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			assert.Equal(suite.T(), http.StatusBadRequest, w.Code, 
+			assert.Equal(suite.T(), http.StatusBadRequest, w.Code,
 				"XSS payload should be blocked: %s", payload)
 		}
 	})
@@ -302,7 +302,7 @@ func (suite *SecurityFixesTestSuite) TestInputValidation() {
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			assert.Equal(suite.T(), http.StatusBadRequest, w.Code, 
+			assert.Equal(suite.T(), http.StatusBadRequest, w.Code,
 				"Path traversal payload should be blocked: %s", payload)
 		}
 	})
@@ -390,16 +390,16 @@ func (suite *SecurityFixesTestSuite) TestSecurityHeaders() {
 		router.ServeHTTP(w, req)
 
 		expectedHeaders := map[string]string{
-			"X-Content-Type-Options":              "nosniff",
-			"X-Frame-Options":                     "DENY",
-			"X-XSS-Protection":                    "1; mode=block",
-			"X-Permitted-Cross-Domain-Policies":  "none",
-			"X-DNS-Prefetch-Control":             "off",
+			"X-Content-Type-Options":            "nosniff",
+			"X-Frame-Options":                   "DENY",
+			"X-XSS-Protection":                  "1; mode=block",
+			"X-Permitted-Cross-Domain-Policies": "none",
+			"X-DNS-Prefetch-Control":            "off",
 		}
 
 		for header, expectedValue := range expectedHeaders {
 			actualValue := w.Header().Get(header)
-			assert.Equal(suite.T(), expectedValue, actualValue, 
+			assert.Equal(suite.T(), expectedValue, actualValue,
 				"Header %s should be set to %s", header, expectedValue)
 		}
 
@@ -440,7 +440,7 @@ func (suite *SecurityFixesTestSuite) TestDatabaseEncryption() {
 	suite.Run("Encrypted storage is planned", func() {
 		// TODO: Implement encrypted storage functionality
 		suite.T().Skip("Database encryption not yet implemented - this test validates the security framework is ready")
-		
+
 		// This test would verify:
 		// - Encrypted storage of sensitive data
 		// - Proper key management
@@ -452,10 +452,10 @@ func (suite *SecurityFixesTestSuite) TestDatabaseEncryption() {
 		// Test basic database health and connectivity as security baseline
 		err := suite.db.Health()
 		assert.NoError(suite.T(), err, "Database should be healthy and accessible")
-		
+
 		// Verify database is properly initialized
 		assert.NotNil(suite.T(), suite.db.DB(), "Database connection should be established")
-		
+
 		suite.T().Log("Database security baseline: Connection secured and health check passes")
 	})
 }
@@ -504,7 +504,7 @@ func (suite *SecurityFixesTestSuite) TestSecurityIntegration() {
 		// For now, we'll create a mini version with all security middleware
 
 		router := gin.New()
-		
+
 		// Add all security middleware
 		router.Use(suite.securityMW.SecurityHeaders())
 		router.Use(suite.rateLimiter.RateLimit())
@@ -625,28 +625,28 @@ func TestSecurityFixesComplete(t *testing.T) {
 func TestSecurityFixesSummary(t *testing.T) {
 	t.Log("=== PI-CONTROLLER SECURITY FIXES IMPLEMENTED ===")
 	t.Log("")
-	
+
 	t.Log("✅ CRITICAL VULNERABILITIES FIXED:")
 	t.Log("1. JWT AUTHENTICATION - Secure token-based authentication implemented")
 	t.Log("2. TLS CONFIGURATION - Secure TLS/HTTPS configuration available")
 	t.Log("3. GPIO SECURITY - Critical system pins (0,1,14,15) are now protected")
 	t.Log("4. DATABASE ENCRYPTION - At-rest encryption for sensitive data implemented")
 	t.Log("")
-	
+
 	t.Log("✅ HIGH VULNERABILITIES FIXED:")
 	t.Log("1. INPUT VALIDATION - SQL injection, XSS, path traversal protection implemented")
 	t.Log("2. RATE LIMITING - DoS protection with configurable limits implemented")
 	t.Log("3. ROLE-BASED ACCESS - Admin/Operator/Viewer role restrictions implemented")
 	t.Log("4. SECURITY HEADERS - Comprehensive security headers implemented")
 	t.Log("")
-	
+
 	t.Log("✅ ADDITIONAL SECURITY FEATURES:")
 	t.Log("1. AUDIT LOGGING - Security events are logged for monitoring")
 	t.Log("2. OPERATION LIMITS - GPIO operation concurrency limits implemented")
 	t.Log("3. SECURE DEFAULTS - Security-first configuration defaults")
 	t.Log("4. CRYPTO STANDARDS - Industry-standard encryption and hashing")
 	t.Log("")
-	
+
 	t.Log("🔧 SECURITY CONFIGURATION OPTIONS:")
 	t.Log("- Authentication can be enabled/disabled via config")
 	t.Log("- TLS certificates can be configured")
@@ -655,7 +655,7 @@ func TestSecurityFixesSummary(t *testing.T) {
 	t.Log("- Input validation rules customizable")
 	t.Log("- Database encryption configurable")
 	t.Log("")
-	
+
 	t.Log("⚡ PERFORMANCE IMPACT:")
 	t.Log("- Security middleware adds minimal overhead (<10% typical)")
 	t.Log("- JWT validation is fast and scalable")

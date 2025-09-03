@@ -33,8 +33,8 @@ func (h *ClusterHandler) List(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
 	opts := services.ClusterListOptions{
-		Limit:        limit,
-		Offset:       offset,
+		Limit:  limit,
+		Offset: offset,
 	}
 
 	clusters, total, err := h.service.List(opts)

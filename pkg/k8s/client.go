@@ -126,10 +126,10 @@ type NodeInfo struct {
 
 // NodeCondition represents a node condition
 type NodeCondition struct {
-	Type    string    `json:"type"`
-	Status  string    `json:"status"`
-	Reason  string    `json:"reason"`
-	Message string    `json:"message"`
+	Type               string    `json:"type"`
+	Status             string    `json:"status"`
+	Reason             string    `json:"reason"`
+	Message            string    `json:"message"`
 	LastTransitionTime time.Time `json:"last_transition_time"`
 }
 
@@ -288,7 +288,7 @@ func (c *Client) ListPods(ctx context.Context, namespace string) ([]PodInfo, err
 // ListPodsOnNode returns information about all pods running on a specific node
 func (c *Client) ListPodsOnNode(ctx context.Context, nodeName string) ([]PodInfo, error) {
 	fieldSelector := fmt.Sprintf("spec.nodeName=%s", nodeName)
-	
+
 	pods, err := c.clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
@@ -436,12 +436,12 @@ func (c *Client) GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	}
 
 	clusterInfo := &ClusterInfo{
-		Version:      version,
-		TotalNodes:   len(nodes),
-		ReadyNodes:   readyNodes,
-		TotalPods:    len(allPods),
-		RunningPods:  runningPods,
-		Nodes:        nodes,
+		Version:     version,
+		TotalNodes:  len(nodes),
+		ReadyNodes:  readyNodes,
+		TotalPods:   len(allPods),
+		RunningPods: runningPods,
+		Nodes:       nodes,
 	}
 
 	return clusterInfo, nil

@@ -102,8 +102,8 @@ func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 			c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()))
 
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":   "Rate Limit Exceeded",
-				"message": "Too many requests, please slow down",
+				"error":       "Rate Limit Exceeded",
+				"message":     "Too many requests, please slow down",
 				"retry_after": 60,
 			})
 			c.Abort()

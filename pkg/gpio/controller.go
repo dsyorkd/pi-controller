@@ -28,25 +28,25 @@ const (
 
 // SecurityConfig holds GPIO security configuration
 type SecurityConfig struct {
-	Level                SecurityLevel `yaml:"level"`
-	AllowCriticalPins    bool          `yaml:"allow_critical_pins"`
-	MaxConcurrentOps     int           `yaml:"max_concurrent_ops"`
-	OperationTimeout     time.Duration `yaml:"operation_timeout"`
-	EnableAuditLog       bool          `yaml:"enable_audit_log"`
-	RequireUserContext   bool          `yaml:"require_user_context"`
-	AllowedOperations    []string      `yaml:"allowed_operations"`
+	Level              SecurityLevel `yaml:"level"`
+	AllowCriticalPins  bool          `yaml:"allow_critical_pins"`
+	MaxConcurrentOps   int           `yaml:"max_concurrent_ops"`
+	OperationTimeout   time.Duration `yaml:"operation_timeout"`
+	EnableAuditLog     bool          `yaml:"enable_audit_log"`
+	RequireUserContext bool          `yaml:"require_user_context"`
+	AllowedOperations  []string      `yaml:"allowed_operations"`
 }
 
 // DefaultSecurityConfig returns secure default configuration
 func DefaultSecurityConfig() *SecurityConfig {
 	return &SecurityConfig{
-		Level:                SecurityLevelStrict,
-		AllowCriticalPins:    false,
-		MaxConcurrentOps:     10,
-		OperationTimeout:     30 * time.Second,
-		EnableAuditLog:       true,
-		RequireUserContext:   true,
-		AllowedOperations:    []string{"read", "write", "configure"},
+		Level:              SecurityLevelStrict,
+		AllowCriticalPins:  false,
+		MaxConcurrentOps:   10,
+		OperationTimeout:   30 * time.Second,
+		EnableAuditLog:     true,
+		RequireUserContext: true,
+		AllowedOperations:  []string{"read", "write", "configure"},
 	}
 }
 
@@ -126,11 +126,11 @@ func (c *Controller) initializeSecureDefaults() {
 		// Only allow known safe pins
 		c.config.AllowedPins = []int{18, 19, 20, 21} // PWM and safe GPIO pins
 		c.config.RestrictedPins = append(c.config.RestrictedPins, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 22, 23, 24, 25, 26, 27)
-		
+
 	case SecurityLevelStrict:
 		// Default secure configuration - allow most GPIO but protect system pins
 		// RestrictedPins already includes critical system pins
-		
+
 	case SecurityLevelPermissive:
 		// Allow more pins but still protect critical ones
 		if !c.securityConfig.AllowCriticalPins {
@@ -241,9 +241,9 @@ func (c *Controller) checkOperationLimits() error {
 	if c.activeOps >= c.securityConfig.MaxConcurrentOps {
 		return fmt.Errorf("maximum concurrent operations (%d) reached", c.securityConfig.MaxConcurrentOps)
 	}
-	
+
 	c.activeOps++
-	
+
 	// Set up cleanup after timeout
 	go func() {
 		time.Sleep(c.securityConfig.OperationTimeout)
@@ -485,7 +485,7 @@ func (c *Controller) SPITransfer(channel int, data []byte, userID string) ([]byt
 	if len(data) > 4096 { // Limit SPI transfer size for safety
 		return nil, fmt.Errorf("SPI transfer size %d bytes exceeds maximum allowed (4096)", len(data))
 	}
-	
+
 	c.auditLog("spi_transfer", fmt.Sprintf("SPI transfer on channel %d, %d bytes", channel, len(data)), userID, -1)
 	return c.impl.SPITransfer(channel, data)
 }
@@ -494,7 +494,7 @@ func (c *Controller) SPIWrite(channel int, data []byte, userID string) error {
 	if len(data) > 4096 {
 		return fmt.Errorf("SPI write size %d bytes exceeds maximum allowed (4096)", len(data))
 	}
-	
+
 	c.auditLog("spi_write", fmt.Sprintf("SPI write on channel %d, %d bytes", channel, len(data)), userID, -1)
 	return c.impl.SPIWrite(channel, data)
 }
@@ -503,7 +503,7 @@ func (c *Controller) SPIRead(channel int, length int, userID string) ([]byte, er
 	if length > 4096 {
 		return nil, fmt.Errorf("SPI read length %d bytes exceeds maximum allowed (4096)", length)
 	}
-	
+
 	c.auditLog("spi_read", fmt.Sprintf("SPI read on channel %d, %d bytes", channel, length), userID, -1)
 	return c.impl.SPIRead(channel, length)
 }
@@ -513,7 +513,7 @@ func (c *Controller) I2CWrite(bus int, address int, data []byte, userID string) 
 	if len(data) > 256 { // Limit I2C transfer size
 		return fmt.Errorf("I2C write size %d bytes exceeds maximum allowed (256)", len(data))
 	}
-	
+
 	c.auditLog("i2c_write", fmt.Sprintf("I2C write to bus %d, address 0x%02x, %d bytes", bus, address, len(data)), userID, -1)
 	return c.impl.I2CWrite(bus, address, data)
 }
@@ -522,7 +522,7 @@ func (c *Controller) I2CRead(bus int, address int, length int, userID string) ([
 	if length > 256 {
 		return nil, fmt.Errorf("I2C read length %d bytes exceeds maximum allowed (256)", length)
 	}
-	
+
 	c.auditLog("i2c_read", fmt.Sprintf("I2C read from bus %d, address 0x%02x, %d bytes", bus, address, length), userID, -1)
 	return c.impl.I2CRead(bus, address, length)
 }
@@ -531,7 +531,7 @@ func (c *Controller) I2CWriteRegister(bus int, address int, register int, data [
 	if len(data) > 256 {
 		return fmt.Errorf("I2C register write size %d bytes exceeds maximum allowed (256)", len(data))
 	}
-	
+
 	c.auditLog("i2c_write_register", fmt.Sprintf("I2C write to bus %d, address 0x%02x, register 0x%02x, %d bytes", bus, address, register, len(data)), userID, -1)
 	return c.impl.I2CWriteRegister(bus, address, register, data)
 }
@@ -540,7 +540,7 @@ func (c *Controller) I2CReadRegister(bus int, address int, register int, length 
 	if length > 256 {
 		return nil, fmt.Errorf("I2C register read length %d bytes exceeds maximum allowed (256)", length)
 	}
-	
+
 	c.auditLog("i2c_read_register", fmt.Sprintf("I2C read from bus %d, address 0x%02x, register 0x%02x, %d bytes", bus, address, register, length), userID, -1)
 	return c.impl.I2CReadRegister(bus, address, register, length)
 }
@@ -598,14 +598,14 @@ func (c *Controller) GetSecurityStats() map[string]interface{} {
 	defer c.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"security_level":       c.securityConfig.Level,
-		"allow_critical_pins":  c.securityConfig.AllowCriticalPins,
-		"active_pins":          len(c.activePins),
-		"active_operations":    c.activeOps,
-		"max_concurrent_ops":   c.securityConfig.MaxConcurrentOps,
-		"restricted_pins":      c.config.RestrictedPins,
-		"allowed_pins":         c.config.AllowedPins,
-		"critical_pins":        CriticalSystemPins,
-		"audit_enabled":        c.securityConfig.EnableAuditLog,
+		"security_level":      c.securityConfig.Level,
+		"allow_critical_pins": c.securityConfig.AllowCriticalPins,
+		"active_pins":         len(c.activePins),
+		"active_operations":   c.activeOps,
+		"max_concurrent_ops":  c.securityConfig.MaxConcurrentOps,
+		"restricted_pins":     c.config.RestrictedPins,
+		"allowed_pins":        c.config.AllowedPins,
+		"critical_pins":       CriticalSystemPins,
+		"audit_enabled":       c.securityConfig.EnableAuditLog,
 	}
 }

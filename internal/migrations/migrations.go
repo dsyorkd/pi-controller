@@ -82,7 +82,7 @@ func (m *Migrator) Up() error {
 		}
 
 		m.logger.Info("Applying migration", "id", migration.ID, "description", migration.Description)
-		
+
 		// Run migration in transaction
 		err := m.db.Transaction(func(tx *gorm.DB) error {
 			if err := migration.Up(tx); err != nil {

@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"periph.io/x/conn/v3/gpio"
 	"periph.io/x/conn/v3/gpio/gpioreg"
 	"periph.io/x/host/v3"
-	"github.com/sirupsen/logrus"
 )
 
 // PeriphGPIO implements the GPIO interface using periph.io

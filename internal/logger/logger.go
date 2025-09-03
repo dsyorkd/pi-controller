@@ -14,13 +14,13 @@ type Interface interface {
 	Info(msg string, args ...interface{})
 	Warn(msg string, args ...interface{})
 	Error(msg string, args ...interface{})
-	
+
 	Debugf(format string, args ...interface{})
 	Infof(format string, args ...interface{})
 	Warnf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
-	
+
 	WithField(key string, value interface{}) Interface
 	WithFields(fields map[string]interface{}) Interface
 	WithError(err error) Interface
@@ -70,7 +70,7 @@ func New(config Config) (*Logger, error) {
 	// Create handler based on format
 	var handler slog.Handler
 	opts := &slog.HandlerOptions{
-		Level: level,
+		Level:     level,
 		AddSource: level == slog.LevelDebug, // Add source info for debug level
 	}
 

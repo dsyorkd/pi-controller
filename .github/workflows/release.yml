@@ -1,0 +1,431 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  GO_VERSION: "1.21"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Pre-release validation
+  validate-release:
+    name: Validate Release
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      is_prerelease: ${{ steps.check_prerelease.outputs.is_prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for changelog
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${{ github.ref_name }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="$(git describe --tags --always --dirty)"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Check if prerelease
+        id: check_prerelease
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            IS_PRERELEASE="${{ github.event.release.prerelease }}"
+          elif [[ "${{ steps.get_version.outputs.version }}" == *"-"* ]]; then
+            IS_PRERELEASE="true"
+          else
+            IS_PRERELEASE="false"
+          fi
+          echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          echo "Is prerelease: ${IS_PRERELEASE}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Run quick validation
+        run: |
+          make proto
+          make fmt
+          make vet
+          make test-unit
+
+  # Build release artifacts for all platforms
+  build-release:
+    name: Build Release Artifacts
+    runs-on: [self-hosted, ubuntu]
+    needs: validate-release
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - goos: linux
+            goarch: amd64
+            name: linux-amd64
+          - goos: linux
+            goarch: arm64
+            name: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            name: linux-armv7
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+            name: windows-amd64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Build release binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          make build
+          
+          # Create release directory structure
+          mkdir -p release/${{ matrix.name }}
+          
+          # Copy binaries with proper naming
+          cd build
+          for binary in pi-controller-* pi-agent-*; do
+            if [[ -f "$binary" ]]; then
+              base_name=${binary%-*}
+              if [[ "${{ matrix.goos }}" == "windows" ]]; then
+                cp "$binary" "../release/${{ matrix.name }}/${base_name}.exe"
+              else
+                cp "$binary" "../release/${{ matrix.name }}/${base_name}"
+              fi
+            fi
+          done
+
+      - name: Create release package
+        run: |
+          cd release/${{ matrix.name }}
+          
+          # Add README and LICENSE
+          cp ../../README.md . || echo "# Pi Controller" > README.md
+          cp ../../LICENSE . || echo "MIT License" > LICENSE
+          
+          # Create example configs
+          mkdir -p config
+          if [[ -f "../../config/controller.example.yml" ]]; then
+            cp ../../config/controller.example.yml config/
+          fi
+          if [[ -f "../../config/agent.example.yml" ]]; then
+            cp ../../config/agent.example.yml config/
+          fi
+          
+          # Create systemd service files for Linux builds
+          if [[ "${{ matrix.goos }}" == "linux" ]]; then
+            mkdir -p systemd
+            cat > systemd/pi-controller.service << 'EOF'
+          [Unit]
+          Description=Pi Controller Service
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=pi-controller
+          ExecStart=/usr/local/bin/pi-controller
+          Restart=always
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+            cat > systemd/pi-agent.service << 'EOF'
+          [Unit]
+          Description=Pi Agent Service
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=pi-agent
+          ExecStart=/usr/local/bin/pi-agent
+          Restart=always
+          RestartSec=5
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          fi
+          
+          # Create installation script
+          cat > install.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          PREFIX=${PREFIX:-/usr/local}
+          SUDO=${SUDO:-sudo}
+          
+          echo "Installing Pi Controller binaries to ${PREFIX}/bin/"
+          $SUDO mkdir -p ${PREFIX}/bin
+          $SUDO cp pi-controller pi-agent ${PREFIX}/bin/
+          $SUDO chmod +x ${PREFIX}/bin/pi-controller ${PREFIX}/bin/pi-agent
+          
+          echo "Installing configuration files to /etc/pi-controller/"
+          $SUDO mkdir -p /etc/pi-controller
+          if [[ -d "config" ]]; then
+            $SUDO cp -r config/* /etc/pi-controller/
+          fi
+          
+          if [[ -d "systemd" && -d "/etc/systemd/system" ]]; then
+            echo "Installing systemd service files..."
+            $SUDO cp systemd/*.service /etc/systemd/system/
+            $SUDO systemctl daemon-reload
+            echo "Enable services with: sudo systemctl enable pi-controller pi-agent"
+          fi
+          
+          echo "Installation complete!"
+          EOF
+          chmod +x install.sh
+          
+          # Create archive
+          if [[ "${{ matrix.goos }}" == "windows" ]]; then
+            zip -r "../pi-controller-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.zip" .
+          else
+            tar -czf "../pi-controller-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.tar.gz" .
+          fi
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: release/pi-controller-*
+          retention-days: 30
+
+  # Build and push Docker images
+  docker-release:
+    name: Build & Push Docker Images
+    runs-on: [self-hosted, ubuntu]
+    needs: [validate-release, build-release]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push controller image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.controller
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}-controller
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.validate-release.outputs.version }}
+
+      - name: Build and push agent image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.agent
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}-agent
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.validate-release.outputs.version }}
+
+  # Test release artifacts on actual Raspberry Pi hardware
+  test-release-hardware:
+    name: Test Release on Pi Hardware
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: [validate-release, build-release]
+    timeout-minutes: 15
+    steps:
+      - name: Download Pi ARM64 release
+        uses: actions/download-artifact@v4
+        with:
+          name: release-linux-arm64
+          path: ./release-test/
+
+      - name: Extract and test release
+        run: |
+          cd release-test
+          tar -xzf pi-controller-*.tar.gz
+          cd pi-controller-*/
+          
+          # Test binaries run without errors
+          ./pi-controller --version
+          ./pi-agent --version
+          
+          # Test installation script
+          bash install.sh --dry-run || echo "Install script validation complete"
+          
+          echo "Release artifacts tested successfully on Raspberry Pi hardware!"
+
+  # Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    runs-on: [self-hosted, ubuntu]
+    needs: [validate-release, build-release, docker-release, test-release-hardware]
+    timeout-minutes: 15
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.version != ''
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts/ -name "pi-controller-*.tar.gz" -o -name "pi-controller-*.zip" | \
+            xargs -I {} cp {} release-assets/
+          ls -la release-assets/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if git tag --list | grep -q .; then
+            LAST_TAG=$(git tag --sort=-version:refname | head -n 1)
+            echo "Generating changelog since ${LAST_TAG}..."
+            CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | head -20)
+          else
+            echo "No previous tags found, generating changelog from initial commit..."
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
+          fi
+          
+          cat > release-notes.md << EOF
+          ## Pi Controller ${{ needs.validate-release.outputs.version }}
+          
+          ### Changes
+          ${CHANGELOG}
+          
+          ### Installation
+          
+          1. Download the appropriate binary for your platform
+          2. Extract the archive: \`tar -xzf pi-controller-*.tar.gz\`
+          3. Run the installation script: \`sudo ./install.sh\`
+          4. Enable and start services: \`sudo systemctl enable --now pi-controller pi-agent\`
+          
+          ### Docker Images
+          
+          - Controller: \`ghcr.io/${{ github.repository }}:${{ needs.validate-release.outputs.version }}-controller\`
+          - Agent: \`ghcr.io/${{ github.repository }}:${{ needs.validate-release.outputs.version }}-agent\`
+          
+          ### Supported Platforms
+          
+          - Linux (amd64, arm64, armv7)
+          - macOS (Intel & Apple Silicon)
+          - Windows (amd64)
+          
+          ### Hardware Tested
+          
+          - Raspberry Pi 5 Model B ✅
+          - Generic Linux ARM64 ✅
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate-release.outputs.version }}
+          name: Pi Controller ${{ needs.validate-release.outputs.version }}
+          body_path: release-notes.md
+          files: release-assets/*
+          prerelease: ${{ needs.validate-release.outputs.is_prerelease }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update release summary
+        run: |
+          echo "🚀 **Release ${{ needs.validate-release.outputs.version }} Published!**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts Created:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Multi-platform binaries" >> $GITHUB_STEP_SUMMARY  
+          echo "- ✅ Docker images" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Installation scripts" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Hardware tested on Raspberry Pi" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Download:" >> $GITHUB_STEP_SUMMARY
+          echo "https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY

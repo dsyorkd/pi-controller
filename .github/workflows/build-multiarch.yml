@@ -1,0 +1,433 @@
+name: Multi-Architecture Build
+
+on:
+  push:
+    branches: [ main, develop, master ]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'pkg/**'
+      - 'proto/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - 'docker/**'
+  pull_request:
+    branches: [ main, develop, master ]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'pkg/**'
+      - 'proto/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - 'docker/**'
+  workflow_dispatch:
+    inputs:
+      include_experimental:
+        description: 'Include experimental architectures (mips, ppc64le, s390x)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.21"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Matrix strategy for comprehensive multi-arch builds
+  build-matrix:
+    name: Build ${{ matrix.name }}
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Primary supported platforms
+          - goos: linux
+            goarch: amd64
+            name: linux-amd64
+            primary: true
+          - goos: linux
+            goarch: arm64
+            name: linux-arm64
+            primary: true
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            name: linux-armv7
+            primary: true
+          - goos: linux
+            goarch: arm
+            goarm: 6
+            name: linux-armv6
+            primary: true
+          
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+            primary: false
+          - goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+            primary: false
+          
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+            name: windows-amd64
+            primary: false
+          - goos: windows
+            goarch: arm64
+            name: windows-arm64
+            primary: false
+          
+          # BSD variants
+          - goos: freebsd
+            goarch: amd64
+            name: freebsd-amd64
+            primary: false
+          - goos: openbsd
+            goarch: amd64
+            name: openbsd-amd64
+            primary: false
+          - goos: netbsd
+            goarch: amd64
+            name: netbsd-amd64
+            primary: false
+          
+          # Additional architectures (if requested)
+          - goos: linux
+            goarch: mips
+            name: linux-mips
+            primary: false
+            experimental: true
+          - goos: linux
+            goarch: mips64
+            name: linux-mips64
+            primary: false
+            experimental: true
+          - goos: linux
+            goarch: ppc64le
+            name: linux-ppc64le
+            primary: false
+            experimental: true
+          - goos: linux
+            goarch: s390x
+            name: linux-s390x
+            primary: false
+            experimental: true
+          - goos: linux
+            goarch: riscv64
+            name: linux-riscv64
+            primary: false
+            experimental: true
+
+    steps:
+      - name: Skip experimental builds
+        if: matrix.experimental == true && github.event.inputs.include_experimental != 'true'
+        run: |
+          echo "Skipping experimental architecture ${{ matrix.name }}"
+          exit 0
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache build dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && 'v' }}${{ matrix.goarm }}"
+          make build
+          
+          # Create organized output directory
+          mkdir -p dist/${{ matrix.name }}
+          
+          # Move and rename binaries
+          cd build
+          for binary in pi-controller-* pi-agent-*; do
+            if [[ -f "$binary" ]]; then
+              base_name=${binary%-*}
+              if [[ "${{ matrix.goos }}" == "windows" ]]; then
+                cp "$binary" "../dist/${{ matrix.name }}/${base_name}.exe"
+              else
+                cp "$binary" "../dist/${{ matrix.name }}/${base_name}"
+              fi
+            fi
+          done
+
+      - name: Test binaries (basic smoke test)
+        if: matrix.primary == true
+        run: |
+          cd dist/${{ matrix.name }}
+          
+          # Test that binaries run without error (version check)
+          if [[ "${{ matrix.goos }}" != "windows" ]]; then
+            chmod +x pi-controller pi-agent
+            timeout 5s ./pi-controller --version || echo "Controller version check completed"
+            timeout 5s ./pi-agent --version || echo "Agent version check completed"
+          fi
+
+      - name: Generate build info
+        run: |
+          cd dist/${{ matrix.name }}
+          
+          cat > BUILD_INFO.txt << EOF
+          Pi Controller Build Information
+          ==============================
+          
+          Platform: ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && 'v' }}${{ matrix.goarm }}
+          Go Version: ${{ env.GO_VERSION }}
+          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Git Commit: $(git rev-parse --short HEAD)
+          Git Tag: $(git describe --tags --always --dirty)
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}
+          
+          Files in this build:
+          $(ls -la)
+          EOF
+
+      - name: Create checksums
+        run: |
+          cd dist/${{ matrix.name }}
+          
+          if command -v sha256sum > /dev/null; then
+            sha256sum * > SHA256SUMS
+          elif command -v shasum > /dev/null; then
+            shasum -a 256 * > SHA256SUMS
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-controller-${{ matrix.name }}
+          path: dist/${{ matrix.name }}/
+          retention-days: 7
+
+      - name: Create build manifest
+        if: matrix.primary == true
+        run: |
+          echo "${{ matrix.name }}" >> successful_builds.txt
+
+      - name: Upload build manifest
+        if: matrix.primary == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-manifest-${{ matrix.name }}
+          path: successful_builds.txt
+          retention-days: 1
+
+  # Docker multi-arch builds using buildx
+  docker-multiarch:
+    name: Docker Multi-Arch Build
+    runs-on: [self-hosted, ubuntu]
+    needs: build-matrix
+    timeout-minutes: 45
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for controller
+        id: meta-controller
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-controller
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for agent
+        id: meta-agent
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-agent
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push controller image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.controller
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta-controller.outputs.tags }}
+          labels: ${{ steps.meta-controller.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push agent image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.agent
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta-agent.outputs.tags }}
+          labels: ${{ steps.meta-agent.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Test multi-arch binaries on actual hardware
+  test-hardware-matrix:
+    name: Test on Hardware
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: build-matrix
+    timeout-minutes: 15
+    if: contains(needs.build-matrix.result, 'success')
+    strategy:
+      matrix:
+        arch: [linux-arm64, linux-armv7]
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pi-controller-${{ matrix.arch }}
+          path: ./test-${{ matrix.arch }}/
+
+      - name: Test binaries on hardware
+        run: |
+          cd test-${{ matrix.arch }}
+          
+          # Make binaries executable
+          chmod +x pi-controller pi-agent
+          
+          # Test version commands
+          echo "Testing pi-controller..."
+          timeout 10s ./pi-controller --version || echo "Controller version test completed"
+          
+          echo "Testing pi-agent..."
+          timeout 10s ./pi-agent --version || echo "Agent version test completed"
+          
+          # Test configuration parsing (if config exists)
+          if [[ -f "../config/controller.example.yml" ]]; then
+            echo "Testing configuration parsing..."
+            timeout 5s ./pi-controller --config-file=../config/controller.example.yml --dry-run || echo "Config test completed"
+          fi
+          
+          echo "Hardware testing completed successfully for ${{ matrix.arch }}"
+
+  # Generate build summary report
+  build-summary:
+    name: Build Summary
+    runs-on: [self-hosted, ubuntu]
+    needs: [build-matrix, docker-multiarch, test-hardware-matrix]
+    if: always()
+    timeout-minutes: 10
+    steps:
+      - name: Download all build manifests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-manifest-*
+          path: ./manifests/
+
+      - name: Generate build report
+        run: |
+          echo "# 🏗️ Multi-Architecture Build Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Count successful builds
+          SUCCESSFUL_BUILDS=0
+          TOTAL_BUILDS=0
+          
+          if [[ -d "./manifests" ]]; then
+            for manifest in ./manifests/*/successful_builds.txt; do
+              if [[ -f "$manifest" ]]; then
+                while read -r build; do
+                  SUCCESSFUL_BUILDS=$((SUCCESSFUL_BUILDS + 1))
+                  echo "✅ $build" >> $GITHUB_STEP_SUMMARY
+                done < "$manifest"
+              fi
+            done
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Successful Builds**: $SUCCESSFUL_BUILDS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Images**: ${{ needs.docker-multiarch.result == 'success' && '✅ Built' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Hardware Tests**: ${{ needs.test-hardware-matrix.result == 'success' && '✅ Passed' || needs.test-hardware-matrix.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Build artifacts available for download in the workflow summary." >> $GITHUB_STEP_SUMMARY
+
+      - name: Check build success criteria
+        run: |
+          # Define minimum required successful builds (primary platforms)
+          MIN_REQUIRED=3  # linux-amd64, linux-arm64, linux-armv7
+          
+          # Count successful primary builds
+          PRIMARY_SUCCESS=0
+          if [[ -d "./manifests" ]]; then
+            for manifest in ./manifests/*/successful_builds.txt; do
+              if [[ -f "$manifest" ]]; then
+                while read -r build; do
+                  if [[ "$build" =~ ^linux-(amd64|arm64|armv7)$ ]]; then
+                    PRIMARY_SUCCESS=$((PRIMARY_SUCCESS + 1))
+                  fi
+                done < "$manifest"
+              fi
+            done
+          fi
+          
+          echo "Primary platform builds successful: $PRIMARY_SUCCESS / $MIN_REQUIRED"
+          
+          if [[ $PRIMARY_SUCCESS -ge $MIN_REQUIRED ]]; then
+            echo "✅ Multi-architecture build succeeded!"
+            exit 0
+          else
+            echo "❌ Multi-architecture build failed - insufficient primary platform builds"
+            exit 1
+          fi

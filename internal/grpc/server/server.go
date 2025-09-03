@@ -78,9 +78,9 @@ func (s *Server) Stop() {
 func loggingInterceptor(logger logger.Interface) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		logger.WithField("method", info.FullMethod).Debug("gRPC request started")
-		
+
 		resp, err := handler(ctx, req)
-		
+
 		if err != nil {
 			logger.WithFields(map[string]interface{}{
 				"method": info.FullMethod,
@@ -89,7 +89,7 @@ func loggingInterceptor(logger logger.Interface) grpc.UnaryServerInterceptor {
 		} else {
 			logger.WithField("method", info.FullMethod).Debug("gRPC request completed")
 		}
-		
+
 		return resp, err
 	}
 }
@@ -98,9 +98,9 @@ func loggingInterceptor(logger logger.Interface) grpc.UnaryServerInterceptor {
 func streamLoggingInterceptor(logger logger.Interface) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		logger.WithField("method", info.FullMethod).Debug("gRPC stream started")
-		
+
 		err := handler(srv, ss)
-		
+
 		if err != nil {
 			logger.WithFields(map[string]interface{}{
 				"method": info.FullMethod,
@@ -109,7 +109,7 @@ func streamLoggingInterceptor(logger logger.Interface) grpc.StreamServerIntercep
 		} else {
 			logger.WithField("method", info.FullMethod).Debug("gRPC stream completed")
 		}
-		
+
 		return err
 	}
 }

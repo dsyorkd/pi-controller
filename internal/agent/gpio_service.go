@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
@@ -24,7 +24,7 @@ func NewGPIOService(logger logger.Interface) (*GPIOService, error) {
 	// Create GPIO configuration with secure defaults
 	gpioConfig := gpio.DefaultConfig()
 	securityConfig := gpio.DefaultSecurityConfig()
-	
+
 	// For agent mode, we can be less restrictive since it's running on the node
 	securityConfig.Level = gpio.SecurityLevelPermissive
 	securityConfig.RequireUserContext = false // Agent operations are system-level
@@ -32,7 +32,7 @@ func NewGPIOService(logger logger.Interface) (*GPIOService, error) {
 	// Initialize GPIO controller
 	logrusLogger := logrus.New()
 	controller := gpio.NewController(gpioConfig, securityConfig, logrusLogger)
-	
+
 	return &GPIOService{
 		controller: controller,
 		logger:     logger.WithField("component", "gpio-service"),
@@ -42,12 +42,12 @@ func NewGPIOService(logger logger.Interface) (*GPIOService, error) {
 // Initialize initializes the GPIO service
 func (s *GPIOService) Initialize(ctx context.Context) error {
 	s.logger.Info("Initializing GPIO service")
-	
+
 	if err := s.controller.Initialize(ctx); err != nil {
 		s.logger.WithError(err).Error("Failed to initialize GPIO controller")
 		return fmt.Errorf("failed to initialize GPIO controller: %w", err)
 	}
-	
+
 	s.logger.Info("GPIO service initialized successfully")
 	return nil
 }
@@ -55,12 +55,12 @@ func (s *GPIOService) Initialize(ctx context.Context) error {
 // Close shuts down the GPIO service
 func (s *GPIOService) Close() error {
 	s.logger.Info("Shutting down GPIO service")
-	
+
 	if err := s.controller.Close(); err != nil {
 		s.logger.WithError(err).Error("Failed to close GPIO controller")
 		return fmt.Errorf("failed to close GPIO controller: %w", err)
 	}
-	
+
 	s.logger.Info("GPIO service shut down successfully")
 	return nil
 }
@@ -207,7 +207,7 @@ func (s *GPIOService) ListConfiguredPins(ctx context.Context, req *pb.ListConfig
 func (s *GPIOService) AgentHealth(ctx context.Context, req *pb.AgentHealthRequest) (*pb.AgentHealthResponse, error) {
 	status := "ok"
 	gpioAvailable := s.controller.IsAvailable()
-	
+
 	if !gpioAvailable {
 		status = "gpio_unavailable"
 	}
@@ -216,7 +216,7 @@ func (s *GPIOService) AgentHealth(ctx context.Context, req *pb.AgentHealthReques
 		Status:        status,
 		Timestamp:     timestamppb.Now(),
 		Version:       "1.0.0", // TODO: Get from build info
-		Uptime:        "0s",     // TODO: Calculate uptime
+		Uptime:        "0s",    // TODO: Calculate uptime
 		GpioAvailable: gpioAvailable,
 	}, nil
 }
@@ -226,17 +226,17 @@ func (s *GPIOService) GetSystemInfo(ctx context.Context, req *pb.GetSystemInfoRe
 	// TODO: Implement system info collection
 	// For now, return basic placeholder info
 	return &pb.GetSystemInfoResponse{
-		Hostname:         "pi-agent",
-		Platform:         "linux",
-		Architecture:     "arm64",
-		CpuCores:         4,
-		MemoryTotal:      4 * 1024 * 1024 * 1024, // 4GB
-		MemoryAvailable:  2 * 1024 * 1024 * 1024, // 2GB
-		KernelVersion:    "6.0.0",
-		LoadAverage_1M:   0.1,
-		LoadAverage_5M:   0.2,
-		LoadAverage_15M:  0.3,
-		Timestamp:        timestamppb.Now(),
+		Hostname:        "pi-agent",
+		Platform:        "linux",
+		Architecture:    "arm64",
+		CpuCores:        4,
+		MemoryTotal:     4 * 1024 * 1024 * 1024, // 4GB
+		MemoryAvailable: 2 * 1024 * 1024 * 1024, // 2GB
+		KernelVersion:   "6.0.0",
+		LoadAverage_1M:  0.1,
+		LoadAverage_5M:  0.2,
+		LoadAverage_15M: 0.3,
+		Timestamp:       timestamppb.Now(),
 	}, nil
 }
 

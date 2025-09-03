@@ -1,0 +1,401 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+  schedule:
+    # Run security scans daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.21"
+
+jobs:
+  # Dependency vulnerability scanning
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Run Govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      - name: Run Nancy (Sonatype dependency scan)
+        run: |
+          go install github.com/sonatypecommunity/nancy@latest
+          go list -json -m all | nancy sleuth
+
+      - name: Generate SBOM (Software Bill of Materials)
+        run: |
+          go install github.com/anchore/syft/cmd/syft@latest
+          syft . -o spdx-json=sbom.json
+          syft . -o table=sbom.txt
+          echo "Generated SBOM files"
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            sbom.txt
+          retention-days: 30
+
+  # Static code analysis with multiple tools
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Install security analysis tools
+        run: |
+          # Install gosec for security scanning
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          
+          # Install staticcheck for advanced static analysis
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          
+          # Install golangci-lint with security linters
+          make install-lint
+
+      - name: Run gosec security scanner
+        run: |
+          gosec -fmt json -out gosec-report.json -stdout -verbose=text ./...
+          echo "Gosec scan completed"
+
+      - name: Run staticcheck
+        run: |
+          staticcheck -f json ./... > staticcheck-report.json || true
+          echo "Staticcheck analysis completed"
+
+      - name: Run golangci-lint with security focus
+        run: |
+          golangci-lint run --out-format json > golangci-report.json || true
+          echo "Golangci-lint security scan completed"
+
+      - name: Run custom security tests
+        run: |
+          make test-security-verbose
+
+      - name: Upload security scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            gosec-report.json
+            staticcheck-report.json  
+            golangci-report.json
+            coverage-security.out
+          retention-days: 30
+
+      - name: Check for critical security issues
+        run: |
+          # Parse gosec results for critical issues
+          if [[ -f gosec-report.json ]]; then
+            CRITICAL_COUNT=$(jq '[.Issues[] | select(.Severity == "HIGH" or .Confidence == "HIGH")] | length' gosec-report.json)
+            echo "Critical security issues found: $CRITICAL_COUNT"
+            
+            if [[ $CRITICAL_COUNT -gt 0 ]]; then
+              echo "❌ Critical security issues detected!"
+              jq -r '.Issues[] | select(.Severity == "HIGH" or .Confidence == "HIGH") | "- \(.RuleID): \(.Details) (\(.File):\(.Line))"' gosec-report.json
+              exit 1
+            else
+              echo "✅ No critical security issues found"
+            fi
+          fi
+
+  # CodeQL analysis for advanced security scanning
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      matrix:
+        language: [ 'go' ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies and build
+        run: |
+          make deps
+          make proto
+          make build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # Docker image security scanning
+  container-scan:
+    name: Container Security Scan
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test images
+        run: |
+          # Build images for scanning (don't push)
+          docker build -f docker/Dockerfile.controller -t pi-controller:scan-test .
+          docker build -f docker/Dockerfile.agent -t pi-agent:scan-test .
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Scan controller image
+        run: |
+          trivy image --format json --output trivy-controller.json pi-controller:scan-test
+          trivy image --format table pi-controller:scan-test
+
+      - name: Scan agent image  
+        run: |
+          trivy image --format json --output trivy-agent.json pi-agent:scan-test
+          trivy image --format table pi-agent:scan-test
+
+      - name: Check for critical vulnerabilities
+        run: |
+          # Check controller image
+          CONTROLLER_CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-controller.json)
+          CONTROLLER_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-controller.json)
+          
+          # Check agent image
+          AGENT_CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-agent.json)
+          AGENT_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-agent.json)
+          
+          echo "Controller - Critical: $CONTROLLER_CRITICAL, High: $CONTROLLER_HIGH"
+          echo "Agent - Critical: $AGENT_CRITICAL, High: $AGENT_HIGH"
+          
+          # Fail if critical vulnerabilities found
+          TOTAL_CRITICAL=$((CONTROLLER_CRITICAL + AGENT_CRITICAL))
+          if [[ $TOTAL_CRITICAL -gt 0 ]]; then
+            echo "❌ Critical vulnerabilities found in container images!"
+            exit 1
+          else
+            echo "✅ No critical vulnerabilities found in container images"
+          fi
+
+      - name: Upload container scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-scan-results
+          path: |
+            trivy-controller.json
+            trivy-agent.json
+          retention-days: 30
+
+  # Secrets scanning
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for secret scanning
+
+      - name: Install TruffleHog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /tmp
+          sudo mv /tmp/trufflehog /usr/local/bin/
+
+      - name: Run TruffleHog secrets scan
+        run: |
+          trufflehog git file://. --json > trufflehog-results.json || true
+          trufflehog git file://. --only-verified
+
+      - name: Install detect-secrets
+        run: |
+          pip install detect-secrets
+
+      - name: Run detect-secrets
+        run: |
+          detect-secrets scan --all-files --baseline .secrets.baseline
+
+      - name: Check for verified secrets
+        run: |
+          if [[ -f trufflehog-results.json ]]; then
+            VERIFIED_SECRETS=$(jq '[.[] | select(.Verified == true)] | length' trufflehog-results.json)
+            echo "Verified secrets found: $VERIFIED_SECRETS"
+            
+            if [[ $VERIFIED_SECRETS -gt 0 ]]; then
+              echo "❌ Verified secrets detected in repository!"
+              jq -r '.[] | select(.Verified == true) | "- \(.DetectorName): \(.Raw) (\(.SourceMetadata.Data.Filesystem.file):\(.SourceMetadata.Data.Filesystem.line))"' trufflehog-results.json
+              exit 1
+            else
+              echo "✅ No verified secrets found"
+            fi
+          fi
+
+      - name: Upload secrets scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: secrets-scan-results
+          path: |
+            trufflehog-results.json
+            .secrets.baseline
+          retention-days: 30
+
+  # License compliance check
+  license-check:
+    name: License Compliance
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Install go-licenses tool
+        run: |
+          go install github.com/google/go-licenses@latest
+
+      - name: Check licenses
+        run: |
+          echo "Checking licenses for pi-controller..."
+          go-licenses report ./cmd/pi-controller --template licenses.tpl > controller-licenses.txt || true
+          
+          echo "Checking licenses for pi-agent..."  
+          go-licenses report ./cmd/pi-agent --template licenses.tpl > agent-licenses.txt || true
+          
+          echo "Generating license summary..."
+          go-licenses csv ./... > licenses-summary.csv
+
+      - name: Check for forbidden licenses
+        run: |
+          # Define forbidden licenses (customize as needed)
+          FORBIDDEN_LICENSES=("GPL-2.0" "GPL-3.0" "AGPL-3.0" "LGPL-2.1" "LGPL-3.0")
+          
+          if [[ -f licenses-summary.csv ]]; then
+            for license in "${FORBIDDEN_LICENSES[@]}"; do
+              if grep -q "$license" licenses-summary.csv; then
+                echo "❌ Forbidden license detected: $license"
+                grep "$license" licenses-summary.csv
+                exit 1
+              fi
+            done
+            echo "✅ No forbidden licenses detected"
+          fi
+
+      - name: Upload license reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: |
+            controller-licenses.txt
+            agent-licenses.txt
+            licenses-summary.csv
+          retention-days: 30
+
+  # Security summary report
+  security-summary:
+    name: Security Summary
+    runs-on: [self-hosted, ubuntu]
+    needs: [dependency-scan, static-analysis, codeql-analysis, container-scan, secrets-scan, license-check]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Scan | ${{ needs.dependency-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Static Analysis | ${{ needs.static-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Scan | ${{ needs.container-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Scan | ${{ needs.secrets-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Check | ${{ needs.license-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check overall security status
+          if [[ "${{ needs.dependency-scan.result }}" == "success" && 
+                "${{ needs.static-analysis.result }}" == "success" && 
+                "${{ needs.codeql-analysis.result }}" == "success" && 
+                "${{ needs.container-scan.result }}" == "success" && 
+                "${{ needs.secrets-scan.result }}" == "success" && 
+                "${{ needs.license-check.result }}" == "success" ]]; then
+            echo "### ✅ All security scans passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Some security scans failed - please review the results" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📁 Detailed reports available in workflow artifacts" >> $GITHUB_STEP_SUMMARY

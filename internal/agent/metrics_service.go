@@ -209,16 +209,16 @@ func (m *MetricsService) collectMemoryMetrics() (*pb.MemoryMetrics, error) {
 	}
 
 	return &pb.MemoryMetrics{
-		TotalBytes:        vmStats.Total,
-		AvailableBytes:    vmStats.Available,
-		UsedBytes:         vmStats.Used,
-		FreeBytes:         vmStats.Free,
-		CachedBytes:       vmStats.Cached,
-		BuffersBytes:      vmStats.Buffers,
-		UsagePercent:      vmStats.UsedPercent,
-		SwapTotalBytes:    swapStats.Total,
-		SwapUsedBytes:     swapStats.Used,
-		SwapUsagePercent:  swapStats.UsedPercent,
+		TotalBytes:       vmStats.Total,
+		AvailableBytes:   vmStats.Available,
+		UsedBytes:        vmStats.Used,
+		FreeBytes:        vmStats.Free,
+		CachedBytes:      vmStats.Cached,
+		BuffersBytes:     vmStats.Buffers,
+		UsagePercent:     vmStats.UsedPercent,
+		SwapTotalBytes:   swapStats.Total,
+		SwapUsedBytes:    swapStats.Used,
+		SwapUsagePercent: swapStats.UsedPercent,
 	}, nil
 }
 
@@ -239,17 +239,17 @@ func (m *MetricsService) collectDiskMetrics() ([]*pb.DiskMetrics, error) {
 		}
 
 		diskMetric := &pb.DiskMetrics{
-			Device:              partition.Device,
-			Mountpoint:          partition.Mountpoint,
-			Filesystem:          partition.Fstype,
-			TotalBytes:          usage.Total,
-			UsedBytes:           usage.Used,
-			FreeBytes:           usage.Free,
-			UsagePercent:        usage.UsedPercent,
-			InodesTotal:         usage.InodesTotal,
-			InodesUsed:          usage.InodesUsed,
-			InodesFree:          usage.InodesFree,
-			InodesUsagePercent:  usage.InodesUsedPercent,
+			Device:             partition.Device,
+			Mountpoint:         partition.Mountpoint,
+			Filesystem:         partition.Fstype,
+			TotalBytes:         usage.Total,
+			UsedBytes:          usage.Used,
+			FreeBytes:          usage.Free,
+			UsagePercent:       usage.UsedPercent,
+			InodesTotal:        usage.InodesTotal,
+			InodesUsed:         usage.InodesUsed,
+			InodesFree:         usage.InodesFree,
+			InodesUsagePercent: usage.InodesUsedPercent,
 		}
 
 		diskMetrics = append(diskMetrics, diskMetric)

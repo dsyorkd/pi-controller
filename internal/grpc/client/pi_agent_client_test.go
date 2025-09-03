@@ -23,7 +23,7 @@ func TestPiAgentClientManager_GetClient(t *testing.T) {
 
 	// This will fail to connect (no actual agent running), but we can test the creation logic
 	_, err := manager.GetClient(node)
-	
+
 	// We expect a connection error since no agent is actually running
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to connect to Pi Agent")
@@ -80,7 +80,7 @@ func TestPiAgentClient_IsConnected(t *testing.T) {
 	client := &PiAgentClient{
 		conn: nil,
 	}
-	
+
 	assert.False(t, client.IsConnected())
 }
 

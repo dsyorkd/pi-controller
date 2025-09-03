@@ -83,7 +83,7 @@ func TestStreamSystemMetrics(t *testing.T) {
 	// For now, just verify the request structure and service exists
 	assert.Equal(t, int32(1), req.IntervalSeconds)
 	assert.NotNil(t, service) // Use the service variable
-	
+
 	// TODO: Implement full streaming test when we have proper mock infrastructure
 	// This would require implementing pb.PiAgentService_StreamSystemMetricsServer interface
 }
@@ -93,7 +93,7 @@ func TestCollectCPUMetrics(t *testing.T) {
 	ctx := context.Background()
 
 	cpuMetrics, err := service.collectCPUMetrics(ctx)
-	
+
 	// CPU metrics collection might fail in some environments (CI, containers)
 	// so we'll be lenient with errors but strict with data when available
 	if err != nil {
@@ -179,7 +179,7 @@ func TestCollectThermalMetrics(t *testing.T) {
 	}
 
 	require.NotNil(t, thermalMetrics)
-	
+
 	// If we have thermal zones, verify their structure
 	for _, zone := range thermalMetrics.Zones {
 		assert.NotEmpty(t, zone.Name)
@@ -216,7 +216,7 @@ func TestCollectProcessMetrics(t *testing.T) {
 	assert.Greater(t, procMetrics.Total, uint32(0))
 
 	// The sum of process states should not exceed total
-	stateSum := procMetrics.Running + procMetrics.Sleeping + 
+	stateSum := procMetrics.Running + procMetrics.Sleeping +
 		procMetrics.Stopped + procMetrics.Zombie
 	assert.LessOrEqual(t, stateSum, procMetrics.Total)
 
@@ -241,7 +241,7 @@ func TestCollectMetrics(t *testing.T) {
 	// Disks and network might be empty in some test environments, so just check they're not nil
 	assert.NotNil(t, metrics.Disks)
 	assert.NotNil(t, metrics.Network)
-	
+
 	// Thermal might be nil on systems without sensors
 	// assert.NotNil(t, metrics.Thermal) // Comment out to avoid test failures
 }

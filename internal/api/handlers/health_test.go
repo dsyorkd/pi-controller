@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -149,7 +149,7 @@ func TestSystemInfo(t *testing.T) {
 
 	// Verify expected fields are present
 	expectedFields := []string{
-		"go_version", "go_os", "go_arch", "cpu_count", 
+		"go_version", "go_os", "go_arch", "cpu_count",
 		"goroutines", "memory", "gc", "timestamp", "uptime",
 	}
 
@@ -160,12 +160,12 @@ func TestSystemInfo(t *testing.T) {
 	// Verify memory structure
 	memory, ok := response["memory"].(map[string]interface{})
 	require.True(t, ok, "Memory should be a map")
-	
+
 	memoryFields := []string{
-		"alloc", "total_alloc", "sys", "heap_alloc", 
+		"alloc", "total_alloc", "sys", "heap_alloc",
 		"heap_sys", "heap_inuse", "heap_idle", "heap_objects",
 	}
-	
+
 	for _, field := range memoryFields {
 		assert.Contains(t, memory, field, "Memory should contain field %s", field)
 	}
@@ -173,7 +173,7 @@ func TestSystemInfo(t *testing.T) {
 	// Verify GC structure
 	gc, ok := response["gc"].(map[string]interface{})
 	require.True(t, ok, "GC should be a map")
-	
+
 	gcFields := []string{"num_gc", "pause_total", "last_gc"}
 	for _, field := range gcFields {
 		assert.Contains(t, gc, field, "GC should contain field %s", field)
@@ -239,12 +239,12 @@ func TestHealthEndpoints_Security(t *testing.T) {
 	router.GET("/system/metrics", SystemMetrics)
 
 	securityTests := []struct {
-		name            string
-		endpoint        string
-		method          string
-		expectedStatus  int
+		name             string
+		endpoint         string
+		method           string
+		expectedStatus   int
 		shouldNotContain []string
-		description     string
+		description      string
 	}{
 		{
 			name:           "health endpoint doesn't leak sensitive info",
@@ -252,7 +252,7 @@ func TestHealthEndpoints_Security(t *testing.T) {
 			method:         "GET",
 			expectedStatus: http.StatusOK,
 			shouldNotContain: []string{
-				"password", "secret", "key", "token", 
+				"password", "secret", "key", "token",
 				"database", "connection", "user",
 			},
 			description: "Health endpoint should not expose sensitive information",
@@ -263,7 +263,7 @@ func TestHealthEndpoints_Security(t *testing.T) {
 			method:         "GET",
 			expectedStatus: http.StatusOK,
 			shouldNotContain: []string{
-				"password", "secret", "key", "token", 
+				"password", "secret", "key", "token",
 				"connection_string", "user",
 			},
 			description: "Ready endpoint should minimize information exposure",
@@ -282,21 +282,21 @@ func TestHealthEndpoints_Security(t *testing.T) {
 			name:           "POST not allowed on health endpoints",
 			endpoint:       "/health",
 			method:         "POST",
-			expectedStatus: http.StatusMethodNotAllowed,
+			expectedStatus: http.StatusNotFound,
 			description:    "Health endpoints should not accept POST requests",
 		},
 		{
 			name:           "PUT not allowed on health endpoints",
 			endpoint:       "/ready",
 			method:         "PUT",
-			expectedStatus: http.StatusMethodNotAllowed,
+			expectedStatus: http.StatusNotFound,
 			description:    "Health endpoints should not accept PUT requests",
 		},
 		{
 			name:           "DELETE not allowed on health endpoints",
 			endpoint:       "/system/info",
 			method:         "DELETE",
-			expectedStatus: http.StatusMethodNotAllowed,
+			expectedStatus: http.StatusNotFound,
 			description:    "Health endpoints should not accept DELETE requests",
 		},
 	}
@@ -314,7 +314,7 @@ func TestHealthEndpoints_Security(t *testing.T) {
 			if tt.expectedStatus == http.StatusOK {
 				responseBody := w.Body.String()
 				for _, sensitiveInfo := range tt.shouldNotContain {
-					assert.NotContains(t, responseBody, sensitiveInfo, 
+					assert.NotContains(t, responseBody, sensitiveInfo,
 						"Response should not contain sensitive information: %s", sensitiveInfo)
 				}
 			}

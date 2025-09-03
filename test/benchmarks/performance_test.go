@@ -9,8 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
@@ -18,6 +16,8 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
 	"github.com/dsyorkd/pi-controller/pkg/gpio"
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -150,7 +150,7 @@ func BenchmarkCluster_List(b *testing.B) {
 
 	// Pre-populate database with test clusters
 	testSizes := []int{10, 100, 1000}
-	
+
 	for _, size := range testSizes {
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			// Create test clusters
@@ -197,11 +197,11 @@ func BenchmarkNode_Create(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		createReq := services.CreateNodeRequest{
-			Name:        fmt.Sprintf("benchmark-node-%d", i),
-			IPAddress:   fmt.Sprintf("192.168.1.%d", (i%254)+1),
-			MACAddress:  fmt.Sprintf("02:00:00:00:00:%02x", i%256),
-			Role:        models.NodeRoleWorker,
-			ClusterID:   &cluster.ID,
+			Name:       fmt.Sprintf("benchmark-node-%d", i),
+			IPAddress:  fmt.Sprintf("192.168.1.%d", (i%254)+1),
+			MACAddress: fmt.Sprintf("02:00:00:00:00:%02x", i%256),
+			Role:       models.NodeRoleWorker,
+			ClusterID:  &cluster.ID,
 		}
 
 		body, _ := json.Marshal(createReq)
@@ -399,7 +399,7 @@ func BenchmarkDatabase_Operations(b *testing.B) {
 				Description: "Benchmark cluster",
 				Status:      models.ClusterStatusActive,
 			}
-			
+
 			result := db.Create(cluster)
 			if result.Error != nil {
 				b.Fatal(result.Error)

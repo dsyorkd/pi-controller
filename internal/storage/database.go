@@ -90,7 +90,7 @@ func New(config *Config, logger applogger.Interface) (*Database, error) {
 
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
-	
+
 	if config.ConnMaxLifetime != "" {
 		duration, err := time.ParseDuration(config.ConnMaxLifetime)
 		if err != nil {
@@ -162,7 +162,7 @@ func NewWithoutMigration(config *Config, logger applogger.Interface) (*Database,
 
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
-	
+
 	if config.ConnMaxLifetime != "" {
 		duration, err := time.ParseDuration(config.ConnMaxLifetime)
 		if err != nil {
@@ -210,20 +210,20 @@ func (d *Database) Health() error {
 // migrate runs database migrations
 func (d *Database) migrate() error {
 	d.logger.Info("Running database migrations")
-	
+
 	// Use the new migration system
 	migrator := migrations.NewMigrator(d.db, d.logger)
-	
+
 	// Validate migration order first
 	if err := migrator.ValidateMigrationOrder(); err != nil {
 		return errors.Wrapf(err, "migration validation failed")
 	}
-	
+
 	// Run migrations
 	if err := migrator.Up(); err != nil {
 		return errors.Wrapf(err, "failed to run migrations")
 	}
-	
+
 	d.logger.Info("Database migrations completed successfully")
 	return nil
 }
@@ -239,19 +239,19 @@ func (d *Database) WithTx(fn func(tx *gorm.DB) error) error {
 	if tx.Error != nil {
 		return tx.Error
 	}
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
 			panic(r)
 		}
 	}()
-	
+
 	if err := fn(tx); err != nil {
 		tx.Rollback()
 		return err
 	}
-	
+
 	return tx.Commit().Error
 }
 
@@ -260,7 +260,7 @@ func ensureDirExists(dir string) error {
 	if dir == "" || dir == "." {
 		return nil
 	}
-	
+
 	info, err := os.Stat(dir)
 	if err == nil {
 		if !info.IsDir() {
@@ -268,11 +268,11 @@ func ensureDirExists(dir string) error {
 		}
 		return nil
 	}
-	
+
 	if !os.IsNotExist(err) {
 		return err
 	}
-	
+
 	return os.MkdirAll(dir, 0755)
 }
 
@@ -301,13 +301,13 @@ func (g *gormSlogAdapter) Error(ctx context.Context, msg string, data ...interfa
 func (g *gormSlogAdapter) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	elapsed := time.Since(begin)
 	sql, rows := fc()
-	
+
 	fields := map[string]interface{}{
 		"duration": elapsed.String(),
 		"rows":     rows,
 		"sql":      sql,
 	}
-	
+
 	if err != nil {
 		g.logger.WithFields(fields).WithError(err).Error("Database query failed")
 	} else {

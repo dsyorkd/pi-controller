@@ -8,13 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -145,7 +145,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_ClusterWorkflow() {
 	suite.router.ServeHTTP(w, req)
 
 	assert.Equal(suite.T(), http.StatusOK, w.Code)
-	
+
 	var listResponse struct {
 		Data  []models.Cluster `json:"data"`
 		Total int64            `json:"total"`
@@ -159,7 +159,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_ClusterWorkflow() {
 		Name:        "integration-test-cluster",
 		Description: "Cluster for integration testing",
 	}
-	
+
 	body, err := json.Marshal(createReq)
 	require.NoError(suite.T(), err)
 
@@ -177,7 +177,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_ClusterWorkflow() {
 	}
 	err = json.Unmarshal(w.Body.Bytes(), &createResponse)
 	require.NoError(suite.T(), err)
-	
+
 	clusterID := createResponse.Data.ID
 	assert.NotZero(suite.T(), clusterID)
 	assert.Equal(suite.T(), createReq.Name, createResponse.Data.Name)
@@ -232,7 +232,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_ClusterWorkflow() {
 	suite.router.ServeHTTP(w, req)
 
 	assert.Equal(suite.T(), http.StatusOK, w.Code)
-	
+
 	err = json.Unmarshal(w.Body.Bytes(), &listResponse)
 	require.NoError(suite.T(), err)
 	assert.Len(suite.T(), listResponse.Data, 1)
@@ -265,13 +265,13 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_NodeWorkflow() {
 
 	// 1. Create a node
 	createReq := services.CreateNodeRequest{
-		Name:        "integration-test-node",
-		IPAddress:   "192.168.1.100",
-		MACAddress:  "02:00:00:00:01:00",
-		Role:        models.NodeRoleWorker,
-		ClusterID:   &cluster.ID,
+		Name:       "integration-test-node",
+		IPAddress:  "192.168.1.100",
+		MACAddress: "02:00:00:00:01:00",
+		Role:       models.NodeRoleWorker,
+		ClusterID:  &cluster.ID,
 	}
-	
+
 	body, err := json.Marshal(createReq)
 	require.NoError(suite.T(), err)
 
@@ -289,7 +289,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_NodeWorkflow() {
 	}
 	err = json.Unmarshal(w.Body.Bytes(), &createResponse)
 	require.NoError(suite.T(), err)
-	
+
 	nodeID := createResponse.Data.ID
 	assert.NotZero(suite.T(), nodeID)
 	assert.Equal(suite.T(), createReq.Name, createResponse.Data.Name)
@@ -330,7 +330,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_NodeWorkflow() {
 	suite.router.ServeHTTP(w, req)
 
 	assert.Equal(suite.T(), http.StatusOK, w.Code)
-	
+
 	var listResponse struct {
 		Data  []models.Node `json:"data"`
 		Total int64         `json:"total"`
@@ -354,7 +354,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_GPIOWorkflow() {
 	// Setup test data
 	cluster := testutils.CreateTestCluster(suite.T())
 	require.NoError(suite.T(), suite.db.DB().Create(cluster).Error)
-	
+
 	node := testutils.CreateTestNode(suite.T(), cluster.ID)
 	require.NoError(suite.T(), suite.db.DB().Create(node).Error)
 
@@ -368,7 +368,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_GPIOWorkflow() {
 		PullMode:    models.GPIOPullNone,
 		DeviceType:  models.GPIODeviceTypeDigital,
 	}
-	
+
 	body, err := json.Marshal(createReq)
 	require.NoError(suite.T(), err)
 
@@ -386,7 +386,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_GPIOWorkflow() {
 	}
 	err = json.Unmarshal(w.Body.Bytes(), &createResponse)
 	require.NoError(suite.T(), err)
-	
+
 	deviceID := createResponse.Data.ID
 	assert.NotZero(suite.T(), deviceID)
 	assert.Equal(suite.T(), createReq.Name, createResponse.Data.Name)
@@ -502,7 +502,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_Security_NoAuth() {
 			suite.router.ServeHTTP(w, req)
 
 			assert.Equal(suite.T(), tt.expectedStatus, w.Code)
-			
+
 			if tt.description != "" {
 				suite.T().Logf("Security Issue: %s", tt.description)
 			}

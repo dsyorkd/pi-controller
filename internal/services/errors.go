@@ -6,28 +6,28 @@ import "errors"
 var (
 	// ErrNotFound indicates a resource was not found
 	ErrNotFound = errors.New("resource not found")
-	
+
 	// ErrAlreadyExists indicates a resource already exists
 	ErrAlreadyExists = errors.New("resource already exists")
-	
+
 	// ErrInvalidInput indicates invalid input data
 	ErrInvalidInput = errors.New("invalid input")
-	
+
 	// ErrUnauthorized indicates unauthorized access
 	ErrUnauthorized = errors.New("unauthorized")
-	
+
 	// ErrForbidden indicates forbidden access
 	ErrForbidden = errors.New("forbidden")
-	
+
 	// ErrConflict indicates a conflict with current state
 	ErrConflict = errors.New("conflict")
-	
+
 	// ErrHasAssociatedResources indicates the resource has associated resources that prevent deletion
 	ErrHasAssociatedResources = errors.New("resource has associated resources")
-	
+
 	// ErrValidationFailed indicates input validation failed
 	ErrValidationFailed = errors.New("validation failed")
-	
+
 	// ErrInternalError indicates an internal server error
 	ErrInternalError = errors.New("internal server error")
 )

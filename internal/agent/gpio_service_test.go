@@ -169,11 +169,11 @@ func TestSetGPIOPWM(t *testing.T) {
 
 	// First configure the pin for PWM
 	configReq := &pb.ConfigureGPIOPinRequest{
-		Pin:           18,
-		Direction:     pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
-		PullMode:      pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE,
-		PwmFrequency:  1000,
-		PwmDutyCycle:  50,
+		Pin:          18,
+		Direction:    pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
+		PullMode:     pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE,
+		PwmFrequency: 1000,
+		PwmDutyCycle: 50,
 	}
 
 	configResp, err := service.ConfigureGPIOPin(ctx, configReq)

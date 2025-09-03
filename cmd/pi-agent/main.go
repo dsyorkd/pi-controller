@@ -53,7 +53,7 @@ func init() {
 	rootCmd.Flags().StringVar(&logFormat, "log-format", "json", "log format (json, text)")
 	rootCmd.Flags().StringVar(&serverAddress, "server", "", "Pi Controller server address")
 	rootCmd.Flags().StringVar(&nodeID, "node-id", "", "unique node identifier")
-	
+
 	rootCmd.AddCommand(versionCmd)
 }
 
@@ -73,7 +73,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to setup logger: %w", err)
 	}
-	
+
 	structuredLogger.WithFields(map[string]interface{}{
 		"version": version,
 		"commit":  commit,
@@ -127,13 +127,13 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	grpcClient.SetNodeInfo(nodeInfo)
 
 	structuredLogger.WithFields(map[string]interface{}{
-		"node_id":     nodeInfo.ID,
-		"node_name":   nodeInfo.Name,
-		"ip_address":  nodeInfo.IPAddress,
-		"mac_address": nodeInfo.MACAddress,
+		"node_id":      nodeInfo.ID,
+		"node_name":    nodeInfo.Name,
+		"ip_address":   nodeInfo.IPAddress,
+		"mac_address":  nodeInfo.MACAddress,
 		"architecture": nodeInfo.Architecture,
-		"model":       nodeInfo.Model,
-		"cpu_cores":   nodeInfo.CPUCores,
+		"model":        nodeInfo.Model,
+		"cpu_cores":    nodeInfo.CPUCores,
 	}).Info("Node information collected")
 
 	// Create context for graceful shutdown
@@ -170,7 +170,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 			Address: cfg.AgentServer.Address,
 			Port:    cfg.AgentServer.Port,
 		}
-		
+
 		agentServer, err = agent.NewServer(agentConfig, structuredLogger)
 		if err != nil {
 			structuredLogger.WithError(err).Error("Failed to create agent server")
@@ -201,12 +201,12 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		case <-ticker.C:
 			// Periodic tasks - the heartbeat is handled automatically by the gRPC client
 			structuredLogger.Debug("Agent periodic maintenance")
-			
+
 			// Update node status to indicate we're still alive
 			if err := grpcClient.UpdateNodeStatus(ctx, registeredNode.Id, registeredNode.Status); err != nil {
 				structuredLogger.WithError(err).Warn("Failed to update node status")
 			}
-			
+
 			// TODO: Future enhancements:
 			// - Collect and report system metrics
 			// - Update GPIO device states
@@ -215,27 +215,27 @@ func runAgent(cmd *cobra.Command, args []string) error {
 
 		case sig := <-sigChan:
 			structuredLogger.WithField("signal", sig).Info("Received shutdown signal")
-			
+
 			// Update node status to maintenance before shutting down
-			if err := grpcClient.UpdateNodeStatus(ctx, registeredNode.Id, 
+			if err := grpcClient.UpdateNodeStatus(ctx, registeredNode.Id,
 				pb.NodeStatus_NODE_STATUS_MAINTENANCE); err != nil {
 				structuredLogger.WithError(err).Warn("Failed to update node status to maintenance")
 			}
-			
+
 			// Stop the agent server if it's running
 			if agentServer != nil {
 				if err := agentServer.Stop(); err != nil {
 					structuredLogger.WithError(err).Error("Error stopping agent server")
 				}
 			}
-			
+
 			// Stop the gRPC client
 			if err := grpcClient.Stop(); err != nil {
 				structuredLogger.WithError(err).Error("Error stopping gRPC client")
 			}
-			
+
 			cancel()
-			
+
 		case <-ctx.Done():
 			structuredLogger.Info("Pi Agent shutdown complete")
 			return nil
@@ -250,12 +250,12 @@ func setupStructuredLogger() (logger.Interface, error) {
 		Format: logFormat,
 		Output: "stdout",
 	}
-	
+
 	structuredLogger, err := logger.New(loggerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create structured logger: %w", err)
 	}
-	
+
 	return structuredLogger, nil
 }
 

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 const (
@@ -51,16 +51,16 @@ type JWTClaims struct {
 
 // AuthConfig holds authentication configuration
 type AuthConfig struct {
-	JWTSecret           []byte        `yaml:"jwt_secret"`
-	JWTSecretFromFile   string        `yaml:"jwt_secret_file"`
-	AccessTokenExpiry   time.Duration `yaml:"access_token_expiry"`
-	RefreshTokenExpiry  time.Duration `yaml:"refresh_token_expiry"`
-	APIKeyExpiry        time.Duration `yaml:"api_key_expiry"`
-	EnableIPWhitelist   bool          `yaml:"enable_ip_whitelist"`
-	AllowedIPs          []string      `yaml:"allowed_ips"`
-	RateLimitPerMinute  int           `yaml:"rate_limit_per_minute"`
-	RequireHTTPS        bool          `yaml:"require_https"`
-	EnableAuditLog      bool          `yaml:"enable_audit_log"`
+	JWTSecret          []byte        `yaml:"jwt_secret"`
+	JWTSecretFromFile  string        `yaml:"jwt_secret_file"`
+	AccessTokenExpiry  time.Duration `yaml:"access_token_expiry"`
+	RefreshTokenExpiry time.Duration `yaml:"refresh_token_expiry"`
+	APIKeyExpiry       time.Duration `yaml:"api_key_expiry"`
+	EnableIPWhitelist  bool          `yaml:"enable_ip_whitelist"`
+	AllowedIPs         []string      `yaml:"allowed_ips"`
+	RateLimitPerMinute int           `yaml:"rate_limit_per_minute"`
+	RequireHTTPS       bool          `yaml:"require_https"`
+	EnableAuditLog     bool          `yaml:"enable_audit_log"`
 }
 
 // DefaultAuthConfig returns environment-aware default authentication configuration
@@ -69,22 +69,22 @@ func DefaultAuthConfig() *AuthConfig {
 	if env == "" {
 		env = os.Getenv("ENVIRONMENT")
 	}
-	
+
 	// Use secure production defaults unless explicitly set to development
 	requireHTTPS := true
 	if env == "development" || env == "dev" {
 		requireHTTPS = false // Allow HTTP for development ease
 	}
-	
+
 	return &AuthConfig{
-		AccessTokenExpiry:   15 * time.Minute,
-		RefreshTokenExpiry:  7 * 24 * time.Hour,
-		APIKeyExpiry:        90 * 24 * time.Hour,
-		EnableIPWhitelist:   false,
-		AllowedIPs:          []string{"127.0.0.1", "::1"},
-		RateLimitPerMinute:  100,
-		RequireHTTPS:        requireHTTPS,
-		EnableAuditLog:      true,
+		AccessTokenExpiry:  15 * time.Minute,
+		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		APIKeyExpiry:       90 * 24 * time.Hour,
+		EnableIPWhitelist:  false,
+		AllowedIPs:         []string{"127.0.0.1", "::1"},
+		RateLimitPerMinute: 100,
+		RequireHTTPS:       requireHTTPS,
+		EnableAuditLog:     true,
 	}
 }
 
@@ -144,7 +144,7 @@ func (am *AuthManager) loadSecret() error {
 
 	am.logger.Warn("Generated new JWT secret - tokens will be invalidated on restart")
 	am.logger.Info("Consider setting JWT_SECRET environment variable or jwt_secret_file config")
-	
+
 	return nil
 }
 
@@ -389,14 +389,14 @@ func (am *AuthManager) auditLog(c *gin.Context, eventType, message, userID strin
 	}
 
 	am.logger.WithFields(map[string]interface{}{
-		"event_type":  eventType,
-		"message":     message,
-		"user_id":     userID,
-		"client_ip":   c.ClientIP(),
-		"user_agent":  c.GetHeader("User-Agent"),
-		"method":      c.Request.Method,
-		"path":        c.Request.URL.Path,
-		"request_id":  c.GetHeader("X-Request-ID"),
+		"event_type": eventType,
+		"message":    message,
+		"user_id":    userID,
+		"client_ip":  c.ClientIP(),
+		"user_agent": c.GetHeader("User-Agent"),
+		"method":     c.Request.Method,
+		"path":       c.Request.URL.Path,
+		"request_id": c.GetHeader("X-Request-ID"),
 	}).Info("Auth event")
 }
 
@@ -448,7 +448,7 @@ func GenerateSecureAPIKey() (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	// Encode as hex with prefix
 	return "pk_" + hex.EncodeToString(bytes), nil
 }

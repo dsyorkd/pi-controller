@@ -83,7 +83,7 @@ func TestGPIOService_ReadWithGRPCClient(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -132,7 +132,7 @@ func TestGPIOService_WriteWithGRPCClient(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -184,7 +184,7 @@ func TestGPIOService_ClientConnectionError(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -230,7 +230,7 @@ func TestGPIOService_ConfigurationError(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -278,7 +278,7 @@ func TestGPIOService_HardwareReadError(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -327,7 +327,7 @@ func TestGPIOService_HardwareWriteError(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -375,7 +375,7 @@ func TestGPIOService_Close(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -400,7 +400,7 @@ func TestGPIOService_CloseError(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 
@@ -426,7 +426,7 @@ func TestGPIOService_ReadingCreation(t *testing.T) {
 
 	// Setup mock client manager
 	mockManager := NewMockPiAgentClientManager()
-	
+
 	// Create GPIO service with mock manager
 	gpioService := services.NewGPIOServiceWithManager(db, logger.Default(), mockManager)
 

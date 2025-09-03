@@ -53,7 +53,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "", "config file path")
 	rootCmd.Flags().StringVar(&logLevel, "log-level", "info", "log level (debug, info, warn, error)")
 	rootCmd.Flags().StringVar(&logFormat, "log-format", "json", "log format (json, text)")
-	
+
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(migrateCmd)
 }
@@ -107,7 +107,7 @@ func init() {
 	migrateCmd.AddCommand(migrateDownCmd)
 	migrateCmd.AddCommand(migrateStatusCmd)
 	migrateCmd.AddCommand(migrateResetCmd)
-	
+
 	// Add confirmation flag for reset command
 	migrateResetCmd.Flags().Bool("confirm", false, "Confirm destructive reset operation")
 }
@@ -118,7 +118,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to setup logger")
 	}
-	
+
 	log.WithFields(map[string]interface{}{
 		"version": version,
 		"commit":  commit,
@@ -166,7 +166,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to create gRPC server")
 	}
-	
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -199,7 +199,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Graceful shutdown
 	log.Info("Initiating graceful shutdown...")
-	
+
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
@@ -252,7 +252,7 @@ func setupLogger() (*logger.Logger, error) {
 
 	// Set as default logger
 	logger.SetDefault(log)
-	
+
 	return log, nil
 }
 
@@ -266,7 +266,7 @@ func runMigrateUp(cmd *cobra.Command, args []string) error {
 	defer db.Close()
 
 	migrator := migrations.NewMigrator(db.DB(), log)
-	
+
 	log.Info("Running database migrations...")
 	if err := migrator.Up(); err != nil {
 		return errors.Wrapf(err, "failed to run migrations")
@@ -284,7 +284,7 @@ func runMigrateDown(cmd *cobra.Command, args []string) error {
 	defer db.Close()
 
 	migrator := migrations.NewMigrator(db.DB(), log)
-	
+
 	log.Info("Rolling back last migration...")
 	if err := migrator.Down(); err != nil {
 		return errors.Wrapf(err, "failed to rollback migration")
@@ -302,7 +302,7 @@ func runMigrateStatus(cmd *cobra.Command, args []string) error {
 	defer db.Close()
 
 	migrator := migrations.NewMigrator(db.DB(), log)
-	
+
 	statuses, err := migrator.Status()
 	if err != nil {
 		return errors.Wrapf(err, "failed to get migration status")
@@ -343,7 +343,7 @@ func runMigrateReset(cmd *cobra.Command, args []string) error {
 	defer db.Close()
 
 	migrator := migrations.NewMigrator(db.DB(), log)
-	
+
 	log.Warn("DANGER: Resetting database - all data will be lost!")
 	if err := migrator.Reset(); err != nil {
 		return errors.Wrapf(err, "failed to reset database")

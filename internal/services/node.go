@@ -27,45 +27,45 @@ func NewNodeService(db *storage.Database, logger logger.Interface) *NodeService 
 
 // CreateNodeRequest represents the request to create a node
 type CreateNodeRequest struct {
-	Name         string           `json:"name" validate:"required,min=1,max=100"`
-	IPAddress    string           `json:"ip_address" validate:"required,ip"`
-	MACAddress   string           `json:"mac_address" validate:"required,mac"`
-	Role         models.NodeRole  `json:"role" validate:"required,oneof=master worker"`
-	ClusterID    *uint            `json:"cluster_id,omitempty"`
-	Architecture string           `json:"architecture" validate:"max=50"`
-	Model        string           `json:"model" validate:"max=100"`
-	SerialNumber string           `json:"serial_number" validate:"max=100"`
-	CPUCores     int              `json:"cpu_cores" validate:"min=1"`
-	Memory       int64            `json:"memory" validate:"min=1"`
+	Name         string          `json:"name" validate:"required,min=1,max=100"`
+	IPAddress    string          `json:"ip_address" validate:"required,ip"`
+	MACAddress   string          `json:"mac_address" validate:"required,mac"`
+	Role         models.NodeRole `json:"role" validate:"required,oneof=master worker"`
+	ClusterID    *uint           `json:"cluster_id,omitempty"`
+	Architecture string          `json:"architecture" validate:"max=50"`
+	Model        string          `json:"model" validate:"max=100"`
+	SerialNumber string          `json:"serial_number" validate:"max=100"`
+	CPUCores     int             `json:"cpu_cores" validate:"min=1"`
+	Memory       int64           `json:"memory" validate:"min=1"`
 }
 
 // UpdateNodeRequest represents the request to update a node
 type UpdateNodeRequest struct {
-	Name         *string          `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
-	IPAddress    *string          `json:"ip_address,omitempty" validate:"omitempty,ip"`
-	MACAddress   *string          `json:"mac_address,omitempty" validate:"omitempty,mac"`
-	Status       *models.NodeStatus `json:"status,omitempty"`
-	Role         *models.NodeRole `json:"role,omitempty" validate:"omitempty,oneof=master worker"`
-	ClusterID    *uint            `json:"cluster_id,omitempty"`
-	Architecture *string          `json:"architecture,omitempty" validate:"omitempty,max=50"`
-	Model        *string          `json:"model,omitempty" validate:"omitempty,max=100"`
-	SerialNumber *string          `json:"serial_number,omitempty" validate:"omitempty,max=100"`
-	CPUCores     *int             `json:"cpu_cores,omitempty" validate:"omitempty,min=1"`
-	Memory       *int64           `json:"memory,omitempty" validate:"omitempty,min=1"`
-	OSVersion    *string          `json:"os_version,omitempty" validate:"omitempty,max=100"`
-	KernelVersion *string         `json:"kernel_version,omitempty" validate:"omitempty,max=100"`
-	KubeVersion  *string          `json:"kube_version,omitempty" validate:"omitempty,max=50"`
-	NodeName     *string          `json:"node_name,omitempty" validate:"omitempty,max=100"`
+	Name          *string            `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
+	IPAddress     *string            `json:"ip_address,omitempty" validate:"omitempty,ip"`
+	MACAddress    *string            `json:"mac_address,omitempty" validate:"omitempty,mac"`
+	Status        *models.NodeStatus `json:"status,omitempty"`
+	Role          *models.NodeRole   `json:"role,omitempty" validate:"omitempty,oneof=master worker"`
+	ClusterID     *uint              `json:"cluster_id,omitempty"`
+	Architecture  *string            `json:"architecture,omitempty" validate:"omitempty,max=50"`
+	Model         *string            `json:"model,omitempty" validate:"omitempty,max=100"`
+	SerialNumber  *string            `json:"serial_number,omitempty" validate:"omitempty,max=100"`
+	CPUCores      *int               `json:"cpu_cores,omitempty" validate:"omitempty,min=1"`
+	Memory        *int64             `json:"memory,omitempty" validate:"omitempty,min=1"`
+	OSVersion     *string            `json:"os_version,omitempty" validate:"omitempty,max=100"`
+	KernelVersion *string            `json:"kernel_version,omitempty" validate:"omitempty,max=100"`
+	KubeVersion   *string            `json:"kube_version,omitempty" validate:"omitempty,max=50"`
+	NodeName      *string            `json:"node_name,omitempty" validate:"omitempty,max=100"`
 }
 
 // NodeListOptions represents options for listing nodes
 type NodeListOptions struct {
-	ClusterID    *uint
-	Status       *models.NodeStatus
-	Role         *models.NodeRole
-	IncludeGPIO  bool
-	Limit        int
-	Offset       int
+	ClusterID   *uint
+	Status      *models.NodeStatus
+	Role        *models.NodeRole
+	IncludeGPIO bool
+	Limit       int
+	Offset      int
 }
 
 // List returns a paginated list of nodes
@@ -458,9 +458,9 @@ func (s *NodeService) Deprovision(id uint) error {
 	}
 
 	s.logger.WithFields(map[string]interface{}{
-		"node_id":      id,
-		"node_name":    node.Name,
-		"cluster_id":   oldClusterID,
+		"node_id":    id,
+		"node_name":  node.Name,
+		"cluster_id": oldClusterID,
 	}).Info("Node deprovisioned successfully")
 
 	return nil

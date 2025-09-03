@@ -15,9 +15,9 @@ import (
 
 // GPIOService handles GPIO device business logic
 type GPIOService struct {
-	db            *storage.Database
-	logger        logger.Interface
-	agentManager  client.PiAgentClientManagerInterface
+	db           *storage.Database
+	logger       logger.Interface
+	agentManager client.PiAgentClientManagerInterface
 }
 
 // NewGPIOService creates a new GPIO service
@@ -40,24 +40,24 @@ func NewGPIOServiceWithManager(db *storage.Database, logger logger.Interface, ag
 
 // CreateGPIODeviceRequest represents the request to create a GPIO device
 type CreateGPIODeviceRequest struct {
-	Name        string                   `json:"name" validate:"required,min=1,max=100"`
-	Description string                   `json:"description" validate:"max=500"`
-	NodeID      uint                     `json:"node_id" validate:"required"`
-	PinNumber   int                      `json:"pin_number" validate:"required,min=0,max=40"`
-	Direction   models.GPIODirection     `json:"direction" validate:"required,oneof=input output"`
-	PullMode    models.GPIOPullMode      `json:"pull_mode" validate:"oneof=none up down"`
-	DeviceType  models.GPIODeviceType    `json:"device_type" validate:"oneof=digital analog pwm spi i2c"`
-	Config      models.GPIOConfig        `json:"config"`
+	Name        string                `json:"name" validate:"required,min=1,max=100"`
+	Description string                `json:"description" validate:"max=500"`
+	NodeID      uint                  `json:"node_id" validate:"required"`
+	PinNumber   int                   `json:"pin_number" validate:"required,min=0,max=40"`
+	Direction   models.GPIODirection  `json:"direction" validate:"required,oneof=input output"`
+	PullMode    models.GPIOPullMode   `json:"pull_mode" validate:"oneof=none up down"`
+	DeviceType  models.GPIODeviceType `json:"device_type" validate:"oneof=digital analog pwm spi i2c"`
+	Config      models.GPIOConfig     `json:"config"`
 }
 
 // UpdateGPIODeviceRequest represents the request to update a GPIO device
 type UpdateGPIODeviceRequest struct {
-	Name        *string                  `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
-	Description *string                  `json:"description,omitempty" validate:"omitempty,max=500"`
-	Direction   *models.GPIODirection    `json:"direction,omitempty" validate:"omitempty,oneof=input output"`
-	PullMode    *models.GPIOPullMode     `json:"pull_mode,omitempty" validate:"omitempty,oneof=none up down"`
-	Status      *models.GPIOStatus       `json:"status,omitempty" validate:"omitempty,oneof=active inactive error"`
-	Config      *models.GPIOConfig       `json:"config,omitempty"`
+	Name        *string               `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
+	Description *string               `json:"description,omitempty" validate:"omitempty,max=500"`
+	Direction   *models.GPIODirection `json:"direction,omitempty" validate:"omitempty,oneof=input output"`
+	PullMode    *models.GPIOPullMode  `json:"pull_mode,omitempty" validate:"omitempty,oneof=none up down"`
+	Status      *models.GPIOStatus    `json:"status,omitempty" validate:"omitempty,oneof=active inactive error"`
+	Config      *models.GPIOConfig    `json:"config,omitempty"`
 }
 
 // GPIOListOptions represents options for listing GPIO devices
@@ -77,6 +77,27 @@ type GPIOReadingFilter struct {
 	EndTime   *time.Time
 	Limit     int
 	Offset    int
+}
+
+// GPIOReservationRequest represents a request to reserve a GPIO pin
+type GPIOReservationRequest struct {
+	ClientID string         `json:"client_id" validate:"required,min=1,max=100"`
+	TTL      *time.Duration `json:"ttl,omitempty"` // Optional reservation time-to-live
+}
+
+// GPIOReleaseRequest represents a request to release a GPIO pin reservation
+type GPIOReleaseRequest struct {
+	ClientID string `json:"client_id" validate:"required,min=1,max=100"`
+}
+
+// GPIOReservationInfo represents information about a GPIO pin reservation
+type GPIOReservationInfo struct {
+	PinID      uint       `json:"pin_id"`
+	NodeID     uint       `json:"node_id"`
+	PinNumber  int        `json:"pin_number"`
+	ReservedBy string     `json:"reserved_by"`
+	ReservedAt time.Time  `json:"reserved_at"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 }
 
 // List returns a paginated list of GPIO devices
@@ -306,6 +327,16 @@ func (s *GPIOService) Read(id uint) (*models.GPIODevice, error) {
 		return nil, errors.Wrapf(ErrValidationFailed, "GPIO device %d is not active", id)
 	}
 
+	// Check if pin is reserved - we allow reads from reserved pins as they are generally safe
+	// but log for auditing purposes
+	if device.IsReserved() {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id":   id,
+			"pin_number":  device.PinNumber,
+			"reserved_by": *device.ReservedBy,
+		}).Debug("Reading from reserved GPIO pin")
+	}
+
 	// Get gRPC client for the node
 	agentClient, err := s.agentManager.GetClient(&device.Node)
 	if err != nil {
@@ -379,6 +410,11 @@ func (s *GPIOService) Read(id uint) (*models.GPIODevice, error) {
 
 // Write writes a value to a GPIO device
 func (s *GPIOService) Write(id uint, value int) error {
+	return s.WriteWithClient(id, value, "")
+}
+
+// WriteWithClient writes a value to a GPIO device with client ID for reservation checking
+func (s *GPIOService) WriteWithClient(id uint, value int, clientID string) error {
 	device, err := s.GetByID(id)
 	if err != nil {
 		return err
@@ -390,6 +426,25 @@ func (s *GPIOService) Write(id uint, value int) error {
 
 	if !device.IsOutput() {
 		return errors.Wrapf(ErrValidationFailed, "GPIO device %d is not configured as output", id)
+	}
+
+	// Check for reservation conflicts on writes (more critical than reads)
+	if device.IsReserved() {
+		if clientID == "" || !device.IsReservedBy(clientID) {
+			reservedBy := "unknown"
+			if device.ReservedBy != nil {
+				reservedBy = *device.ReservedBy
+			}
+			return errors.Wrapf(ErrValidationFailed, "GPIO pin %d on node %d is reserved by %s",
+				device.PinNumber, device.NodeID, reservedBy)
+		}
+		// Log authorized write to reserved pin
+		s.logger.WithFields(map[string]interface{}{
+			"device_id":  id,
+			"pin_number": device.PinNumber,
+			"client_id":  clientID,
+			"value":      value,
+		}).Debug("Writing to reserved GPIO pin by authorized client")
 	}
 
 	// Get gRPC client for the node
@@ -528,15 +583,183 @@ func (s *GPIOService) CleanupOldReadings(olderThan time.Duration) (int64, error)
 	return result.RowsAffected, nil
 }
 
+// ReservePin reserves a GPIO pin for a specific client
+func (s *GPIOService) ReservePin(id uint, req GPIOReservationRequest) error {
+	device, err := s.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Check if pin is already reserved by someone else
+	if device.IsReserved() && !device.IsReservedBy(req.ClientID) {
+		return errors.Wrapf(ErrAlreadyExists, "GPIO pin %d on node %d is already reserved by %s",
+			device.PinNumber, device.NodeID, *device.ReservedBy)
+	}
+
+	// If already reserved by the same client, extend/update the reservation
+	device.Reserve(req.ClientID, req.TTL)
+
+	if err := s.db.DB().Save(device).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"client_id": req.ClientID,
+			"error":     err,
+		}).Error("Failed to reserve GPIO pin")
+		return errors.Wrapf(err, "failed to reserve GPIO pin")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"device_id":  id,
+		"pin_number": device.PinNumber,
+		"node_id":    device.NodeID,
+		"client_id":  req.ClientID,
+		"expires_at": device.ReservationTTL,
+	}).Info("GPIO pin reserved successfully")
+
+	return nil
+}
+
+// ReleasePin releases a GPIO pin reservation
+func (s *GPIOService) ReleasePin(id uint, req GPIOReleaseRequest) error {
+	device, err := s.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Check if pin is reserved
+	if !device.IsReserved() {
+		return errors.Wrapf(ErrNotFound, "GPIO pin %d on node %d is not reserved",
+			device.PinNumber, device.NodeID)
+	}
+
+	// Check if client has permission to release this pin
+	if !device.IsReservedBy(req.ClientID) {
+		return errors.Wrapf(ErrValidationFailed, "GPIO pin %d on node %d is reserved by different client",
+			device.PinNumber, device.NodeID)
+	}
+
+	device.Release()
+
+	if err := s.db.DB().Save(device).Error; err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"device_id": id,
+			"client_id": req.ClientID,
+			"error":     err,
+		}).Error("Failed to release GPIO pin")
+		return errors.Wrapf(err, "failed to release GPIO pin")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"device_id":  id,
+		"pin_number": device.PinNumber,
+		"node_id":    device.NodeID,
+		"client_id":  req.ClientID,
+	}).Info("GPIO pin released successfully")
+
+	return nil
+}
+
+// GetReservations returns all active GPIO pin reservations
+func (s *GPIOService) GetReservations() ([]GPIOReservationInfo, error) {
+	var devices []models.GPIODevice
+
+	// Query only reserved pins
+	if err := s.db.DB().Where("reserved_by IS NOT NULL").Preload("Node").Find(&devices).Error; err != nil {
+		s.logger.WithError(err).Error("Failed to fetch GPIO reservations")
+		return nil, errors.Wrapf(err, "failed to fetch GPIO reservations")
+	}
+
+	// Filter out expired reservations and convert to info structs
+	var reservations []GPIOReservationInfo
+
+	for _, device := range devices {
+		// Skip expired reservations
+		if device.IsReservationExpired() {
+			// Cleanup expired reservation in background (non-blocking)
+			go func(d models.GPIODevice) {
+				d.Release()
+				if err := s.db.DB().Save(&d).Error; err != nil {
+					s.logger.WithFields(map[string]interface{}{
+						"device_id": d.ID,
+						"error":     err,
+					}).Error("Failed to cleanup expired reservation")
+				}
+			}(device)
+			continue
+		}
+
+		reservation := GPIOReservationInfo{
+			PinID:      device.ID,
+			NodeID:     device.NodeID,
+			PinNumber:  device.PinNumber,
+			ReservedBy: *device.ReservedBy,
+			ReservedAt: *device.ReservedAt,
+			ExpiresAt:  device.ReservationTTL,
+		}
+		reservations = append(reservations, reservation)
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"count": len(reservations),
+	}).Debug("Fetched GPIO reservations")
+
+	return reservations, nil
+}
+
+// CleanupExpiredReservations removes all expired GPIO pin reservations
+func (s *GPIOService) CleanupExpiredReservations() (int64, error) {
+	now := time.Now()
+
+	// Find expired reservations
+	var expiredDevices []models.GPIODevice
+	if err := s.db.DB().Where("reserved_by IS NOT NULL AND reservation_ttl IS NOT NULL AND reservation_ttl < ?", now).Find(&expiredDevices).Error; err != nil {
+		s.logger.WithError(err).Error("Failed to find expired reservations")
+		return 0, errors.Wrapf(err, "failed to find expired reservations")
+	}
+
+	if len(expiredDevices) == 0 {
+		return 0, nil
+	}
+
+	// Release expired reservations
+	for i := range expiredDevices {
+		expiredDevices[i].Release()
+	}
+
+	// Update all devices in a transaction
+	err := s.db.DB().Transaction(func(tx *gorm.DB) error {
+		for _, device := range expiredDevices {
+			if err := tx.Save(&device).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"count": len(expiredDevices),
+			"error": err,
+		}).Error("Failed to cleanup expired reservations")
+		return 0, errors.Wrapf(err, "failed to cleanup expired reservations")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"count": len(expiredDevices),
+	}).Info("Cleaned up expired GPIO pin reservations")
+
+	return int64(len(expiredDevices)), nil
+}
+
 // Close gracefully closes the GPIO service and all agent connections
 func (s *GPIOService) Close() error {
 	s.logger.Info("Shutting down GPIO service")
-	
+
 	if err := s.agentManager.CloseAll(); err != nil {
 		s.logger.WithError(err).Error("Failed to close all agent connections")
 		return errors.Wrapf(err, "failed to close agent connections")
 	}
-	
+
 	s.logger.Info("GPIO service shut down successfully")
 	return nil
 }

@@ -37,6 +37,12 @@ func getAllMigrations() []MigrationDefinition {
 			Up:          addPerformanceIndexes,
 			Down:        dropPerformanceIndexes,
 		},
+		{
+			ID:          "20241201000006",
+			Description: "Add GPIO pin reservation fields",
+			Up:          addGPIOReservationFields,
+			Down:        dropGPIOReservationFields,
+		},
 	}
 }
 
@@ -60,7 +66,7 @@ func createClustersTable(db *gorm.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_clusters_deleted_at ON clusters(deleted_at);
 	CREATE INDEX IF NOT EXISTS idx_clusters_status ON clusters(status);
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -72,7 +78,7 @@ func dropClustersTable(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_clusters_name;
 	DROP TABLE IF EXISTS clusters;
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -111,7 +117,7 @@ func createNodesTable(db *gorm.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_nodes_ip_address ON nodes(ip_address);
 	CREATE INDEX IF NOT EXISTS idx_nodes_last_seen ON nodes(last_seen);
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -127,7 +133,7 @@ func dropNodesTable(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_nodes_name;
 	DROP TABLE IF EXISTS nodes;
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -167,7 +173,7 @@ func createGPIODevicesTable(db *gorm.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_deleted_at ON gpio_devices(deleted_at);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_gpio_devices_node_pin ON gpio_devices(node_id, pin_number) WHERE deleted_at IS NULL;
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -181,7 +187,7 @@ func dropGPIODevicesTable(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_gpio_devices_node_id;
 	DROP TABLE IF EXISTS gpio_devices;
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -200,7 +206,7 @@ func createGPIOReadingsTable(db *gorm.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_timestamp ON gpio_readings(timestamp);
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_device_timestamp ON gpio_readings(device_id, timestamp);
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -212,7 +218,7 @@ func dropGPIOReadingsTable(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_gpio_readings_device_id;
 	DROP TABLE IF EXISTS gpio_readings;
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -233,7 +239,7 @@ func addPerformanceIndexes(db *gorm.DB) error {
 	-- Index for recent readings (last 24 hours pattern)
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_recent ON gpio_readings(timestamp) WHERE timestamp > datetime('now', '-1 day');
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -247,6 +253,44 @@ func dropPerformanceIndexes(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_gpio_devices_node_status;
 	DROP INDEX IF EXISTS idx_nodes_cluster_status;
 	`
+
+	return db.Exec(sql).Error
+}
+
+// addGPIOReservationFields adds reservation tracking fields to gpio_devices table
+func addGPIOReservationFields(db *gorm.DB) error {
+	sql := `
+	-- Add reservation fields to gpio_devices table
+	ALTER TABLE gpio_devices ADD COLUMN reserved_by TEXT;
+	ALTER TABLE gpio_devices ADD COLUMN reserved_at DATETIME;
+	ALTER TABLE gpio_devices ADD COLUMN reservation_ttl DATETIME;
 	
+	-- Add index for reserved_by field for efficient queries
+	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reserved_by ON gpio_devices(reserved_by);
+	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reserved_at ON gpio_devices(reserved_at);
+	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reservation_ttl ON gpio_devices(reservation_ttl);
+	
+	-- Composite index for reservation queries
+	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reservation_status ON gpio_devices(reserved_by, reservation_ttl) WHERE reserved_by IS NOT NULL;
+	`
+
+	return db.Exec(sql).Error
+}
+
+// dropGPIOReservationFields removes reservation tracking fields from gpio_devices table
+func dropGPIOReservationFields(db *gorm.DB) error {
+	sql := `
+	-- Drop indexes first
+	DROP INDEX IF EXISTS idx_gpio_devices_reservation_status;
+	DROP INDEX IF EXISTS idx_gpio_devices_reservation_ttl;
+	DROP INDEX IF EXISTS idx_gpio_devices_reserved_at;
+	DROP INDEX IF EXISTS idx_gpio_devices_reserved_by;
+	
+	-- Remove reservation fields (Note: SQLite doesn't support DROP COLUMN directly)
+	-- For SQLite, we would need to recreate the table, but this is a rollback scenario
+	-- so we'll use a pragmatic approach and just set them to NULL
+	UPDATE gpio_devices SET reserved_by = NULL, reserved_at = NULL, reservation_ttl = NULL;
+	`
+
 	return db.Exec(sql).Error
 }

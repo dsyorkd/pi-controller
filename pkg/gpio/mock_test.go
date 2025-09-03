@@ -96,7 +96,7 @@ func TestMockGPIO_ConfigurePin(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify pin state
 				state, err := mock.GetPinState(tt.config.Pin)
 				require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestMockGPIO_WritePin(t *testing.T) {
 	// Configure pins
 	outputConfig := PinConfig{Pin: 18, Direction: DirectionOutput, PullMode: PullNone}
 	inputConfig := PinConfig{Pin: 19, Direction: DirectionInput, PullMode: PullNone}
-	
+
 	require.NoError(t, mock.ConfigurePin(outputConfig))
 	require.NoError(t, mock.ConfigurePin(inputConfig))
 
@@ -161,7 +161,7 @@ func TestMockGPIO_WritePin(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the value was written
 				state, err := mock.GetPinState(tt.pin)
 				require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestMockGPIO_ReadPin(t *testing.T) {
 	// Configure pins
 	outputConfig := PinConfig{Pin: 18, Direction: DirectionOutput, PullMode: PullNone}
 	inputConfig := PinConfig{Pin: 19, Direction: DirectionInput, PullMode: PullNone}
-	
+
 	require.NoError(t, mock.ConfigurePin(outputConfig))
 	require.NoError(t, mock.ConfigurePin(inputConfig))
 
@@ -428,7 +428,7 @@ func TestMockGPIO_SPI(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, result)
 				assert.Len(t, result, len(tt.data))
-				
+
 				// Mock implementation should invert bits
 				for i, expected := range tt.data {
 					assert.Equal(t, ^expected, result[i])
@@ -657,7 +657,7 @@ func TestMockGPIO_Events(t *testing.T) {
 
 	// Test stopping event loop again should fail
 	err = mock.StopEventLoop()
-	require.Error(t, err)
+	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not running")
 }
 
@@ -751,9 +751,9 @@ func TestMockGPIO_ListConfiguredPins(t *testing.T) {
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		 len(s) > len(substr)+1 && s[1:len(substr)+1] == substr)))
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			len(s) > len(substr)+1 && s[1:len(substr)+1] == substr)))
 }
 
 // BenchmarkMockGPIO_WritePin benchmarks mock GPIO writing

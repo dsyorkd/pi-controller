@@ -33,7 +33,7 @@ type Server struct {
 
 // New creates a new API server instance
 func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Server {
-	// Set Gin mode based on environment  
+	// Set Gin mode based on environment
 	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
 
 	router := gin.New()
@@ -86,7 +86,7 @@ func (s *Server) setupRoutes() {
 	s.router.Use(middleware.RequestID())
 	s.router.Use(s.validator.ValidateRequest()) // Add input validation
 	s.router.Use(s.rateLimiter.RateLimit())     // Add rate limiting
-	
+
 	if s.config.CORSEnabled {
 		s.router.Use(middleware.CORS())
 	}
@@ -112,11 +112,11 @@ func (s *Server) setupRoutes() {
 			clusters.GET("/:id", s.requireRole("viewer"), clusterHandler.Get)
 			clusters.GET("/:id/nodes", s.requireRole("viewer"), clusterHandler.ListNodes)
 			clusters.GET("/:id/status", s.requireRole("viewer"), clusterHandler.Status)
-			
+
 			// Write operations - require operator role
 			clusters.POST("", s.requireRole("operator"), clusterHandler.Create)
 			clusters.PUT("/:id", s.requireRole("operator"), clusterHandler.Update)
-			
+
 			// Delete operations - require admin role
 			clusters.DELETE("/:id", s.requireRole("admin"), clusterHandler.Delete)
 		}
@@ -129,13 +129,13 @@ func (s *Server) setupRoutes() {
 			nodes.GET("", s.requireRole("viewer"), nodeHandler.List)
 			nodes.GET("/:id", s.requireRole("viewer"), nodeHandler.Get)
 			nodes.GET("/:id/gpio", s.requireRole("viewer"), nodeHandler.ListGPIO)
-			
+
 			// Write operations - require operator role
 			nodes.POST("", s.requireRole("operator"), nodeHandler.Create)
 			nodes.PUT("/:id", s.requireRole("operator"), nodeHandler.Update)
 			nodes.POST("/:id/provision", s.requireRole("operator"), nodeHandler.Provision)
 			nodes.POST("/:id/deprovision", s.requireRole("operator"), nodeHandler.Deprovision)
-			
+
 			// Delete operations - require admin role
 			nodes.DELETE("/:id", s.requireRole("admin"), nodeHandler.Delete)
 		}
@@ -149,12 +149,18 @@ func (s *Server) setupRoutes() {
 			gpio.GET("/:id", s.requireRole("viewer"), gpioHandler.Get)
 			gpio.GET("/:id/readings", s.requireRole("viewer"), gpioHandler.GetReadings)
 			gpio.POST("/:id/read", s.requireRole("viewer"), gpioHandler.Read)
-			
+
 			// Write operations - require operator role (GPIO control is sensitive)
 			gpio.POST("", s.requireRole("operator"), gpioHandler.Create)
 			gpio.PUT("/:id", s.requireRole("operator"), gpioHandler.Update)
 			gpio.POST("/:id/write", s.requireRole("operator"), gpioHandler.Write)
-			
+
+			// Pin reservation operations - require operator role
+			gpio.POST("/:id/reserve", s.requireRole("operator"), gpioHandler.ReservePin)
+			gpio.POST("/:id/release", s.requireRole("operator"), gpioHandler.ReleasePin)
+			gpio.GET("/reservations", s.requireRole("viewer"), gpioHandler.GetReservations)
+			gpio.POST("/reservations/cleanup", s.requireRole("admin"), gpioHandler.CleanupExpiredReservations)
+
 			// Delete operations - require admin role
 			gpio.DELETE("/:id", s.requireRole("admin"), gpioHandler.Delete)
 		}
@@ -193,26 +199,26 @@ func (s *Server) Start() error {
 	if s.config.IsTLSEnabled() {
 		return s.server.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
 	}
-	
+
 	return s.server.ListenAndServe()
 }
 
 // Stop gracefully stops the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
 	s.logger.Info("Shutting down API server")
-	
+
 	// Close all services first
 	if err := s.Close(); err != nil {
 		s.logger.WithError(err).Error("Failed to close services during shutdown")
 	}
-	
+
 	return s.server.Shutdown(ctx)
 }
 
 // Close closes all services and their connections
 func (s *Server) Close() error {
 	s.logger.Info("Closing API server services")
-	
+
 	// Close GPIO service and its agent connections
 	if s.gpioService != nil {
 		if err := s.gpioService.Close(); err != nil {
@@ -220,10 +226,10 @@ func (s *Server) Close() error {
 			return err
 		}
 	}
-	
+
 	// Close other services as needed
 	// (cluster service and node service don't currently need cleanup)
-	
+
 	s.logger.Info("API server services closed successfully")
 	return nil
 }
@@ -241,6 +247,6 @@ func (s *Server) requireRole(role string) gin.HandlerFunc {
 			c.Next()
 		}
 	}
-	
+
 	return s.authManager.RequireRole(role)
 }

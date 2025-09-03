@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/gin-gonic/gin"
 )
 
 // Recovery creates a gin middleware for panic recovery with logrus

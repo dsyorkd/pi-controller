@@ -14,14 +14,14 @@ import (
 
 // Node represents a discovered node
 type Node struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	IPAddress   string            `json:"ip_address"`
-	Port        int               `json:"port"`
-	ServiceType string            `json:"service_type"`
-	TXTRecords  map[string]string `json:"txt_records"`
-	LastSeen    time.Time         `json:"last_seen"`
-	Capabilities []string         `json:"capabilities"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	IPAddress    string            `json:"ip_address"`
+	Port         int               `json:"port"`
+	ServiceType  string            `json:"service_type"`
+	TXTRecords   map[string]string `json:"txt_records"`
+	LastSeen     time.Time         `json:"last_seen"`
+	Capabilities []string          `json:"capabilities"`
 }
 
 // NodeEventType represents the type of node discovery event
@@ -44,15 +44,15 @@ type NodeEventHandler func(event NodeEvent)
 
 // Config represents discovery service configuration
 type Config struct {
-	Enabled         bool     `yaml:"enabled" mapstructure:"enabled"`
-	Method          string   `yaml:"method" mapstructure:"method"`
-	Interface       string   `yaml:"interface" mapstructure:"interface"`
-	Port            int      `yaml:"port" mapstructure:"port"`
-	Interval        string   `yaml:"interval" mapstructure:"interval"`
-	Timeout         string   `yaml:"timeout" mapstructure:"timeout"`
-	StaticNodes     []string `yaml:"static_nodes" mapstructure:"static_nodes"`
-	ServiceName     string   `yaml:"service_name" mapstructure:"service_name"`
-	ServiceType     string   `yaml:"service_type" mapstructure:"service_type"`
+	Enabled     bool     `yaml:"enabled" mapstructure:"enabled"`
+	Method      string   `yaml:"method" mapstructure:"method"`
+	Interface   string   `yaml:"interface" mapstructure:"interface"`
+	Port        int      `yaml:"port" mapstructure:"port"`
+	Interval    string   `yaml:"interval" mapstructure:"interval"`
+	Timeout     string   `yaml:"timeout" mapstructure:"timeout"`
+	StaticNodes []string `yaml:"static_nodes" mapstructure:"static_nodes"`
+	ServiceName string   `yaml:"service_name" mapstructure:"service_name"`
+	ServiceType string   `yaml:"service_type" mapstructure:"service_type"`
 }
 
 // DefaultConfig returns default discovery configuration
@@ -232,13 +232,13 @@ func (s *Service) loadStaticNodes() {
 		}
 
 		node := &Node{
-			ID:          fmt.Sprintf("static-%d", i),
-			Name:        fmt.Sprintf("static-node-%d", i),
-			IPAddress:   host,
-			Port:        port,
-			ServiceType: "static",
-			TXTRecords:  make(map[string]string),
-			LastSeen:    time.Now(),
+			ID:           fmt.Sprintf("static-%d", i),
+			Name:         fmt.Sprintf("static-node-%d", i),
+			IPAddress:    host,
+			Port:         port,
+			ServiceType:  "static",
+			TXTRecords:   make(map[string]string),
+			LastSeen:     time.Now(),
 			Capabilities: []string{"gpio", "monitoring"},
 		}
 
@@ -285,31 +285,31 @@ func (s *Service) performMDNSDiscovery() {
 	// Mock discovery: simulate finding nodes
 	mockNodes := []Node{
 		{
-			ID:        "mdns-pi-001",
-			Name:      "raspberrypi-001",
-			IPAddress: "192.168.1.101",
-			Port:      s.config.Port,
+			ID:          "mdns-pi-001",
+			Name:        "raspberrypi-001",
+			IPAddress:   "192.168.1.101",
+			Port:        s.config.Port,
 			ServiceType: s.config.ServiceType,
 			TXTRecords: map[string]string{
 				"version":      "1.0.0",
 				"capabilities": "gpio,monitoring",
 				"model":        "Raspberry Pi 4",
 			},
-			LastSeen:    time.Now(),
+			LastSeen:     time.Now(),
 			Capabilities: []string{"gpio", "monitoring"},
 		},
 		{
-			ID:        "mdns-pi-002",
-			Name:      "raspberrypi-002",
-			IPAddress: "192.168.1.102",
-			Port:      s.config.Port,
+			ID:          "mdns-pi-002",
+			Name:        "raspberrypi-002",
+			IPAddress:   "192.168.1.102",
+			Port:        s.config.Port,
 			ServiceType: s.config.ServiceType,
 			TXTRecords: map[string]string{
 				"version":      "1.0.0",
 				"capabilities": "gpio,monitoring",
 				"model":        "Raspberry Pi 3",
 			},
-			LastSeen:    time.Now(),
+			LastSeen:     time.Now(),
 			Capabilities: []string{"gpio", "monitoring"},
 		},
 	}

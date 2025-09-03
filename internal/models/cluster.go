@@ -20,7 +20,7 @@ type Cluster struct {
 	// Configuration
 	KubeConfig     string `json:"-" gorm:"type:text"` // Base64 encoded kubeconfig
 	MasterEndpoint string `json:"master_endpoint"`
-	
+
 	// Relationships
 	Nodes []Node `json:"nodes,omitempty" gorm:"foreignKey:ClusterID"`
 }
@@ -29,12 +29,12 @@ type Cluster struct {
 type ClusterStatus string
 
 const (
-	ClusterStatusPending     ClusterStatus = "pending"
+	ClusterStatusPending      ClusterStatus = "pending"
 	ClusterStatusProvisioning ClusterStatus = "provisioning"
-	ClusterStatusActive      ClusterStatus = "active"
-	ClusterStatusDegraded    ClusterStatus = "degraded"
-	ClusterStatusMaintenance ClusterStatus = "maintenance"
-	ClusterStatusFailed      ClusterStatus = "failed"
+	ClusterStatusActive       ClusterStatus = "active"
+	ClusterStatusDegraded     ClusterStatus = "degraded"
+	ClusterStatusMaintenance  ClusterStatus = "maintenance"
+	ClusterStatusFailed       ClusterStatus = "failed"
 )
 
 // IsActive returns true if the cluster is in an active state

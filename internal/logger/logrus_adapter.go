@@ -8,7 +8,7 @@ import (
 // LogrusCompatible defines the interface we need to mimic from logrus
 type LogrusCompatible interface {
 	WithField(key string, value interface{}) LogrusEntryCompatible
-	WithFields(fields map[string]interface{}) LogrusEntryCompatible 
+	WithFields(fields map[string]interface{}) LogrusEntryCompatible
 	WithError(err error) LogrusEntryCompatible
 	Debug(args ...interface{})
 	Info(args ...interface{})

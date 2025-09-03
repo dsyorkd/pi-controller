@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -22,12 +22,12 @@ var (
 
 // ValidationConfig holds validation configuration
 type ValidationConfig struct {
-	MaxNameLength    int   `yaml:"max_name_length"`
-	MaxDescLength    int   `yaml:"max_description_length"`
-	MaxQueryLimit    int   `yaml:"max_query_limit"`
-	AllowedMethods   []string `yaml:"allowed_methods"`
-	EnableSQLCheck   bool  `yaml:"enable_sql_check"`
-	EnableXSSCheck   bool  `yaml:"enable_xss_check"`
+	MaxNameLength  int      `yaml:"max_name_length"`
+	MaxDescLength  int      `yaml:"max_description_length"`
+	MaxQueryLimit  int      `yaml:"max_query_limit"`
+	AllowedMethods []string `yaml:"allowed_methods"`
+	EnableSQLCheck bool     `yaml:"enable_sql_check"`
+	EnableXSSCheck bool     `yaml:"enable_xss_check"`
 }
 
 // DefaultValidationConfig returns secure validation defaults
@@ -89,7 +89,7 @@ func (v *Validator) ValidateRequest() gin.HandlerFunc {
 		if err := v.validateQueryParams(c); err != nil {
 			v.logger.WithError(err).Warn("Invalid query parameters")
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "Bad Request", 
+				"error":   "Bad Request",
 				"message": err.Error(),
 			})
 			c.Abort()
@@ -266,40 +266,40 @@ func (v *Validator) isAllowedMethod(method string) bool {
 // containsSQLInjection checks for SQL injection patterns
 func (v *Validator) containsSQLInjection(input string) bool {
 	lowerInput := strings.ToLower(input)
-	
+
 	// Common SQL injection patterns
 	sqlPatterns := []string{
 		"'", "\"", ";", "--", "/*", "*/", "xp_", "sp_",
 		"union", "select", "insert", "update", "delete", "drop", "create", "alter",
 		"exec", "execute", "script", "javascript:", "vbscript:", "onload", "onerror",
 	}
-	
+
 	for _, pattern := range sqlPatterns {
 		if strings.Contains(lowerInput, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // containsXSS checks for XSS patterns
 func (v *Validator) containsXSS(input string) bool {
 	lowerInput := strings.ToLower(input)
-	
+
 	// Common XSS patterns
 	xssPatterns := []string{
-		"<script", "</script>", "javascript:", "vbscript:", "onload=", "onerror=", 
+		"<script", "</script>", "javascript:", "vbscript:", "onload=", "onerror=",
 		"onmouseover=", "onfocus=", "onblur=", "onchange=", "onsubmit=",
 		"<iframe", "<object", "<embed", "<form", "eval(", "alert(",
 	}
-	
+
 	for _, pattern := range xssPatterns {
 		if strings.Contains(lowerInput, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -312,7 +312,7 @@ func (v *Validator) SanitizeInput(input string) string {
 		}
 		return r
 	}, input)
-	
+
 	// Trim whitespace
 	return strings.TrimSpace(input)
 }

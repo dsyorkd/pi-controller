@@ -158,7 +158,7 @@ func TestMigrator_ValidateMigrationOrder(t *testing.T) {
 
 func TestMigrator_GetPendingMigrations(t *testing.T) {
 	db, log := setupTestDB(t)
-	
+
 	// Create test migrations
 	testMigrations := []MigrationDefinition{
 		{ID: "20241201000001", Description: "Test 1"},
@@ -200,7 +200,7 @@ func TestMigrator_GetPendingMigrations(t *testing.T) {
 
 func TestMigrator_Status(t *testing.T) {
 	db, log := setupTestDB(t)
-	
+
 	testMigrations := []MigrationDefinition{
 		{ID: "20241201000001", Description: "Test 1"},
 		{ID: "20241201000002", Description: "Test 2"},
@@ -475,7 +475,7 @@ func TestMigrator_ProductionSchemaIntegration(t *testing.T) {
 		// Verify expected indexes exist (sample a few critical ones)
 		expectedIndexes := []string{
 			"idx_clusters_name",
-			"idx_nodes_name", 
+			"idx_nodes_name",
 			"idx_nodes_ip_address",
 			"idx_gpio_devices_node_id",
 			"idx_gpio_readings_device_id",
@@ -489,18 +489,18 @@ func TestMigrator_ProductionSchemaIntegration(t *testing.T) {
 
 		// Verify foreign key constraints work by testing table structure
 		var pragmaResults []struct {
-			CID      int    `gorm:"column:cid"`
-			Name     string `gorm:"column:name"`
-			Type     string `gorm:"column:type"`
-			NotNull  int    `gorm:"column:notnull"`
+			CID       int         `gorm:"column:cid"`
+			Name      string      `gorm:"column:name"`
+			Type      string      `gorm:"column:type"`
+			NotNull   int         `gorm:"column:notnull"`
 			DfltValue interface{} `gorm:"column:dflt_value"`
-			PK       int    `gorm:"column:pk"`
+			PK        int         `gorm:"column:pk"`
 		}
 
 		// Check nodes table has foreign key to clusters
 		err = db.Raw("PRAGMA table_info(nodes)").Scan(&pragmaResults).Error
 		assert.NoError(t, err)
-		
+
 		clusterIDFound := false
 		for _, col := range pragmaResults {
 			if col.Name == "cluster_id" {

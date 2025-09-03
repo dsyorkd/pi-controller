@@ -11,8 +11,8 @@ import (
 
 // TestClusterData provides standard test clusters
 var TestClusterData = struct {
-	ActiveCluster   models.Cluster
-	InactiveCluster models.Cluster
+	ActiveCluster     models.Cluster
+	InactiveCluster   models.Cluster
 	ProductionCluster models.Cluster
 }{
 	ActiveCluster: models.Cluster{
@@ -43,36 +43,36 @@ var TestClusterData = struct {
 
 // TestNodeData provides standard test nodes
 var TestNodeData = struct {
-	RaspberryPi4   models.Node
+	RaspberryPi4    models.Node
 	RaspberryPiZero models.Node
-	OfflineNode    models.Node
+	OfflineNode     models.Node
 }{
 	RaspberryPi4: models.Node{
-		ID:          1,
-		Name:        "raspberry-pi-4",
-		IPAddress:   "192.168.1.100",
-		Status:      models.NodeStatusReady,
-		ClusterID:   uintPtr(1), // Active cluster
-		CreatedAt:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		UpdatedAt:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		ID:        1,
+		Name:      "raspberry-pi-4",
+		IPAddress: "192.168.1.100",
+		Status:    models.NodeStatusReady,
+		ClusterID: uintPtr(1), // Active cluster
+		CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 	},
 	RaspberryPiZero: models.Node{
-		ID:          2,
-		Name:        "raspberry-pi-zero",
-		IPAddress:   "192.168.1.101",
-		Status:      models.NodeStatusReady,
-		ClusterID:   uintPtr(1), // Active cluster
-		CreatedAt:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		UpdatedAt:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		ID:        2,
+		Name:      "raspberry-pi-zero",
+		IPAddress: "192.168.1.101",
+		Status:    models.NodeStatusReady,
+		ClusterID: uintPtr(1), // Active cluster
+		CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 	},
 	OfflineNode: models.Node{
-		ID:          3,
-		Name:        "offline-node",
-		IPAddress:   "192.168.1.102",
-		Status:      models.NodeStatusFailed,
-		ClusterID:   uintPtr(1), // Active cluster
-		CreatedAt:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		UpdatedAt:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		ID:        3,
+		Name:      "offline-node",
+		IPAddress: "192.168.1.102",
+		Status:    models.NodeStatusFailed,
+		ClusterID: uintPtr(1), // Active cluster
+		CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 	},
 }
 
@@ -180,25 +180,25 @@ var TestGPIOReadingData = []models.GPIOReading{
 	},
 	{
 		ID:        3,
-		DeviceID:  2, // Emergency button
+		DeviceID:  2,   // Emergency button
 		Value:     1.0, // Not pressed
 		Timestamp: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
 	},
 	{
 		ID:        4,
-		DeviceID:  2, // Emergency button
+		DeviceID:  2,   // Emergency button
 		Value:     0.0, // Pressed!
 		Timestamp: time.Date(2024, 1, 1, 12, 0, 30, 0, time.UTC),
 	},
 	{
 		ID:        5,
-		DeviceID:  4, // Temperature sensor
+		DeviceID:  4,    // Temperature sensor
 		Value:     23.5, // 23.5°C
 		Timestamp: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
 	},
 	{
 		ID:        6,
-		DeviceID:  4, // Temperature sensor
+		DeviceID:  4,    // Temperature sensor
 		Value:     24.1, // 24.1°C
 		Timestamp: time.Date(2024, 1, 1, 12, 1, 0, 0, time.UTC),
 	},
@@ -225,9 +225,9 @@ var TestServiceRequests = struct {
 		}(),
 	},
 	CreateNode: services.CreateNodeRequest{
-		Name:        "new-test-node",
-		IPAddress:   "192.168.1.200",
-		ClusterID:   uintPtr(1), // Active cluster
+		Name:      "new-test-node",
+		IPAddress: "192.168.1.200",
+		ClusterID: uintPtr(1), // Active cluster
 	},
 	UpdateNode: services.UpdateNodeRequest{
 		Status: func() *models.NodeStatus {
@@ -292,8 +292,8 @@ var SecurityTestData = struct {
 		},
 	},
 	DangerousPins: []int{
-		0, 1,    // I2C pins - system critical
-		14, 15,  // UART pins - console communication
+		0, 1, // I2C pins - system critical
+		14, 15, // UART pins - console communication
 		-1, -99, // Invalid negative pins
 		99, 999, // Invalid high pins
 	},

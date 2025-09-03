@@ -12,18 +12,18 @@ import (
 
 // SecurityConfig holds security middleware configuration
 type SecurityConfig struct {
-	EnforceHTTPS        bool     `yaml:"enforce_https"`
-	StrictTransportSec  bool     `yaml:"strict_transport_security"`
-	STSMaxAge           int      `yaml:"sts_max_age"`
-	STSIncludeSubdom    bool     `yaml:"sts_include_subdomains"`
-	STSPreload          bool     `yaml:"sts_preload"`
-	ContentTypeOptions  bool     `yaml:"content_type_options"`
-	FrameOptions        string   `yaml:"frame_options"`
-	XSSProtection       bool     `yaml:"xss_protection"`
-	ContentSecPolicy    string   `yaml:"content_security_policy"`
-	ReferrerPolicy      string   `yaml:"referrer_policy"`
-	AllowedHosts        []string `yaml:"allowed_hosts"`
-	ProxyTrustHeaders   []string `yaml:"proxy_trust_headers"`
+	EnforceHTTPS       bool     `yaml:"enforce_https"`
+	StrictTransportSec bool     `yaml:"strict_transport_security"`
+	STSMaxAge          int      `yaml:"sts_max_age"`
+	STSIncludeSubdom   bool     `yaml:"sts_include_subdomains"`
+	STSPreload         bool     `yaml:"sts_preload"`
+	ContentTypeOptions bool     `yaml:"content_type_options"`
+	FrameOptions       string   `yaml:"frame_options"`
+	XSSProtection      bool     `yaml:"xss_protection"`
+	ContentSecPolicy   string   `yaml:"content_security_policy"`
+	ReferrerPolicy     string   `yaml:"referrer_policy"`
+	AllowedHosts       []string `yaml:"allowed_hosts"`
+	ProxyTrustHeaders  []string `yaml:"proxy_trust_headers"`
 }
 
 // DefaultSecurityConfig returns secure default configuration
@@ -62,11 +62,11 @@ func NewSecurityMiddleware(config *SecurityConfig, logger *logrus.Logger) *Secur
 	}
 
 	sm.logger.WithFields(logrus.Fields{
-		"enforce_https":    config.EnforceHTTPS,
-		"hsts_enabled":     config.StrictTransportSec,
-		"frame_options":    config.FrameOptions,
-		"xss_protection":   config.XSSProtection,
-		"allowed_hosts":    len(config.AllowedHosts),
+		"enforce_https":  config.EnforceHTTPS,
+		"hsts_enabled":   config.StrictTransportSec,
+		"frame_options":  config.FrameOptions,
+		"xss_protection": config.XSSProtection,
+		"allowed_hosts":  len(config.AllowedHosts),
 	}).Info("Security middleware initialized")
 
 	return sm
@@ -94,10 +94,10 @@ func (sm *SecurityMiddleware) EnforceHTTPS() gin.HandlerFunc {
 		// Check if request is HTTPS
 		if !sm.isHTTPS(c) {
 			sm.logger.WithFields(logrus.Fields{
-				"client_ip":   c.ClientIP(),
-				"method":      c.Request.Method,
-				"path":        c.Request.URL.Path,
-				"user_agent":  c.GetHeader("User-Agent"),
+				"client_ip":  c.ClientIP(),
+				"method":     c.Request.Method,
+				"path":       c.Request.URL.Path,
+				"user_agent": c.GetHeader("User-Agent"),
 			}).Warn("HTTP request blocked, HTTPS required")
 
 			// Redirect to HTTPS
@@ -180,11 +180,11 @@ func (sm *SecurityMiddleware) addSecurityHeaders(c *gin.Context) {
 // addHSTSHeader adds the Strict-Transport-Security header
 func (sm *SecurityMiddleware) addHSTSHeader(c *gin.Context) {
 	hsts := fmt.Sprintf("max-age=%d", sm.config.STSMaxAge)
-	
+
 	if sm.config.STSIncludeSubdom {
 		hsts += "; includeSubDomains"
 	}
-	
+
 	if sm.config.STSPreload {
 		hsts += "; preload"
 	}
@@ -267,7 +267,7 @@ func GetSecureTLSConfig() *tls.Config {
 			tls.TLS_AES_128_GCM_SHA256,
 			tls.TLS_AES_256_GCM_SHA384,
 			tls.TLS_CHACHA20_POLY1305_SHA256,
-			
+
 			// TLS 1.2 cipher suites
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
@@ -283,8 +283,8 @@ func GetSecureTLSConfig() *tls.Config {
 		},
 		PreferServerCipherSuites: true,
 		SessionTicketsDisabled:   false,
-		Renegotiation:           tls.RenegotiateNever,
-		InsecureSkipVerify:      false,
+		Renegotiation:            tls.RenegotiateNever,
+		InsecureSkipVerify:       false,
 	}
 }
 
@@ -306,14 +306,14 @@ func ValidateTLSCertificates(certFile, keyFile string) error {
 // GetSecurityStats returns security middleware statistics
 func (sm *SecurityMiddleware) GetSecurityStats() map[string]interface{} {
 	return map[string]interface{}{
-		"enforce_https":          sm.config.EnforceHTTPS,
-		"strict_transport_sec":   sm.config.StrictTransportSec,
-		"sts_max_age":           sm.config.STSMaxAge,
-		"content_type_options":   sm.config.ContentTypeOptions,
-		"frame_options":          sm.config.FrameOptions,
-		"xss_protection":         sm.config.XSSProtection,
-		"has_csp":               sm.config.ContentSecPolicy != "",
-		"allowed_hosts":          len(sm.config.AllowedHosts),
-		"proxy_trust_headers":    len(sm.config.ProxyTrustHeaders),
+		"enforce_https":        sm.config.EnforceHTTPS,
+		"strict_transport_sec": sm.config.StrictTransportSec,
+		"sts_max_age":          sm.config.STSMaxAge,
+		"content_type_options": sm.config.ContentTypeOptions,
+		"frame_options":        sm.config.FrameOptions,
+		"xss_protection":       sm.config.XSSProtection,
+		"has_csp":              sm.config.ContentSecPolicy != "",
+		"allowed_hosts":        len(sm.config.AllowedHosts),
+		"proxy_trust_headers":  len(sm.config.ProxyTrustHeaders),
 	}
 }

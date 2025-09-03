@@ -59,7 +59,7 @@ func main() {
 
 func testHealth(ctx context.Context, client pb.PiAgentServiceClient) {
 	fmt.Println("Testing agent health...")
-	
+
 	resp, err := client.AgentHealth(ctx, &pb.AgentHealthRequest{})
 	if err != nil {
 		log.Printf("Health check failed: %v", err)
@@ -75,7 +75,7 @@ func testHealth(ctx context.Context, client pb.PiAgentServiceClient) {
 
 func testConfigurePin(ctx context.Context, client pb.PiAgentServiceClient, pin int) {
 	fmt.Printf("Configuring pin %d as output...\n", pin)
-	
+
 	resp, err := client.ConfigureGPIOPin(ctx, &pb.ConfigureGPIOPinRequest{
 		Pin:       int32(pin),
 		Direction: pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
@@ -94,7 +94,7 @@ func testConfigurePin(ctx context.Context, client pb.PiAgentServiceClient, pin i
 
 func testReadPin(ctx context.Context, client pb.PiAgentServiceClient, pin int) {
 	fmt.Printf("Reading pin %d...\n", pin)
-	
+
 	resp, err := client.ReadGPIOPin(ctx, &pb.ReadGPIOPinRequest{
 		Pin: int32(pin),
 	})
@@ -103,14 +103,14 @@ func testReadPin(ctx context.Context, client pb.PiAgentServiceClient, pin int) {
 		return
 	}
 
-	fmt.Printf("Pin %d value: %d (%s)\n", resp.Pin, resp.Value, 
+	fmt.Printf("Pin %d value: %d (%s)\n", resp.Pin, resp.Value,
 		map[int32]string{0: "LOW", 1: "HIGH"}[resp.Value])
 	fmt.Printf("Timestamp: %s\n", resp.Timestamp.AsTime().Format(time.RFC3339))
 }
 
 func testWritePin(ctx context.Context, client pb.PiAgentServiceClient, pin int, value int) {
 	fmt.Printf("Writing value %d to pin %d...\n", value, pin)
-	
+
 	resp, err := client.WriteGPIOPin(ctx, &pb.WriteGPIOPinRequest{
 		Pin:   int32(pin),
 		Value: int32(value),
@@ -122,14 +122,14 @@ func testWritePin(ctx context.Context, client pb.PiAgentServiceClient, pin int, 
 
 	fmt.Printf("Write result:\n")
 	fmt.Printf("  Pin: %d\n", resp.Pin)
-	fmt.Printf("  Value: %d (%s)\n", resp.Value, 
+	fmt.Printf("  Value: %d (%s)\n", resp.Value,
 		map[int32]string{0: "LOW", 1: "HIGH"}[resp.Value])
 	fmt.Printf("  Timestamp: %s\n", resp.Timestamp.AsTime().Format(time.RFC3339))
 }
 
 func testPWM(ctx context.Context, client pb.PiAgentServiceClient, pin int, frequency int, dutyCycle int) {
 	fmt.Printf("Setting PWM on pin %d (freq: %dHz, duty: %d%%)...\n", pin, frequency, dutyCycle)
-	
+
 	resp, err := client.SetGPIOPWM(ctx, &pb.SetGPIOPWMRequest{
 		Pin:       int32(pin),
 		Frequency: int32(frequency),
@@ -151,7 +151,7 @@ func testPWM(ctx context.Context, client pb.PiAgentServiceClient, pin int, frequ
 
 func testListPins(ctx context.Context, client pb.PiAgentServiceClient) {
 	fmt.Println("Listing configured pins...")
-	
+
 	resp, err := client.ListConfiguredPins(ctx, &pb.ListConfiguredPinsRequest{})
 	if err != nil {
 		log.Printf("List failed: %v", err)
@@ -168,7 +168,7 @@ func testListPins(ctx context.Context, client pb.PiAgentServiceClient) {
 		fmt.Printf("  %d. Pin %d:\n", i+1, pin.Pin)
 		fmt.Printf("     Direction: %s\n", pin.Direction.String())
 		fmt.Printf("     Pull Mode: %s\n", pin.PullMode.String())
-		fmt.Printf("     Value: %d (%s)\n", pin.Value, 
+		fmt.Printf("     Value: %d (%s)\n", pin.Value,
 			map[int32]string{0: "LOW", 1: "HIGH"}[pin.Value])
 		fmt.Printf("     Last Updated: %s\n", pin.LastUpdated.AsTime().Format(time.RFC3339))
 	}
@@ -176,50 +176,50 @@ func testListPins(ctx context.Context, client pb.PiAgentServiceClient) {
 
 func runDemo(ctx context.Context, client pb.PiAgentServiceClient) {
 	fmt.Println("Running GPIO demo...")
-	
+
 	// Test health
 	fmt.Println("\n1. Testing agent health...")
 	testHealth(ctx, client)
-	
+
 	// Configure pin 18 as output
 	fmt.Printf("\n2. Configuring pin %d as output...\n", *pin)
 	testConfigurePin(ctx, client, *pin)
-	
+
 	// Write HIGH
 	fmt.Printf("\n3. Writing HIGH to pin %d...\n", *pin)
 	testWritePin(ctx, client, *pin, 1)
-	
+
 	// Read back
 	fmt.Printf("\n4. Reading pin %d...\n", *pin)
 	testReadPin(ctx, client, *pin)
-	
+
 	// Wait a bit
 	fmt.Println("\n5. Waiting 2 seconds...")
 	time.Sleep(2 * time.Second)
-	
+
 	// Write LOW
 	fmt.Printf("\n6. Writing LOW to pin %d...\n", *pin)
 	testWritePin(ctx, client, *pin, 0)
-	
+
 	// Read back
 	fmt.Printf("\n7. Reading pin %d...\n", *pin)
 	testReadPin(ctx, client, *pin)
-	
+
 	// List configured pins
 	fmt.Println("\n8. Listing configured pins...")
 	testListPins(ctx, client)
-	
+
 	// Test PWM (if supported)
 	if *pin == 18 || *pin == 12 || *pin == 13 || *pin == 19 {
 		fmt.Printf("\n9. Testing PWM on pin %d...\n", *pin)
 		testPWM(ctx, client, *pin, 1000, 50)
-		
+
 		fmt.Println("\n10. Waiting 3 seconds for PWM...")
 		time.Sleep(3 * time.Second)
-		
+
 		fmt.Printf("\n11. Stopping PWM (setting to 0%% duty cycle)...\n")
 		testPWM(ctx, client, *pin, 1000, 0)
 	}
-	
+
 	fmt.Println("\nDemo completed!")
 }
