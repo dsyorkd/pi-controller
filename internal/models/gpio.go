@@ -27,6 +27,11 @@ type GPIODevice struct {
 
 	// Configuration
 	Config GPIOConfig `json:"config" gorm:"embedded"`
+
+	// Reservation tracking
+	ReservedBy   *string    `json:"reserved_by,omitempty" gorm:"index"` // Optional client/user ID that reserved this pin
+	ReservedAt   *time.Time `json:"reserved_at,omitempty"`              // When the pin was reserved
+	ReservationTTL *time.Time `json:"reservation_ttl,omitempty"`        // When the reservation expires
 }
 
 // GPIODirection defines the direction of a GPIO pin

@@ -420,7 +420,7 @@
         "dependencies": [
           17
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -433,7 +433,7 @@
         "dependencies": [
           19
         ],
-        "status": "todo",
+        "status": "in-progress",
         "subtasks": []
       },
       {
@@ -1258,7 +1258,7 @@
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-02T19:12:24.309Z",
+      "updated": "2025-09-03T03:55:48.334Z",
       "description": "Tasks for master context"
     }
   }
