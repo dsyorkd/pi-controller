@@ -154,8 +154,22 @@ func runServer(cmd *cobra.Command, args []string) error {
 	var wg sync.WaitGroup
 	serverErrors := make(chan error, 4)
 
+	// Initialize CA service
+	sshExecutor := services.NewSSHExecutor(&cfg.CA.SSH, log)
+	caService, err := services.NewCAService(&cfg.CA, db, log, sshExecutor)
+	if err != nil {
+		log.WithError(err).Warn("Failed to initialize CA service - running without CA functionality")
+	} else {
+		log.Info("CA service initialized successfully")
+		
+		// Initialize CA if it hasn't been initialized yet (this is idempotent)
+		if err := caService.InitializeCA(context.Background()); err != nil {
+			log.WithError(err).Warn("CA initialization failed - manual initialization may be required")
+		}
+	}
+
 	// Start REST API server
-	apiServer := api.New(&cfg.API, log, db)
+	apiServer := api.New(&cfg.API, log, db, caService)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

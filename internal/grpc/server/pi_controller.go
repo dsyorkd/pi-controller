@@ -384,3 +384,294 @@ func (s *PiControllerServer) requireRole(claims *middleware.JWTClaims, requiredR
 
 	return status.Error(codes.PermissionDenied, "Insufficient permissions")
 }
+
+// CA Management Methods
+
+// InitializeCA initializes the Certificate Authority
+func (s *PiControllerServer) InitializeCA(ctx context.Context, req *pb.InitializeCARequest) (*pb.InitializeCAResponse, error) {
+	// Validate authentication - CA initialization requires admin role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleAdmin); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance - will be injected in constructor
+	// For now, return a placeholder response
+	s.logger.WithField("user_id", claims.UserID).Info("CA initialization requested")
+
+	return &pb.InitializeCAResponse{
+		Success: false,
+		Message: "CA service not yet integrated - implementation in progress",
+	}, nil
+}
+
+// GetCAInfo returns information about the Certificate Authority
+func (s *PiControllerServer) GetCAInfo(ctx context.Context, req *pb.GetCAInfoRequest) (*pb.CAInfo, error) {
+	// Validate authentication - CA info requires at least viewer role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and retrieve CA info
+	s.logger.WithField("user_id", claims.UserID).Info("CA info requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// GetCACertificate returns the CA certificate
+func (s *PiControllerServer) GetCACertificate(ctx context.Context, req *pb.GetCACertificateRequest) (*pb.GetCACertificateResponse, error) {
+	// Validate authentication - CA certificate requires at least viewer role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and retrieve CA certificate
+	s.logger.WithField("user_id", claims.UserID).Info("CA certificate requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// Certificate Management Methods
+
+// IssueCertificate issues a new certificate
+func (s *PiControllerServer) IssueCertificate(ctx context.Context, req *pb.IssueCertificateRequest) (*pb.Certificate, error) {
+	// Validate authentication - certificate issuance requires admin role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleAdmin); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and issue certificate
+	s.logger.WithFields(map[string]interface{}{
+		"user_id":     claims.UserID,
+		"common_name": req.CommonName,
+		"type":        req.Type,
+	}).Info("Certificate issuance requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// GetCertificate retrieves a certificate by ID or serial number
+func (s *PiControllerServer) GetCertificate(ctx context.Context, req *pb.GetCertificateRequest) (*pb.Certificate, error) {
+	// Validate authentication - certificate retrieval requires at least viewer role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and retrieve certificate
+	s.logger.WithField("user_id", claims.UserID).Info("Certificate retrieval requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// ListCertificates lists certificates with optional filtering
+func (s *PiControllerServer) ListCertificates(ctx context.Context, req *pb.ListCertificatesRequest) (*pb.ListCertificatesResponse, error) {
+	// Validate authentication - certificate listing requires at least viewer role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and list certificates
+	s.logger.WithFields(map[string]interface{}{
+		"user_id": claims.UserID,
+		"page":    req.Page,
+		"limit":   req.PageSize,
+	}).Info("Certificate listing requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// RenewCertificate renews an existing certificate
+func (s *PiControllerServer) RenewCertificate(ctx context.Context, req *pb.RenewCertificateRequest) (*pb.Certificate, error) {
+	// Validate authentication - certificate renewal requires admin role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleAdmin); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and renew certificate
+	s.logger.WithFields(map[string]interface{}{
+		"user_id": claims.UserID,
+		"cert_id": req.Id,
+	}).Info("Certificate renewal requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// RevokeCertificate revokes a certificate
+func (s *PiControllerServer) RevokeCertificate(ctx context.Context, req *pb.RevokeCertificateRequest) (*pb.RevokeCertificateResponse, error) {
+	// Validate authentication - certificate revocation requires admin role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleAdmin); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and revoke certificate
+	s.logger.WithFields(map[string]interface{}{
+		"user_id": claims.UserID,
+		"cert_id": req.Id,
+		"reason":  req.Reason,
+	}).Info("Certificate revocation requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// ValidateCertificate validates a certificate
+func (s *PiControllerServer) ValidateCertificate(ctx context.Context, req *pb.ValidateCertificateRequest) (*pb.ValidateCertificateResponse, error) {
+	// Validate authentication - certificate validation requires at least viewer role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and validate certificate
+	s.logger.WithField("user_id", claims.UserID).Info("Certificate validation requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// Certificate Request (CSR) Methods
+
+// CreateCertificateRequest creates a new certificate signing request
+func (s *PiControllerServer) CreateCertificateRequest(ctx context.Context, req *pb.CreateCertificateRequestRequest) (*pb.CertificateRequest, error) {
+	// Validate authentication - CSR creation requires at least operator role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleOperator); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and create certificate request
+	s.logger.WithFields(map[string]interface{}{
+		"user_id":     claims.UserID,
+		"common_name": req.CommonName,
+		"type":        req.Type,
+	}).Info("Certificate request creation requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// ProcessCertificateRequest processes a pending certificate signing request
+func (s *PiControllerServer) ProcessCertificateRequest(ctx context.Context, req *pb.ProcessCertificateRequestRequest) (*pb.Certificate, error) {
+	// Validate authentication - CSR processing requires admin role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleAdmin); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and process certificate request
+	s.logger.WithFields(map[string]interface{}{
+		"user_id": claims.UserID,
+		"csr_id":  req.Id,
+		"approve": req.Approve,
+	}).Info("Certificate request processing requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// ListCertificateRequests lists certificate signing requests
+func (s *PiControllerServer) ListCertificateRequests(ctx context.Context, req *pb.ListCertificateRequestsRequest) (*pb.ListCertificateRequestsResponse, error) {
+	// Validate authentication - CSR listing requires at least operator role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleOperator); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and list certificate requests
+	s.logger.WithFields(map[string]interface{}{
+		"user_id": claims.UserID,
+		"page":    req.Page,
+		"limit":   req.PageSize,
+	}).Info("Certificate requests listing requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// CA Statistics and Maintenance Methods
+
+// GetCertificateStats returns certificate statistics
+func (s *PiControllerServer) GetCertificateStats(ctx context.Context, req *pb.GetCertificateStatsRequest) (*pb.CertificateStats, error) {
+	// Validate authentication - certificate stats requires at least viewer role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleViewer); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and retrieve certificate statistics
+	s.logger.WithField("user_id", claims.UserID).Info("Certificate statistics requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}
+
+// CleanupExpiredCertificates removes expired certificates
+func (s *PiControllerServer) CleanupExpiredCertificates(ctx context.Context, req *pb.CleanupExpiredCertificatesRequest) (*pb.CleanupExpiredCertificatesResponse, error) {
+	// Validate authentication - certificate cleanup requires admin role
+	claims, err := s.validateAuthentication(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.requireRole(claims, middleware.RoleAdmin); err != nil {
+		return nil, err
+	}
+
+	// TODO: Get CA service instance and cleanup expired certificates
+	s.logger.WithField("user_id", claims.UserID).Info("Certificate cleanup requested")
+
+	return nil, status.Error(codes.Unimplemented, "CA service not yet integrated")
+}

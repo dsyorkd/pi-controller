@@ -36,6 +36,28 @@ service PiControllerService {
   // Real-time GPIO streaming
   rpc StreamGPIOReadings(StreamGPIOReadingsRequest) returns (stream GPIOReading);
 
+  // Certificate Authority management
+  rpc InitializeCA(InitializeCARequest) returns (InitializeCAResponse);
+  rpc GetCAInfo(GetCAInfoRequest) returns (CAInfo);
+  rpc GetCACertificate(GetCACertificateRequest) returns (GetCACertificateResponse);
+  
+  // Certificate management
+  rpc IssueCertificate(IssueCertificateRequest) returns (Certificate);
+  rpc GetCertificate(GetCertificateRequest) returns (Certificate);
+  rpc ListCertificates(ListCertificatesRequest) returns (ListCertificatesResponse);
+  rpc RenewCertificate(RenewCertificateRequest) returns (Certificate);
+  rpc RevokeCertificate(RevokeCertificateRequest) returns (RevokeCertificateResponse);
+  rpc ValidateCertificate(ValidateCertificateRequest) returns (ValidateCertificateResponse);
+  
+  // Certificate Requests (CSR)
+  rpc CreateCertificateRequest(CreateCertificateRequestRequest) returns (CertificateRequest);
+  rpc ProcessCertificateRequest(ProcessCertificateRequestRequest) returns (Certificate);
+  rpc ListCertificateRequests(ListCertificateRequestsRequest) returns (ListCertificateRequestsResponse);
+  
+  // CA Statistics and Maintenance
+  rpc GetCertificateStats(GetCertificateStatsRequest) returns (CertificateStats);
+  rpc CleanupExpiredCertificates(CleanupExpiredCertificatesRequest) returns (CleanupExpiredCertificatesResponse);
+
   // Health and status
   rpc Health(HealthRequest) returns (HealthResponse);
   rpc GetSystemInfo(SystemInfoRequest) returns (SystemInfoResponse);
@@ -404,4 +426,255 @@ message GCInfo {
   uint32 num_gc = 1;
   uint64 pause_total = 2;
   google.protobuf.Timestamp last_gc = 3;
+}
+
+// Certificate Authority messages
+
+enum CertificateType {
+  CERTIFICATE_TYPE_UNSPECIFIED = 0;
+  CERTIFICATE_TYPE_CA = 1;
+  CERTIFICATE_TYPE_SERVER = 2;
+  CERTIFICATE_TYPE_CLIENT = 3;
+  CERTIFICATE_TYPE_SSH = 4;
+  CERTIFICATE_TYPE_INTERMEDIATE = 5;
+}
+
+enum CertificateStatus {
+  CERTIFICATE_STATUS_UNSPECIFIED = 0;
+  CERTIFICATE_STATUS_ACTIVE = 1;
+  CERTIFICATE_STATUS_EXPIRED = 2;
+  CERTIFICATE_STATUS_REVOKED = 3;
+  CERTIFICATE_STATUS_PENDING = 4;
+  CERTIFICATE_STATUS_FAILED = 5;
+  CERTIFICATE_STATUS_RENEWING = 6;
+}
+
+enum CertificateBackend {
+  CERTIFICATE_BACKEND_UNSPECIFIED = 0;
+  CERTIFICATE_BACKEND_LOCAL = 1;
+  CERTIFICATE_BACKEND_VAULT = 2;
+}
+
+enum CAType {
+  CA_TYPE_UNSPECIFIED = 0;
+  CA_TYPE_ROOT = 1;
+  CA_TYPE_INTERMEDIATE = 2;
+}
+
+enum CAStatus {
+  CA_STATUS_UNSPECIFIED = 0;
+  CA_STATUS_ACTIVE = 1;
+  CA_STATUS_INACTIVE = 2;
+  CA_STATUS_REVOKED = 3;
+  CA_STATUS_EXPIRED = 4;
+}
+
+enum CSRStatus {
+  CSR_STATUS_UNSPECIFIED = 0;
+  CSR_STATUS_PENDING = 1;
+  CSR_STATUS_APPROVED = 2;
+  CSR_STATUS_REJECTED = 3;
+  CSR_STATUS_FAILED = 4;
+}
+
+message Certificate {
+  uint32 id = 1;
+  string serial_number = 2;
+  string common_name = 3;
+  CertificateType type = 4;
+  CertificateStatus status = 5;
+  string subject = 6;
+  string issuer = 7;
+  google.protobuf.Timestamp not_before = 8;
+  google.protobuf.Timestamp not_after = 9;
+  repeated string sans = 10;
+  repeated string key_usage = 11;
+  repeated string ext_key_usage = 12;
+  CertificateBackend backend = 13;
+  optional uint32 node_id = 14;
+  optional uint32 cluster_id = 15;
+  bool auto_renew = 16;
+  optional google.protobuf.Timestamp revoked_at = 17;
+  optional string revoked_reason = 18;
+  google.protobuf.Timestamp created_at = 19;
+  google.protobuf.Timestamp updated_at = 20;
+}
+
+message CAInfo {
+  uint32 id = 1;
+  string name = 2;
+  CAType type = 3;
+  CertificateBackend backend = 4;
+  CAStatus status = 5;
+  string subject = 6;
+  string serial_number = 7;
+  google.protobuf.Timestamp not_before = 8;
+  google.protobuf.Timestamp not_after = 9;
+  int32 certificates_issued = 10;
+  int32 certificates_active = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+message CertificateRequest {
+  uint32 id = 1;
+  string common_name = 2;
+  CertificateType type = 3;
+  CSRStatus status = 4;
+  repeated string sans = 5;
+  string validity_period = 6;
+  repeated string key_usage = 7;
+  repeated string ext_key_usage = 8;
+  optional uint32 node_id = 9;
+  optional uint32 cluster_id = 10;
+  optional google.protobuf.Timestamp processed_at = 11;
+  optional uint32 certificate_id = 12;
+  optional string failure_reason = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+}
+
+message CertificateValidation {
+  bool valid = 1;
+  bool expired = 2;
+  bool revoked = 3;
+  google.protobuf.Timestamp not_before = 4;
+  google.protobuf.Timestamp not_after = 5;
+  string serial_number = 6;
+  string subject = 7;
+  string issuer = 8;
+  repeated string errors = 9;
+}
+
+message CertificateStats {
+  int64 total_certificates = 1;
+  int64 active_certificates = 2;
+  int64 expired_certificates = 3;
+  int64 revoked_certificates = 4;
+  int64 certificates_issued_24h = 5;
+  int64 certificates_expiring_30d = 6;
+  CAInfo ca_info = 7;
+}
+
+// CA Management Requests/Responses
+
+message InitializeCARequest {}
+
+message InitializeCAResponse {
+  bool success = 1;
+  string message = 2;
+  CAInfo ca_info = 3;
+}
+
+message GetCAInfoRequest {}
+
+message GetCACertificateRequest {}
+
+message GetCACertificateResponse {
+  string certificate_pem = 1;
+  string serial_number = 2;
+  google.protobuf.Timestamp not_before = 3;
+  google.protobuf.Timestamp not_after = 4;
+}
+
+// Certificate Management Requests/Responses
+
+message IssueCertificateRequest {
+  string common_name = 1;
+  CertificateType type = 2;
+  repeated string sans = 3;
+  string validity_period = 4;
+  repeated string key_usage = 5;
+  repeated string ext_key_usage = 6;
+  optional uint32 node_id = 7;
+  optional uint32 cluster_id = 8;
+  bool auto_renew = 9;
+}
+
+message GetCertificateRequest {
+  oneof identifier {
+    uint32 id = 1;
+    string serial_number = 2;
+  }
+}
+
+message ListCertificatesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  optional CertificateType type = 3;
+  optional CertificateStatus status = 4;
+  optional uint32 node_id = 5;
+  optional uint32 cluster_id = 6;
+  optional CertificateBackend backend = 7;
+}
+
+message ListCertificatesResponse {
+  repeated Certificate certificates = 1;
+  int32 total_count = 2;
+}
+
+message RenewCertificateRequest {
+  uint32 id = 1;
+}
+
+message RevokeCertificateRequest {
+  uint32 id = 1;
+  string reason = 2;
+}
+
+message RevokeCertificateResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ValidateCertificateRequest {
+  string certificate_pem = 1;
+}
+
+message ValidateCertificateResponse {
+  CertificateValidation validation = 1;
+}
+
+// Certificate Request (CSR) Management
+
+message CreateCertificateRequestRequest {
+  string common_name = 1;
+  CertificateType type = 2;
+  string csr_pem = 3;
+  repeated string sans = 4;
+  string validity_period = 5;
+  repeated string key_usage = 6;
+  repeated string ext_key_usage = 7;
+  optional uint32 node_id = 8;
+  optional uint32 cluster_id = 9;
+}
+
+message ProcessCertificateRequestRequest {
+  uint32 id = 1;
+  bool approve = 2;
+}
+
+message ListCertificateRequestsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  optional CSRStatus status = 3;
+  optional CertificateType type = 4;
+  optional uint32 node_id = 5;
+  optional uint32 cluster_id = 6;
+}
+
+message ListCertificateRequestsResponse {
+  repeated CertificateRequest requests = 1;
+  int32 total_count = 2;
+}
+
+// CA Statistics and Maintenance
+
+message GetCertificateStatsRequest {}
+
+message CleanupExpiredCertificatesRequest {}
+
+message CleanupExpiredCertificatesResponse {
+  int32 cleaned_count = 1;
+  string message = 2;
 }

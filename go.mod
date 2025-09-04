@@ -10,6 +10,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/hashicorp/mdns v1.0.6
+	github.com/pkg/sftp v1.13.9
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
@@ -45,7 +46,6 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
-	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -77,7 +77,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pkg/sftp v1.13.9 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
@@ -93,8 +92,6 @@ require (
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.18.0 // indirect

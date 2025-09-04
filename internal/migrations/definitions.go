@@ -43,6 +43,30 @@ func getAllMigrations() []MigrationDefinition {
 			Up:          addGPIOReservationFields,
 			Down:        dropGPIOReservationFields,
 		},
+		{
+			ID:          "20241201000007",
+			Description: "Create certificates table",
+			Up:          createCertificatesTable,
+			Down:        dropCertificatesTable,
+		},
+		{
+			ID:          "20241201000008",
+			Description: "Create certificate_requests table",
+			Up:          createCertificateRequestsTable,
+			Down:        dropCertificateRequestsTable,
+		},
+		{
+			ID:          "20241201000009",
+			Description: "Create ca_info table",
+			Up:          createCAInfoTable,
+			Down:        dropCAInfoTable,
+		},
+		{
+			ID:          "20241201000010",
+			Description: "Add certificate indexes for performance",
+			Up:          addCertificateIndexes,
+			Down:        dropCertificateIndexes,
+		},
 	}
 }
 
@@ -292,5 +316,191 @@ func dropGPIOReservationFields(db *gorm.DB) error {
 	UPDATE gpio_devices SET reserved_by = NULL, reserved_at = NULL, reservation_ttl = NULL;
 	`
 
+	return db.Exec(sql).Error
+}
+
+// Certificate Authority migrations
+
+// createCertificatesTable creates the certificates table
+func createCertificatesTable(db *gorm.DB) error {
+	sql := `
+	CREATE TABLE IF NOT EXISTS certificates (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		serial_number TEXT NOT NULL UNIQUE,
+		common_name TEXT NOT NULL,
+		type TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'active',
+		certificate_pem TEXT NOT NULL,
+		subject TEXT NOT NULL,
+		issuer TEXT NOT NULL,
+		not_before DATETIME NOT NULL,
+		not_after DATETIME NOT NULL,
+		key_usage TEXT,
+		ext_key_usage TEXT,
+		sans TEXT,
+		backend TEXT NOT NULL,
+		vault_path TEXT,
+		local_path TEXT,
+		node_id INTEGER,
+		cluster_id INTEGER,
+		renewed_from_id INTEGER,
+		auto_renew BOOLEAN NOT NULL DEFAULT 1,
+		renewed_at DATETIME,
+		revoked_at DATETIME,
+		revoked_reason TEXT,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		deleted_at DATETIME,
+		FOREIGN KEY (node_id) REFERENCES nodes(id),
+		FOREIGN KEY (cluster_id) REFERENCES clusters(id),
+		FOREIGN KEY (renewed_from_id) REFERENCES certificates(id)
+	);
+	`
+	
+	return db.Exec(sql).Error
+}
+
+// dropCertificatesTable drops the certificates table
+func dropCertificatesTable(db *gorm.DB) error {
+	return db.Exec("DROP TABLE IF EXISTS certificates").Error
+}
+
+// createCertificateRequestsTable creates the certificate_requests table
+func createCertificateRequestsTable(db *gorm.DB) error {
+	sql := `
+	CREATE TABLE IF NOT EXISTS certificate_requests (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		common_name TEXT NOT NULL,
+		type TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'pending',
+		csr_pem TEXT NOT NULL,
+		sans TEXT,
+		validity_period TEXT,
+		key_usage TEXT,
+		ext_key_usage TEXT,
+		node_id INTEGER,
+		cluster_id INTEGER,
+		processed_at DATETIME,
+		certificate_id INTEGER,
+		failure_reason TEXT,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		deleted_at DATETIME,
+		FOREIGN KEY (node_id) REFERENCES nodes(id),
+		FOREIGN KEY (cluster_id) REFERENCES clusters(id),
+		FOREIGN KEY (certificate_id) REFERENCES certificates(id)
+	);
+	`
+	
+	return db.Exec(sql).Error
+}
+
+// dropCertificateRequestsTable drops the certificate_requests table
+func dropCertificateRequestsTable(db *gorm.DB) error {
+	return db.Exec("DROP TABLE IF EXISTS certificate_requests").Error
+}
+
+// createCAInfoTable creates the ca_info table
+func createCAInfoTable(db *gorm.DB) error {
+	sql := `
+	CREATE TABLE IF NOT EXISTS ca_info (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE,
+		type TEXT NOT NULL,
+		backend TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'active',
+		certificate_id INTEGER,
+		local_path TEXT,
+		vault_path TEXT,
+		subject TEXT NOT NULL,
+		not_before DATETIME NOT NULL,
+		not_after DATETIME NOT NULL,
+		serial_number TEXT NOT NULL,
+		certificates_issued INTEGER NOT NULL DEFAULT 0,
+		certificates_active INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		deleted_at DATETIME,
+		FOREIGN KEY (certificate_id) REFERENCES certificates(id)
+	);
+	`
+	
+	return db.Exec(sql).Error
+}
+
+// dropCAInfoTable drops the ca_info table
+func dropCAInfoTable(db *gorm.DB) error {
+	return db.Exec("DROP TABLE IF EXISTS ca_info").Error
+}
+
+// addCertificateIndexes adds indexes for certificate-related tables
+func addCertificateIndexes(db *gorm.DB) error {
+	sql := `
+	-- Certificates table indexes
+	CREATE INDEX IF NOT EXISTS idx_certificates_serial_number ON certificates(serial_number);
+	CREATE INDEX IF NOT EXISTS idx_certificates_common_name ON certificates(common_name);
+	CREATE INDEX IF NOT EXISTS idx_certificates_status ON certificates(status) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificates_type ON certificates(type) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificates_backend ON certificates(backend) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificates_node_id ON certificates(node_id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificates_cluster_id ON certificates(cluster_id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificates_not_after ON certificates(not_after);
+	CREATE INDEX IF NOT EXISTS idx_certificates_auto_renew ON certificates(auto_renew, not_after) WHERE auto_renew = 1 AND status = 'active';
+	
+	-- Certificate requests table indexes
+	CREATE INDEX IF NOT EXISTS idx_certificate_requests_status ON certificate_requests(status) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificate_requests_type ON certificate_requests(type) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificate_requests_node_id ON certificate_requests(node_id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificate_requests_cluster_id ON certificate_requests(cluster_id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificate_requests_created_at ON certificate_requests(created_at DESC);
+	
+	-- CA info table indexes
+	CREATE INDEX IF NOT EXISTS idx_ca_info_name ON ca_info(name);
+	CREATE INDEX IF NOT EXISTS idx_ca_info_type ON ca_info(type) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_ca_info_backend ON ca_info(backend) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_ca_info_status ON ca_info(status) WHERE deleted_at IS NULL;
+	
+	-- Composite indexes for common queries
+	CREATE INDEX IF NOT EXISTS idx_certificates_node_status ON certificates(node_id, status) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificates_cluster_status ON certificates(cluster_id, status) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_certificates_expiring_soon ON certificates(not_after, auto_renew) WHERE status = 'active' AND not_after < datetime('now', '+30 days');
+	`
+	
+	return db.Exec(sql).Error
+}
+
+// dropCertificateIndexes drops certificate-related indexes
+func dropCertificateIndexes(db *gorm.DB) error {
+	sql := `
+	-- Drop composite indexes
+	DROP INDEX IF EXISTS idx_certificates_expiring_soon;
+	DROP INDEX IF EXISTS idx_certificates_cluster_status;
+	DROP INDEX IF EXISTS idx_certificates_node_status;
+	
+	-- Drop CA info indexes
+	DROP INDEX IF EXISTS idx_ca_info_status;
+	DROP INDEX IF EXISTS idx_ca_info_backend;
+	DROP INDEX IF EXISTS idx_ca_info_type;
+	DROP INDEX IF EXISTS idx_ca_info_name;
+	
+	-- Drop certificate requests indexes
+	DROP INDEX IF EXISTS idx_certificate_requests_created_at;
+	DROP INDEX IF EXISTS idx_certificate_requests_cluster_id;
+	DROP INDEX IF EXISTS idx_certificate_requests_node_id;
+	DROP INDEX IF EXISTS idx_certificate_requests_type;
+	DROP INDEX IF EXISTS idx_certificate_requests_status;
+	
+	-- Drop certificates indexes
+	DROP INDEX IF EXISTS idx_certificates_auto_renew;
+	DROP INDEX IF EXISTS idx_certificates_not_after;
+	DROP INDEX IF EXISTS idx_certificates_cluster_id;
+	DROP INDEX IF EXISTS idx_certificates_node_id;
+	DROP INDEX IF EXISTS idx_certificates_backend;
+	DROP INDEX IF EXISTS idx_certificates_type;
+	DROP INDEX IF EXISTS idx_certificates_status;
+	DROP INDEX IF EXISTS idx_certificates_common_name;
+	DROP INDEX IF EXISTS idx_certificates_serial_number;
+	`
+	
 	return db.Exec(sql).Error
 }

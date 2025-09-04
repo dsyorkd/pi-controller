@@ -19,28 +19,42 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PiControllerService_CreateCluster_FullMethodName      = "/pi_controller.PiControllerService/CreateCluster"
-	PiControllerService_GetCluster_FullMethodName         = "/pi_controller.PiControllerService/GetCluster"
-	PiControllerService_ListClusters_FullMethodName       = "/pi_controller.PiControllerService/ListClusters"
-	PiControllerService_UpdateCluster_FullMethodName      = "/pi_controller.PiControllerService/UpdateCluster"
-	PiControllerService_DeleteCluster_FullMethodName      = "/pi_controller.PiControllerService/DeleteCluster"
-	PiControllerService_CreateNode_FullMethodName         = "/pi_controller.PiControllerService/CreateNode"
-	PiControllerService_GetNode_FullMethodName            = "/pi_controller.PiControllerService/GetNode"
-	PiControllerService_ListNodes_FullMethodName          = "/pi_controller.PiControllerService/ListNodes"
-	PiControllerService_UpdateNode_FullMethodName         = "/pi_controller.PiControllerService/UpdateNode"
-	PiControllerService_DeleteNode_FullMethodName         = "/pi_controller.PiControllerService/DeleteNode"
-	PiControllerService_ProvisionNode_FullMethodName      = "/pi_controller.PiControllerService/ProvisionNode"
-	PiControllerService_DeprovisionNode_FullMethodName    = "/pi_controller.PiControllerService/DeprovisionNode"
-	PiControllerService_CreateGPIODevice_FullMethodName   = "/pi_controller.PiControllerService/CreateGPIODevice"
-	PiControllerService_GetGPIODevice_FullMethodName      = "/pi_controller.PiControllerService/GetGPIODevice"
-	PiControllerService_ListGPIODevices_FullMethodName    = "/pi_controller.PiControllerService/ListGPIODevices"
-	PiControllerService_UpdateGPIODevice_FullMethodName   = "/pi_controller.PiControllerService/UpdateGPIODevice"
-	PiControllerService_DeleteGPIODevice_FullMethodName   = "/pi_controller.PiControllerService/DeleteGPIODevice"
-	PiControllerService_ReadGPIO_FullMethodName           = "/pi_controller.PiControllerService/ReadGPIO"
-	PiControllerService_WriteGPIO_FullMethodName          = "/pi_controller.PiControllerService/WriteGPIO"
-	PiControllerService_StreamGPIOReadings_FullMethodName = "/pi_controller.PiControllerService/StreamGPIOReadings"
-	PiControllerService_Health_FullMethodName             = "/pi_controller.PiControllerService/Health"
-	PiControllerService_GetSystemInfo_FullMethodName      = "/pi_controller.PiControllerService/GetSystemInfo"
+	PiControllerService_CreateCluster_FullMethodName              = "/pi_controller.PiControllerService/CreateCluster"
+	PiControllerService_GetCluster_FullMethodName                 = "/pi_controller.PiControllerService/GetCluster"
+	PiControllerService_ListClusters_FullMethodName               = "/pi_controller.PiControllerService/ListClusters"
+	PiControllerService_UpdateCluster_FullMethodName              = "/pi_controller.PiControllerService/UpdateCluster"
+	PiControllerService_DeleteCluster_FullMethodName              = "/pi_controller.PiControllerService/DeleteCluster"
+	PiControllerService_CreateNode_FullMethodName                 = "/pi_controller.PiControllerService/CreateNode"
+	PiControllerService_GetNode_FullMethodName                    = "/pi_controller.PiControllerService/GetNode"
+	PiControllerService_ListNodes_FullMethodName                  = "/pi_controller.PiControllerService/ListNodes"
+	PiControllerService_UpdateNode_FullMethodName                 = "/pi_controller.PiControllerService/UpdateNode"
+	PiControllerService_DeleteNode_FullMethodName                 = "/pi_controller.PiControllerService/DeleteNode"
+	PiControllerService_ProvisionNode_FullMethodName              = "/pi_controller.PiControllerService/ProvisionNode"
+	PiControllerService_DeprovisionNode_FullMethodName            = "/pi_controller.PiControllerService/DeprovisionNode"
+	PiControllerService_CreateGPIODevice_FullMethodName           = "/pi_controller.PiControllerService/CreateGPIODevice"
+	PiControllerService_GetGPIODevice_FullMethodName              = "/pi_controller.PiControllerService/GetGPIODevice"
+	PiControllerService_ListGPIODevices_FullMethodName            = "/pi_controller.PiControllerService/ListGPIODevices"
+	PiControllerService_UpdateGPIODevice_FullMethodName           = "/pi_controller.PiControllerService/UpdateGPIODevice"
+	PiControllerService_DeleteGPIODevice_FullMethodName           = "/pi_controller.PiControllerService/DeleteGPIODevice"
+	PiControllerService_ReadGPIO_FullMethodName                   = "/pi_controller.PiControllerService/ReadGPIO"
+	PiControllerService_WriteGPIO_FullMethodName                  = "/pi_controller.PiControllerService/WriteGPIO"
+	PiControllerService_StreamGPIOReadings_FullMethodName         = "/pi_controller.PiControllerService/StreamGPIOReadings"
+	PiControllerService_InitializeCA_FullMethodName               = "/pi_controller.PiControllerService/InitializeCA"
+	PiControllerService_GetCAInfo_FullMethodName                  = "/pi_controller.PiControllerService/GetCAInfo"
+	PiControllerService_GetCACertificate_FullMethodName           = "/pi_controller.PiControllerService/GetCACertificate"
+	PiControllerService_IssueCertificate_FullMethodName           = "/pi_controller.PiControllerService/IssueCertificate"
+	PiControllerService_GetCertificate_FullMethodName             = "/pi_controller.PiControllerService/GetCertificate"
+	PiControllerService_ListCertificates_FullMethodName           = "/pi_controller.PiControllerService/ListCertificates"
+	PiControllerService_RenewCertificate_FullMethodName           = "/pi_controller.PiControllerService/RenewCertificate"
+	PiControllerService_RevokeCertificate_FullMethodName          = "/pi_controller.PiControllerService/RevokeCertificate"
+	PiControllerService_ValidateCertificate_FullMethodName        = "/pi_controller.PiControllerService/ValidateCertificate"
+	PiControllerService_CreateCertificateRequest_FullMethodName   = "/pi_controller.PiControllerService/CreateCertificateRequest"
+	PiControllerService_ProcessCertificateRequest_FullMethodName  = "/pi_controller.PiControllerService/ProcessCertificateRequest"
+	PiControllerService_ListCertificateRequests_FullMethodName    = "/pi_controller.PiControllerService/ListCertificateRequests"
+	PiControllerService_GetCertificateStats_FullMethodName        = "/pi_controller.PiControllerService/GetCertificateStats"
+	PiControllerService_CleanupExpiredCertificates_FullMethodName = "/pi_controller.PiControllerService/CleanupExpiredCertificates"
+	PiControllerService_Health_FullMethodName                     = "/pi_controller.PiControllerService/Health"
+	PiControllerService_GetSystemInfo_FullMethodName              = "/pi_controller.PiControllerService/GetSystemInfo"
 )
 
 // PiControllerServiceClient is the client API for PiControllerService service.
@@ -73,6 +87,24 @@ type PiControllerServiceClient interface {
 	WriteGPIO(ctx context.Context, in *WriteGPIORequest, opts ...grpc.CallOption) (*WriteGPIOResponse, error)
 	// Real-time GPIO streaming
 	StreamGPIOReadings(ctx context.Context, in *StreamGPIOReadingsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GPIOReading], error)
+	// Certificate Authority management
+	InitializeCA(ctx context.Context, in *InitializeCARequest, opts ...grpc.CallOption) (*InitializeCAResponse, error)
+	GetCAInfo(ctx context.Context, in *GetCAInfoRequest, opts ...grpc.CallOption) (*CAInfo, error)
+	GetCACertificate(ctx context.Context, in *GetCACertificateRequest, opts ...grpc.CallOption) (*GetCACertificateResponse, error)
+	// Certificate management
+	IssueCertificate(ctx context.Context, in *IssueCertificateRequest, opts ...grpc.CallOption) (*Certificate, error)
+	GetCertificate(ctx context.Context, in *GetCertificateRequest, opts ...grpc.CallOption) (*Certificate, error)
+	ListCertificates(ctx context.Context, in *ListCertificatesRequest, opts ...grpc.CallOption) (*ListCertificatesResponse, error)
+	RenewCertificate(ctx context.Context, in *RenewCertificateRequest, opts ...grpc.CallOption) (*Certificate, error)
+	RevokeCertificate(ctx context.Context, in *RevokeCertificateRequest, opts ...grpc.CallOption) (*RevokeCertificateResponse, error)
+	ValidateCertificate(ctx context.Context, in *ValidateCertificateRequest, opts ...grpc.CallOption) (*ValidateCertificateResponse, error)
+	// Certificate Requests (CSR)
+	CreateCertificateRequest(ctx context.Context, in *CreateCertificateRequestRequest, opts ...grpc.CallOption) (*CertificateRequest, error)
+	ProcessCertificateRequest(ctx context.Context, in *ProcessCertificateRequestRequest, opts ...grpc.CallOption) (*Certificate, error)
+	ListCertificateRequests(ctx context.Context, in *ListCertificateRequestsRequest, opts ...grpc.CallOption) (*ListCertificateRequestsResponse, error)
+	// CA Statistics and Maintenance
+	GetCertificateStats(ctx context.Context, in *GetCertificateStatsRequest, opts ...grpc.CallOption) (*CertificateStats, error)
+	CleanupExpiredCertificates(ctx context.Context, in *CleanupExpiredCertificatesRequest, opts ...grpc.CallOption) (*CleanupExpiredCertificatesResponse, error)
 	// Health and status
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 	GetSystemInfo(ctx context.Context, in *SystemInfoRequest, opts ...grpc.CallOption) (*SystemInfoResponse, error)
@@ -295,6 +327,146 @@ func (c *piControllerServiceClient) StreamGPIOReadings(ctx context.Context, in *
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type PiControllerService_StreamGPIOReadingsClient = grpc.ServerStreamingClient[GPIOReading]
 
+func (c *piControllerServiceClient) InitializeCA(ctx context.Context, in *InitializeCARequest, opts ...grpc.CallOption) (*InitializeCAResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitializeCAResponse)
+	err := c.cc.Invoke(ctx, PiControllerService_InitializeCA_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) GetCAInfo(ctx context.Context, in *GetCAInfoRequest, opts ...grpc.CallOption) (*CAInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CAInfo)
+	err := c.cc.Invoke(ctx, PiControllerService_GetCAInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) GetCACertificate(ctx context.Context, in *GetCACertificateRequest, opts ...grpc.CallOption) (*GetCACertificateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCACertificateResponse)
+	err := c.cc.Invoke(ctx, PiControllerService_GetCACertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) IssueCertificate(ctx context.Context, in *IssueCertificateRequest, opts ...grpc.CallOption) (*Certificate, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Certificate)
+	err := c.cc.Invoke(ctx, PiControllerService_IssueCertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) GetCertificate(ctx context.Context, in *GetCertificateRequest, opts ...grpc.CallOption) (*Certificate, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Certificate)
+	err := c.cc.Invoke(ctx, PiControllerService_GetCertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) ListCertificates(ctx context.Context, in *ListCertificatesRequest, opts ...grpc.CallOption) (*ListCertificatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCertificatesResponse)
+	err := c.cc.Invoke(ctx, PiControllerService_ListCertificates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) RenewCertificate(ctx context.Context, in *RenewCertificateRequest, opts ...grpc.CallOption) (*Certificate, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Certificate)
+	err := c.cc.Invoke(ctx, PiControllerService_RenewCertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) RevokeCertificate(ctx context.Context, in *RevokeCertificateRequest, opts ...grpc.CallOption) (*RevokeCertificateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeCertificateResponse)
+	err := c.cc.Invoke(ctx, PiControllerService_RevokeCertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) ValidateCertificate(ctx context.Context, in *ValidateCertificateRequest, opts ...grpc.CallOption) (*ValidateCertificateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateCertificateResponse)
+	err := c.cc.Invoke(ctx, PiControllerService_ValidateCertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) CreateCertificateRequest(ctx context.Context, in *CreateCertificateRequestRequest, opts ...grpc.CallOption) (*CertificateRequest, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CertificateRequest)
+	err := c.cc.Invoke(ctx, PiControllerService_CreateCertificateRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) ProcessCertificateRequest(ctx context.Context, in *ProcessCertificateRequestRequest, opts ...grpc.CallOption) (*Certificate, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Certificate)
+	err := c.cc.Invoke(ctx, PiControllerService_ProcessCertificateRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) ListCertificateRequests(ctx context.Context, in *ListCertificateRequestsRequest, opts ...grpc.CallOption) (*ListCertificateRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCertificateRequestsResponse)
+	err := c.cc.Invoke(ctx, PiControllerService_ListCertificateRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) GetCertificateStats(ctx context.Context, in *GetCertificateStatsRequest, opts ...grpc.CallOption) (*CertificateStats, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CertificateStats)
+	err := c.cc.Invoke(ctx, PiControllerService_GetCertificateStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *piControllerServiceClient) CleanupExpiredCertificates(ctx context.Context, in *CleanupExpiredCertificatesRequest, opts ...grpc.CallOption) (*CleanupExpiredCertificatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CleanupExpiredCertificatesResponse)
+	err := c.cc.Invoke(ctx, PiControllerService_CleanupExpiredCertificates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *piControllerServiceClient) Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthResponse)
@@ -345,6 +517,24 @@ type PiControllerServiceServer interface {
 	WriteGPIO(context.Context, *WriteGPIORequest) (*WriteGPIOResponse, error)
 	// Real-time GPIO streaming
 	StreamGPIOReadings(*StreamGPIOReadingsRequest, grpc.ServerStreamingServer[GPIOReading]) error
+	// Certificate Authority management
+	InitializeCA(context.Context, *InitializeCARequest) (*InitializeCAResponse, error)
+	GetCAInfo(context.Context, *GetCAInfoRequest) (*CAInfo, error)
+	GetCACertificate(context.Context, *GetCACertificateRequest) (*GetCACertificateResponse, error)
+	// Certificate management
+	IssueCertificate(context.Context, *IssueCertificateRequest) (*Certificate, error)
+	GetCertificate(context.Context, *GetCertificateRequest) (*Certificate, error)
+	ListCertificates(context.Context, *ListCertificatesRequest) (*ListCertificatesResponse, error)
+	RenewCertificate(context.Context, *RenewCertificateRequest) (*Certificate, error)
+	RevokeCertificate(context.Context, *RevokeCertificateRequest) (*RevokeCertificateResponse, error)
+	ValidateCertificate(context.Context, *ValidateCertificateRequest) (*ValidateCertificateResponse, error)
+	// Certificate Requests (CSR)
+	CreateCertificateRequest(context.Context, *CreateCertificateRequestRequest) (*CertificateRequest, error)
+	ProcessCertificateRequest(context.Context, *ProcessCertificateRequestRequest) (*Certificate, error)
+	ListCertificateRequests(context.Context, *ListCertificateRequestsRequest) (*ListCertificateRequestsResponse, error)
+	// CA Statistics and Maintenance
+	GetCertificateStats(context.Context, *GetCertificateStatsRequest) (*CertificateStats, error)
+	CleanupExpiredCertificates(context.Context, *CleanupExpiredCertificatesRequest) (*CleanupExpiredCertificatesResponse, error)
 	// Health and status
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	GetSystemInfo(context.Context, *SystemInfoRequest) (*SystemInfoResponse, error)
@@ -417,6 +607,48 @@ func (UnimplementedPiControllerServiceServer) WriteGPIO(context.Context, *WriteG
 }
 func (UnimplementedPiControllerServiceServer) StreamGPIOReadings(*StreamGPIOReadingsRequest, grpc.ServerStreamingServer[GPIOReading]) error {
 	return status.Errorf(codes.Unimplemented, "method StreamGPIOReadings not implemented")
+}
+func (UnimplementedPiControllerServiceServer) InitializeCA(context.Context, *InitializeCARequest) (*InitializeCAResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitializeCA not implemented")
+}
+func (UnimplementedPiControllerServiceServer) GetCAInfo(context.Context, *GetCAInfoRequest) (*CAInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCAInfo not implemented")
+}
+func (UnimplementedPiControllerServiceServer) GetCACertificate(context.Context, *GetCACertificateRequest) (*GetCACertificateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCACertificate not implemented")
+}
+func (UnimplementedPiControllerServiceServer) IssueCertificate(context.Context, *IssueCertificateRequest) (*Certificate, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IssueCertificate not implemented")
+}
+func (UnimplementedPiControllerServiceServer) GetCertificate(context.Context, *GetCertificateRequest) (*Certificate, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCertificate not implemented")
+}
+func (UnimplementedPiControllerServiceServer) ListCertificates(context.Context, *ListCertificatesRequest) (*ListCertificatesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListCertificates not implemented")
+}
+func (UnimplementedPiControllerServiceServer) RenewCertificate(context.Context, *RenewCertificateRequest) (*Certificate, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenewCertificate not implemented")
+}
+func (UnimplementedPiControllerServiceServer) RevokeCertificate(context.Context, *RevokeCertificateRequest) (*RevokeCertificateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RevokeCertificate not implemented")
+}
+func (UnimplementedPiControllerServiceServer) ValidateCertificate(context.Context, *ValidateCertificateRequest) (*ValidateCertificateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ValidateCertificate not implemented")
+}
+func (UnimplementedPiControllerServiceServer) CreateCertificateRequest(context.Context, *CreateCertificateRequestRequest) (*CertificateRequest, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateCertificateRequest not implemented")
+}
+func (UnimplementedPiControllerServiceServer) ProcessCertificateRequest(context.Context, *ProcessCertificateRequestRequest) (*Certificate, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessCertificateRequest not implemented")
+}
+func (UnimplementedPiControllerServiceServer) ListCertificateRequests(context.Context, *ListCertificateRequestsRequest) (*ListCertificateRequestsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListCertificateRequests not implemented")
+}
+func (UnimplementedPiControllerServiceServer) GetCertificateStats(context.Context, *GetCertificateStatsRequest) (*CertificateStats, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCertificateStats not implemented")
+}
+func (UnimplementedPiControllerServiceServer) CleanupExpiredCertificates(context.Context, *CleanupExpiredCertificatesRequest) (*CleanupExpiredCertificatesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CleanupExpiredCertificates not implemented")
 }
 func (UnimplementedPiControllerServiceServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
@@ -798,6 +1030,258 @@ func _PiControllerService_StreamGPIOReadings_Handler(srv interface{}, stream grp
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type PiControllerService_StreamGPIOReadingsServer = grpc.ServerStreamingServer[GPIOReading]
 
+func _PiControllerService_InitializeCA_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitializeCARequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).InitializeCA(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_InitializeCA_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).InitializeCA(ctx, req.(*InitializeCARequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_GetCAInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCAInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).GetCAInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_GetCAInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).GetCAInfo(ctx, req.(*GetCAInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_GetCACertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCACertificateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).GetCACertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_GetCACertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).GetCACertificate(ctx, req.(*GetCACertificateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_IssueCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IssueCertificateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).IssueCertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_IssueCertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).IssueCertificate(ctx, req.(*IssueCertificateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_GetCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCertificateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).GetCertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_GetCertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).GetCertificate(ctx, req.(*GetCertificateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_ListCertificates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCertificatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).ListCertificates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_ListCertificates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).ListCertificates(ctx, req.(*ListCertificatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_RenewCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenewCertificateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).RenewCertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_RenewCertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).RenewCertificate(ctx, req.(*RenewCertificateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_RevokeCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeCertificateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).RevokeCertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_RevokeCertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).RevokeCertificate(ctx, req.(*RevokeCertificateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_ValidateCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateCertificateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).ValidateCertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_ValidateCertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).ValidateCertificate(ctx, req.(*ValidateCertificateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_CreateCertificateRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCertificateRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).CreateCertificateRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_CreateCertificateRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).CreateCertificateRequest(ctx, req.(*CreateCertificateRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_ProcessCertificateRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProcessCertificateRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).ProcessCertificateRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_ProcessCertificateRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).ProcessCertificateRequest(ctx, req.(*ProcessCertificateRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_ListCertificateRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCertificateRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).ListCertificateRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_ListCertificateRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).ListCertificateRequests(ctx, req.(*ListCertificateRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_GetCertificateStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCertificateStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).GetCertificateStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_GetCertificateStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).GetCertificateStats(ctx, req.(*GetCertificateStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PiControllerService_CleanupExpiredCertificates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CleanupExpiredCertificatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PiControllerServiceServer).CleanupExpiredCertificates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PiControllerService_CleanupExpiredCertificates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PiControllerServiceServer).CleanupExpiredCertificates(ctx, req.(*CleanupExpiredCertificatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PiControllerService_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthRequest)
 	if err := dec(in); err != nil {
@@ -916,6 +1400,62 @@ var PiControllerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WriteGPIO",
 			Handler:    _PiControllerService_WriteGPIO_Handler,
+		},
+		{
+			MethodName: "InitializeCA",
+			Handler:    _PiControllerService_InitializeCA_Handler,
+		},
+		{
+			MethodName: "GetCAInfo",
+			Handler:    _PiControllerService_GetCAInfo_Handler,
+		},
+		{
+			MethodName: "GetCACertificate",
+			Handler:    _PiControllerService_GetCACertificate_Handler,
+		},
+		{
+			MethodName: "IssueCertificate",
+			Handler:    _PiControllerService_IssueCertificate_Handler,
+		},
+		{
+			MethodName: "GetCertificate",
+			Handler:    _PiControllerService_GetCertificate_Handler,
+		},
+		{
+			MethodName: "ListCertificates",
+			Handler:    _PiControllerService_ListCertificates_Handler,
+		},
+		{
+			MethodName: "RenewCertificate",
+			Handler:    _PiControllerService_RenewCertificate_Handler,
+		},
+		{
+			MethodName: "RevokeCertificate",
+			Handler:    _PiControllerService_RevokeCertificate_Handler,
+		},
+		{
+			MethodName: "ValidateCertificate",
+			Handler:    _PiControllerService_ValidateCertificate_Handler,
+		},
+		{
+			MethodName: "CreateCertificateRequest",
+			Handler:    _PiControllerService_CreateCertificateRequest_Handler,
+		},
+		{
+			MethodName: "ProcessCertificateRequest",
+			Handler:    _PiControllerService_ProcessCertificateRequest_Handler,
+		},
+		{
+			MethodName: "ListCertificateRequests",
+			Handler:    _PiControllerService_ListCertificateRequests_Handler,
+		},
+		{
+			MethodName: "GetCertificateStats",
+			Handler:    _PiControllerService_GetCertificateStats_Handler,
+		},
+		{
+			MethodName: "CleanupExpiredCertificates",
+			Handler:    _PiControllerService_CleanupExpiredCertificates_Handler,
 		},
 		{
 			MethodName: "Health",

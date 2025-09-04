@@ -24,6 +24,7 @@ type Server struct {
 	clusterService *services.ClusterService
 	nodeService    *services.NodeService
 	gpioService    *services.GPIOService
+	caService      services.CAService
 	authManager    *middleware.AuthManager
 	validator      *middleware.Validator
 	rateLimiter    *middleware.RateLimiter
@@ -32,7 +33,7 @@ type Server struct {
 }
 
 // New creates a new API server instance
-func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Server {
+func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
 	// Set Gin mode based on environment
 	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
 
@@ -68,6 +69,7 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Ser
 		clusterService: clusterService,
 		nodeService:    nodeService,
 		gpioService:    gpioService,
+		caService:      caService,
 		authManager:    authManager,
 		validator:      validator,
 		rateLimiter:    rateLimiter,
@@ -163,6 +165,50 @@ func (s *Server) setupRoutes() {
 
 			// Delete operations - require admin role
 			gpio.DELETE("/:id", s.requireRole("admin"), gpioHandler.Delete)
+		}
+
+		// Certificate Authority management (only if CA service is available)
+		if s.caService != nil {
+			caHandler := handlers.NewCAHandler(s.caService, s.logger)
+			ca := v1.Group("/ca")
+			{
+				// CA Management - require admin role for initialization
+				ca.POST("/initialize", s.requireRole("admin"), caHandler.InitializeCA)
+				
+				// CA Information - require viewer role
+				ca.GET("/info", s.requireRole("viewer"), caHandler.GetCAInfo)
+				ca.GET("/certificate", s.requireRole("viewer"), caHandler.GetCACertificate)
+				ca.GET("/stats", s.requireRole("viewer"), caHandler.GetCertificateStats)
+				
+				// Certificate Management
+				certs := ca.Group("/certificates")
+				{
+					// Read operations - require viewer role
+					certs.GET("", s.requireRole("viewer"), caHandler.ListCertificates)
+					certs.GET("/:id", s.requireRole("viewer"), caHandler.GetCertificate)
+					certs.GET("/serial/:serial", s.requireRole("viewer"), caHandler.GetCertificateBySerial)
+					
+					// Certificate operations - require admin role
+					certs.POST("", s.requireRole("admin"), caHandler.IssueCertificate)
+					certs.POST("/:id/renew", s.requireRole("admin"), caHandler.RenewCertificate)
+					certs.POST("/:id/revoke", s.requireRole("admin"), caHandler.RevokeCertificate)
+					certs.POST("/validate", s.requireRole("viewer"), caHandler.ValidateCertificate)
+				}
+				
+				// Certificate Requests (CSR)
+				requests := ca.Group("/requests")
+				{
+					// Read operations - require operator role (can see their own requests)
+					requests.GET("", s.requireRole("operator"), caHandler.ListCertificateRequests)
+					
+					// CSR operations - require operator role to create, admin to process
+					requests.POST("", s.requireRole("operator"), caHandler.CreateCertificateRequest)
+					requests.POST("/:id/process", s.requireRole("admin"), caHandler.ProcessCertificateRequest)
+				}
+				
+				// Maintenance operations - require admin role
+				ca.POST("/cleanup", s.requireRole("admin"), caHandler.CleanupExpiredCertificates)
+			}
 		}
 
 		// System information - require viewer role
