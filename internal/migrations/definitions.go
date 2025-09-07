@@ -67,6 +67,12 @@ func getAllMigrations() []MigrationDefinition {
 			Up:          addCertificateIndexes,
 			Down:        dropCertificateIndexes,
 		},
+		{
+			ID:          "20241201000011",
+			Description: "Create users table for authentication",
+			Up:          createUsersTable,
+			Down:        dropUsersTable,
+		},
 	}
 }
 
@@ -502,5 +508,70 @@ func dropCertificateIndexes(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_certificates_serial_number;
 	`
 	
+	return db.Exec(sql).Error
+}
+
+// createUsersTable creates the users table for authentication
+func createUsersTable(db *gorm.DB) error {
+	sql := `
+	CREATE TABLE IF NOT EXISTS users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL UNIQUE,
+		email TEXT NOT NULL UNIQUE,
+		password_hash TEXT NOT NULL,
+		role TEXT NOT NULL DEFAULT 'viewer',
+		first_name TEXT,
+		last_name TEXT,
+		is_active BOOLEAN NOT NULL DEFAULT 1,
+		last_login DATETIME,
+		api_key TEXT,
+		api_key_expiry DATETIME,
+		failed_logins INTEGER NOT NULL DEFAULT 0,
+		locked_until DATETIME,
+		password_reset TEXT,
+		reset_expiry DATETIME,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		deleted_at DATETIME
+	);
+	
+	-- Create indexes for performance and security
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE deleted_at IS NULL;
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_users_role ON users(role) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active) WHERE deleted_at IS NULL;
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key) WHERE api_key IS NOT NULL;
+	CREATE INDEX IF NOT EXISTS idx_users_locked_until ON users(locked_until) WHERE locked_until IS NOT NULL;
+	CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
+	
+	-- Composite indexes for common queries
+	CREATE INDEX IF NOT EXISTS idx_users_active_role ON users(is_active, role) WHERE deleted_at IS NULL;
+	
+	-- Insert default admin user with password "admin123" (bcrypt hash)
+	-- $2a$10$zgl1xM6oW1wR6YaxKa/m/.Cuhvd.kNNdZX1yDqMj7BwymVWwDHtdW
+	INSERT OR IGNORE INTO users (username, email, password_hash, role, first_name, last_name, is_active) 
+	VALUES ('admin', 'admin@pi-controller.local', '$2a$10$zgl1xM6oW1wR6YaxKa/m/.Cuhvd.kNNdZX1yDqMj7BwymVWwDHtdW', 'admin', 'System', 'Administrator', 1);
+	`
+
+	return db.Exec(sql).Error
+}
+
+// dropUsersTable drops the users table
+func dropUsersTable(db *gorm.DB) error {
+	sql := `
+	-- Drop indexes first
+	DROP INDEX IF EXISTS idx_users_active_role;
+	DROP INDEX IF EXISTS idx_users_deleted_at;
+	DROP INDEX IF EXISTS idx_users_locked_until;
+	DROP INDEX IF EXISTS idx_users_api_key;
+	DROP INDEX IF EXISTS idx_users_is_active;
+	DROP INDEX IF EXISTS idx_users_role;
+	DROP INDEX IF EXISTS idx_users_email;
+	DROP INDEX IF EXISTS idx_users_username;
+	
+	-- Drop table
+	DROP TABLE IF EXISTS users;
+	`
+
 	return db.Exec(sql).Error
 }

@@ -18,18 +18,19 @@ import (
 
 // Server represents the REST API server
 type Server struct {
-	config         *config.APIConfig
-	logger         logger.Interface
-	database       *storage.Database
-	clusterService *services.ClusterService
-	nodeService    *services.NodeService
-	gpioService    *services.GPIOService
-	caService      services.CAService
-	authManager    *middleware.AuthManager
-	validator      *middleware.Validator
-	rateLimiter    *middleware.RateLimiter
-	router         *gin.Engine
-	server         *http.Server
+	config               *config.APIConfig
+	logger               logger.Interface
+	database             *storage.Database
+	clusterService       *services.ClusterService
+	nodeService          *services.NodeService
+	gpioService          *services.GPIOService
+	provisioningService  *services.ProvisioningService
+	caService            services.CAService
+	authManager          *middleware.AuthManager
+	validator            *middleware.Validator
+	rateLimiter          *middleware.RateLimiter
+	router               *gin.Engine
+	server               *http.Server
 }
 
 // New creates a new API server instance
@@ -43,6 +44,7 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	clusterService := services.NewClusterService(db, log)
 	nodeService := services.NewNodeService(db, log)
 	gpioService := services.NewGPIOService(db, log)
+	provisioningService := services.NewProvisioningService(nodeService, log)
 
 	// Initialize authentication manager if auth is enabled
 	var authManager *middleware.AuthManager
@@ -63,17 +65,18 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), logrusLogger)
 
 	s := &Server{
-		config:         cfg,
-		logger:         log,
-		database:       db,
-		clusterService: clusterService,
-		nodeService:    nodeService,
-		gpioService:    gpioService,
-		caService:      caService,
-		authManager:    authManager,
-		validator:      validator,
-		rateLimiter:    rateLimiter,
-		router:         router,
+		config:              cfg,
+		logger:              log,
+		database:            db,
+		clusterService:      clusterService,
+		nodeService:         nodeService,
+		gpioService:         gpioService,
+		provisioningService: provisioningService,
+		caService:           caService,
+		authManager:         authManager,
+		validator:           validator,
+		rateLimiter:         rateLimiter,
+		router:              router,
 	}
 
 	s.setupRoutes()
@@ -96,6 +99,19 @@ func (s *Server) setupRoutes() {
 	// Health check endpoints (no auth required)
 	s.router.GET("/health", handlers.NewHealthHandler(s.database).Health)
 	s.router.GET("/ready", handlers.NewHealthHandler(s.database).Ready)
+
+	// Authentication endpoints (no auth required)
+	if s.authManager != nil {
+		authHandler := handlers.NewAuthHandler(s.database, s.authManager, s.logger)
+		auth := s.router.Group("/api/v1/auth")
+		{
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/refresh", authHandler.RefreshToken)
+			auth.GET("/profile", s.authManager.Auth(), authHandler.GetProfile)
+			auth.POST("/logout", s.authManager.Auth(), authHandler.Logout)
+		}
+	}
 
 	// API v1 routes
 	v1 := s.router.Group("/api/v1")
@@ -135,8 +151,6 @@ func (s *Server) setupRoutes() {
 			// Write operations - require operator role
 			nodes.POST("", s.requireRole("operator"), nodeHandler.Create)
 			nodes.PUT("/:id", s.requireRole("operator"), nodeHandler.Update)
-			nodes.POST("/:id/provision", s.requireRole("operator"), nodeHandler.Provision)
-			nodes.POST("/:id/deprovision", s.requireRole("operator"), nodeHandler.Deprovision)
 
 			// Delete operations - require admin role
 			nodes.DELETE("/:id", s.requireRole("admin"), nodeHandler.Delete)
@@ -210,6 +224,20 @@ func (s *Server) setupRoutes() {
 				ca.POST("/cleanup", s.requireRole("admin"), caHandler.CleanupExpiredCertificates)
 			}
 		}
+
+		// K3s Provisioning endpoints
+		provisionerHandler := handlers.NewProvisionerHandler(s.provisioningService, s.logger)
+		
+		// Cluster-level provisioning operations
+		clusters.POST("/:id/provision", s.requireRole("admin"), provisionerHandler.ProvisionCluster)
+		
+		// Individual node provisioning operations  
+		nodes.POST("/:id/provision", s.requireRole("admin"), provisionerHandler.ProvisionNode)
+		nodes.POST("/:id/deprovision", s.requireRole("admin"), provisionerHandler.DeprovisionNode)
+		
+		// Utility operations for master nodes
+		nodes.POST("/:id/cluster-token", s.requireRole("operator"), provisionerHandler.GetClusterToken)
+		nodes.POST("/:id/kubeconfig", s.requireRole("operator"), provisionerHandler.GetKubeConfig)
 
 		// System information - require viewer role
 		system := v1.Group("/system")

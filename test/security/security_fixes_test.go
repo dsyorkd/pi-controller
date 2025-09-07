@@ -82,7 +82,7 @@ func (suite *SecurityFixesTestSuite) SetupSuite() {
 	}
 
 	// Create secure API server
-	suite.server = api.New(apiConfig, appLogger, suite.db)
+	suite.server = api.New(apiConfig, appLogger, suite.db, nil)
 }
 
 // TearDownSuite cleans up after tests

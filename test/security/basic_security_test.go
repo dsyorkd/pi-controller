@@ -44,7 +44,7 @@ func TestBasicSecurity(t *testing.T) {
 	}
 
 	// Create server with security enabled
-	server := api.New(apiConfig, testLogger, db)
+	server := api.New(apiConfig, testLogger, db, nil)
 
 	t.Run("Authentication Required", func(t *testing.T) {
 		// Test that API requires authentication
@@ -187,7 +187,7 @@ func TestClusterCreationWithSecurity(t *testing.T) {
 		WriteTimeout: "30s",
 	}
 
-	server := api.New(apiConfig, testLogger, db)
+	server := api.New(apiConfig, testLogger, db, nil)
 
 	t.Run("Malicious Cluster Name Blocked", func(t *testing.T) {
 		maliciousPayload := map[string]interface{}{
