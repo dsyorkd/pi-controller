@@ -59,11 +59,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Install dependencies
-        run: make deps
-
-      - name: Generate protobuf code
+      - name: Generate protobuf code first
         run: make proto
+
+      - name: Install dependencies after protobuf generation
+        run: make proto && make deps
 
       - name: Format generated code after protobuf generation
         run: |
@@ -116,7 +116,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: make deps
+        run: make proto && make deps
 
       - name: Generate protobuf code
         run: make proto
@@ -177,7 +177,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: make deps
+        run: make proto && make deps
 
       - name: Generate protobuf code
         run: make proto
@@ -232,7 +232,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: make deps
+        run: make proto && make deps
 
       - name: Generate protobuf code
         run: make proto
@@ -283,7 +283,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: make deps
+        run: make proto && make deps
 
       - name: Generate protobuf code
         run: make proto
@@ -311,7 +311,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: make deps
+        run: make proto && make deps
 
       - name: Generate protobuf code
         run: make proto
@@ -337,7 +337,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: make deps
+        run: make proto && make deps
 
       - name: Generate protobuf code
         run: make proto
