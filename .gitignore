@@ -1,25 +1,323 @@
-# Logs
-logs
+# =============================================================================
+# Pi Controller Project .gitignore
+# =============================================================================
+
+# ========================================
+# Go specific
+# ========================================
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (when vendoring is used)
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# ========================================
+# Build artifacts and executables
+# ========================================
+# Main executables (based on your project structure)
+/pi-controller
+/pi-agent
+/gpio-test-client
+
+# Build directory contents (but keep the directory structure)
+/build/*
+!/build/.gitkeep
+
+# Temporary build files
+*.tmp
+*.temp
+
+# ========================================
+# Development and testing
+# ========================================
+# Coverage reports
+coverage*.out
+coverage*.html
+coverage*.xml
+
+# Test artifacts
+*.test
+testdata/
+
+# Benchmark results
+*.bench
+
+# ========================================
+# Database and data files
+# ========================================
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Data directory contents (but keep structure)
+/data/*
+!/data/.gitkeep
+!/data/README.md
+
+# ========================================
+# Configuration and secrets
+# ========================================
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+
+# Local configuration overrides
+**/config/*local*
+**/config/*.local.*
+/config/pi-controller.yaml
+!/config/pi-controller.example.yaml
+!/config/pi-controller.yaml.example
+
+# Kubernetes secrets
+**/k8s/**/secrets/
+**/kubernetes/**/secrets/
+
+# ========================================
+# Logs and debugging
+# ========================================
+# Log files
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 dev-debug.log
 
+# Debug files
+debug
+debug.test
+*.pprof
+
+# Trace files
+trace.out
+
+# ========================================
+# Frontend/Web (Node.js/npm/yarn)
+# ========================================
 # Dependency directories
 node_modules/
+jspm_packages/
 
-# Environment variables
-.env
+# Distribution directories
+dist/
+dist-ssr/
+build/
 
-# Editor directories and files
-.idea
-.vscode
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency lock files (project specific choice)
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# ========================================
+# Editor and IDE files
+# ========================================
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs (IntelliJ IDEA, GoLand, etc.)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Atom
+.atom/
+
+# Visual Studio
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# OS specific
+# ========================================
+# Operating System files
+# ========================================
+# macOS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ========================================
+# Documentation and generated files
+# ========================================
+# Auto-generated documentation
+/docs/generated/
+/docs/api/
+
+# Swagger/OpenAPI generated files
+**/swagger-ui/
+**/redoc-static/
+
+# ========================================
+# CI/CD and deployment
+# ========================================
+# Docker
+.dockerignore
+
+# Kubernetes
+*.kubeconfig
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Ansible
+*.retry
+
+# ========================================
+# Miscellaneous
+# ========================================
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files (unless specifically needed)
+*.zip
+*.tar
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+
+# Performance and profiling
+*.prof
+*.mem
+*.cpu
+
+# Security scan results
+*.sarif
+
+# Local development scripts
+local-*
+dev-*
+test-local*
+
+# ========================================
+# Project specific
+# ========================================
+# Add any project-specific patterns here
+# Examples:
+# /custom-scripts/
+# /local-configs/
