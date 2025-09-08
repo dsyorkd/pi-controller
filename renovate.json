@@ -2,5 +2,69 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ]
+  ],
+  "baseBranches": ["develop"],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "timezone": "America/New_York",
+  "schedule": ["before 6am"],
+  "labels": ["dependencies"],
+  "assignees": ["@dsyorkd"],
+  "reviewers": ["@dsyorkd"],
+  "automerge": false,
+  "major": {
+    "automerge": false
+  },
+  "minor": {
+    "automerge": false
+  },
+  "patch": {
+    "automerge": false
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": false,
+    "schedule": ["before 6am on sunday"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "groupName": "Go dependencies",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "groupName": "Node.js dependencies",
+      "schedule": ["before 6am on tuesday"]
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "Development dependencies",
+      "schedule": ["before 6am on wednesday"]
+    },
+    {
+      "matchPackageNames": ["golang"],
+      "groupName": "Go toolchain updates",
+      "automerge": false,
+      "labels": ["go-toolchain"]
+    },
+    {
+      "matchPackageNames": ["node"],
+      "groupName": "Node.js toolchain updates", 
+      "automerge": false,
+      "labels": ["node-toolchain"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "automerge": false
+  },
+  "commitMessagePrefix": "chore(deps): ",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "prTitle": "chore(deps): {{commitMessageAction}} {{commitMessageTopic}} {{commitMessageExtra}}",
+  "branchPrefix": "renovate/",
+  "gitAuthor": "Renovate Bot <bot@renovateapp.com>"
 }

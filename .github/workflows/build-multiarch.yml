@@ -45,7 +45,7 @@ jobs:
   build-matrix:
     name: Build ${{ matrix.name }}
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -56,15 +56,18 @@ jobs:
             goarch: amd64
             name: linux-amd64
             primary: true
+            experimental: false
           - goos: linux
             goarch: arm64
             name: linux-arm64
             primary: true
+            experimental: false
           # - goos: linux
           #   goarch: arm
-          #   goarm: 7
+          #   goarm: "7"
           #   name: linux-armv7
           #   primary: true
+          #   experimental: false
           # - goos: linux
           #   goarch: arm
           #   goarm: 6
@@ -117,12 +120,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
       - name: Cache build dependencies
         uses: actions/cache@v4
         with:
           path: |
-            /home/ci-user/.cache/go-build
-            /home/ci-user/go/pkg/mod
+            ~/.cache/go-build
+            ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-
@@ -139,10 +163,10 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          GOARM: ${{ matrix.goarm }}
+          GOARM: ${{ matrix.goarm || '' }}
           CGO_ENABLED: 0
         run: |
-          echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && 'v' }}${{ matrix.goarm }}"
+          echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }}"
           make build
           
           # Create organized output directory
@@ -193,7 +217,7 @@ jobs:
           Pi Controller Build Information
           ==============================
           
-          Platform: ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && 'v' }}${{ matrix.goarm }}
+          Platform: ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }}
           Go Version: ${{ env.GO_VERSION }}
           Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           Git Commit: $(git rev-parse --short HEAD)
@@ -239,7 +263,7 @@ jobs:
   docker-multiarch:
     name: Docker Multi-Arch Build
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: build-matrix
     timeout-minutes: 15
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -349,7 +373,7 @@ jobs:
   build-summary:
     name: Build Summary
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: [build-matrix, docker-multiarch, test-hardware-matrix]
     if: always()
     timeout-minutes: 5

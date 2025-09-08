@@ -22,23 +22,49 @@ jobs:
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
       - name: Install dependencies
         run: make deps
 
       - name: Run Govulncheck
-        run: govulncheck ./...
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
 
       - name: Run Additional Vulnerability Scan with OSV-Scanner
-        run: osv-scanner --lockfile=go.mod .
+        run: |
+          go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+          osv-scanner --lockfile=go.mod .
 
       - name: Generate SBOM (Software Bill of Materials)
         run: |
+          go install github.com/anchore/syft/cmd/syft@latest
           syft . -o spdx-json=sbom.json
           syft . -o table=sbom.txt
           echo "Generated SBOM files"
@@ -56,17 +82,49 @@ jobs:
   static-analysis:
     name: Static Code Analysis
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Install dependencies
         run: make deps
 
       - name: Generate protobuf code
         run: make proto
+
+      - name: Install security analysis tools
+        run: |
+          # Install gosec for security scanning
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          
+          # Install staticcheck for advanced static analysis
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          
+          # Install golangci-lint with security linters
+          make install-lint
 
       - name: Run gosec security scanner
         run: |
@@ -119,7 +177,7 @@ jobs:
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 8
     permissions:
       actions: read
@@ -153,7 +211,7 @@ jobs:
   container-scan:
     name: Container Security Scan
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -214,7 +272,7 @@ jobs:
   secrets-scan:
     name: Secrets Scan
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -262,7 +320,7 @@ jobs:
   license-check:
     name: License Compliance
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -315,7 +373,7 @@ jobs:
   security-summary:
     name: Security Summary
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: [dependency-scan, static-analysis, codeql-analysis, container-scan, secrets-scan, license-check]
     if: always()
     timeout-minutes: 5

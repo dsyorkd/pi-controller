@@ -1,0 +1,165 @@
+name: CI (Fallback - No Container)
+
+on:
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+  workflow_dispatch: # Allow manual triggering
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.24"
+  GOLANGCI_LINT_VERSION: "v1.54"
+
+jobs:
+  # Quick validation job using Ubuntu self-hosted runner (no container)
+  validate:
+    name: Code Validation
+    runs-on: [self-hosted, ubuntu]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Format check
+        run: |
+          make fmt
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Code is not properly formatted. Run 'make fmt' locally."
+            git diff
+            exit 1
+          fi
+
+      - name: Vet check
+        run: make vet
+
+      - name: Install golangci-lint
+        run: make install-lint
+
+      - name: Lint
+        run: make lint
+
+  # Unit and integration tests on Ubuntu runner (no container)
+  test:
+    name: Tests
+    runs-on: [self-hosted, ubuntu]
+    needs: validate
+    timeout-minutes: 8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Run integration tests
+        run: make test-integration
+
+      - name: Run API tests
+        run: make test-api
+
+      - name: Run security tests
+        run: make test-security
+
+      - name: Generate test coverage
+        run: make test-coverage
+
+      - name: Check coverage threshold
+        run: make test-coverage-threshold
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # Status check job
+  status-check:
+    name: CI Status Check
+    runs-on: [self-hosted, ubuntu]
+    needs: [validate, test]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Check job statuses
+        run: |
+          echo "Validate: ${{ needs.validate.result }}"
+          echo "Test: ${{ needs.test.result }}"
+          
+          # Check if any critical job failed
+          if [[ "${{ needs.validate.result }}" == "failure" || 
+                "${{ needs.test.result }}" == "failure" ]]; then
+            echo "Critical CI jobs failed!"
+            exit 1
+          fi
+          
+          echo "CI pipeline completed successfully!"
+
+      - name: Post status to commit
+        if: github.event_name == 'push'
+        run: |
+          echo "CI Status: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Code validation: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ✅" >> $GITHUB_STEP_SUMMARY
