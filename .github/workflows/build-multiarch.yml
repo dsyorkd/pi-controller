@@ -45,7 +45,8 @@ jobs:
   build-matrix:
     name: Build ${{ matrix.name }}
     runs-on: [self-hosted, ubuntu]
-    timeout-minutes: 20
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -115,33 +116,13 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
-
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Cache build dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
+            /home/ci-user/.cache/go-build
+            /home/ci-user/go/pkg/mod
           key: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-
@@ -152,6 +133,7 @@ jobs:
 
       - name: Generate protobuf code
         run: make proto
+
 
       - name: Build binaries
         env:
@@ -184,11 +166,23 @@ jobs:
         run: |
           cd dist/${{ matrix.name }}
           
-          # Test that binaries run without error (version check)
+          # Test that binaries exist and are executable
           if [[ "${{ matrix.goos }}" != "windows" ]]; then
             chmod +x pi-controller pi-agent
-            timeout 5s ./pi-controller --version || echo "Controller version check completed"
-            timeout 5s ./pi-agent --version || echo "Agent version check completed"
+            # Quick file test instead of timeout
+            if [[ -x "./pi-controller" ]]; then
+              echo "✅ pi-controller binary is executable"
+            else
+              echo "❌ pi-controller binary not found or not executable"
+              exit 1
+            fi
+            
+            if [[ -x "./pi-agent" ]]; then
+              echo "✅ pi-agent binary is executable"
+            else
+              echo "❌ pi-agent binary not found or not executable" 
+              exit 1
+            fi
           fi
 
       - name: Generate build info
@@ -245,8 +239,9 @@ jobs:
   docker-multiarch:
     name: Docker Multi-Arch Build
     runs-on: [self-hosted, ubuntu]
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: build-matrix
-    timeout-minutes: 45
+    timeout-minutes: 15
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
@@ -316,7 +311,7 @@ jobs:
     name: Test on Hardware
     runs-on: [self-hosted, raspberry-pi, 5-Model-B]
     needs: build-matrix
-    timeout-minutes: 15
+    timeout-minutes: 8
     if: contains(needs.build-matrix.result, 'success')
     strategy:
       matrix:
@@ -354,9 +349,10 @@ jobs:
   build-summary:
     name: Build Summary
     runs-on: [self-hosted, ubuntu]
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: [build-matrix, docker-multiarch, test-hardware-matrix]
     if: always()
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Download all build manifests
         uses: actions/download-artifact@v4

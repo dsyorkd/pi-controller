@@ -1,8 +1,8 @@
 # Build stage
 FROM golang:1.24-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git make
+# Install build dependencies for CGO and hardware access
+RUN apk add --no-cache git make gcc musl-dev linux-headers
 
 # Set working directory
 WORKDIR /app
@@ -21,8 +21,8 @@ ARG VERSION=dev
 ARG COMMIT=unknown
 ARG DATE=unknown
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build \
+# Build the binary with CGO enabled for hardware access
+RUN CGO_ENABLED=1 GOOS=linux go build \
     -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
     -o pi-agent ./cmd/pi-agent
 

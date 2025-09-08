@@ -10,7 +10,7 @@ LDFLAGS = -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DAT
 # Go build variables
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
-CGO_ENABLED ?= 0
+CGO_ENABLED ?= 1
 
 # Directories
 BUILD_DIR = build

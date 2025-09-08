@@ -22,48 +22,23 @@ jobs:
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: [self-hosted, ubuntu]
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
-
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
       - name: Install dependencies
         run: make deps
 
       - name: Run Govulncheck
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+        run: govulncheck ./...
 
       - name: Run Additional Vulnerability Scan with OSV-Scanner
-        run: |
-          go install github.com/google/osv-scanner/cmd/osv-scanner@latest
-          osv-scanner --lockfile=go.mod .
+        run: osv-scanner --lockfile=go.mod .
 
       - name: Generate SBOM (Software Bill of Materials)
         run: |
-          go install github.com/anchore/syft/cmd/syft@latest
           syft . -o spdx-json=sbom.json
           syft . -o table=sbom.txt
           echo "Generated SBOM files"
@@ -81,48 +56,17 @@ jobs:
   static-analysis:
     name: Static Code Analysis
     runs-on: [self-hosted, ubuntu]
-    timeout-minutes: 15
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
-
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Install dependencies
         run: make deps
 
       - name: Generate protobuf code
         run: make proto
-
-      - name: Install security analysis tools
-        run: |
-          # Install gosec for security scanning
-          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-          
-          # Install staticcheck for advanced static analysis
-          go install honnef.co/go/tools/cmd/staticcheck@latest
-          
-          # Install golangci-lint with security linters
-          make install-lint
 
       - name: Run gosec security scanner
         run: |
@@ -175,7 +119,8 @@ jobs:
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: [self-hosted, ubuntu]
-    timeout-minutes: 15
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    timeout-minutes: 8
     permissions:
       actions: read
       contents: read
@@ -193,12 +138,6 @@ jobs:
           languages: ${{ matrix.language }}
           queries: security-extended
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
       - name: Install dependencies and build
         run: |
           make deps
@@ -214,7 +153,8 @@ jobs:
   container-scan:
     name: Container Security Scan
     runs-on: [self-hosted, ubuntu]
-    timeout-minutes: 20
+    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -227,15 +167,6 @@ jobs:
           # Build images for scanning (don't push)
           docker build -f docker/Dockerfile.controller -t pi-controller:scan-test .
           docker build -f docker/Dockerfile.agent -t pi-agent:scan-test .
-
-      - name: Install Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
 
       - name: Scan controller image
         run: |
@@ -283,6 +214,7 @@ jobs:
   secrets-scan:
     name: Secrets Scan
     runs-on: [self-hosted, ubuntu]
+    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -290,27 +222,12 @@ jobs:
         with:
           fetch-depth: 0 # Need full history for secret scanning
 
-      - name: Install TruffleHog
-        run: |
-          # Install specific version to avoid auto-updater issues
-          TRUFFLEHOG_VERSION="3.63.2"
-          if ! curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz" | tar -xz -C /tmp; then
-            echo "Fallback: Using installation script"
-            curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /tmp
-          fi
-          sudo install /tmp/trufflehog /usr/local/bin/trufflehog
-          sudo chmod +x /usr/local/bin/trufflehog
-
       - name: Run TruffleHog secrets scan
         run: |
           # Disable auto-updates to prevent binary move errors
           export TRUFFLEHOG_NO_UPDATE=true
           trufflehog git file://. --json > trufflehog-results.json || true
           trufflehog git file://. --only-verified
-
-      - name: Install detect-secrets
-        run: |
-          pip install detect-secrets
 
       - name: Run detect-secrets
         run: |
@@ -345,26 +262,19 @@ jobs:
   license-check:
     name: License Compliance
     runs-on: [self-hosted, ubuntu]
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
       - name: Install dependencies
         run: make deps
 
-      - name: Install go-licenses tool
-        run: |
-          go install github.com/google/go-licenses@latest
-
       - name: Check licenses
         run: |
+          # Install go-licenses tool if not available
+          go install github.com/google/go-licenses@latest
           echo "Checking licenses for pi-controller..."
           go-licenses report ./cmd/pi-controller --template licenses.tpl > controller-licenses.txt || true
           
@@ -405,6 +315,7 @@ jobs:
   security-summary:
     name: Security Summary
     runs-on: [self-hosted, ubuntu]
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: [dependency-scan, static-analysis, codeql-analysis, container-scan, secrets-scan, license-check]
     if: always()
     timeout-minutes: 5
