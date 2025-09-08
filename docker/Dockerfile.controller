@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git make build-base
@@ -27,7 +27,7 @@ RUN CGO_ENABLED=1 GOOS=linux CGO_CFLAGS="-DSQLITE_MAX_MMAP_SIZE=0" CGO_LDFLAGS="
     -o pi-controller ./cmd/pi-controller
 
 # Final stage
-FROM alpine:3.18
+FROM alpine:3.22
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
