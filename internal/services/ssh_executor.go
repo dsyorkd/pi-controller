@@ -28,11 +28,11 @@ func (s *SSHExecutorImpl) Execute(ctx context.Context, nodeIP string, command st
 		"node_ip": nodeIP,
 		"command": command,
 	}).Debug("Executing SSH command")
-	
+
 	// TODO: Implement actual SSH execution using crypto/ssh or similar
 	// For now, this is a placeholder that logs the command but doesn't execute it
 	s.logger.Warn("SSH execution is not yet implemented - this is a placeholder")
-	
+
 	// This is a mock response to allow development to continue
 	if strings.Contains(command, "cat") && strings.Contains(command, ".crt") {
 		// Mock certificate PEM response
@@ -49,7 +49,7 @@ EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAMockSignatureDataHereForTesting
 OnlyTheQuickBrownFoxJumpsOverTheLazyDog==
 -----END CERTIFICATE-----`, nil
 	}
-	
+
 	// Mock other successful responses
 	return "mock-ssh-success", nil
 }
@@ -61,7 +61,7 @@ func (s *SSHExecutorImpl) CopyFile(ctx context.Context, nodeIP string, localPath
 		"local_path":  localPath,
 		"remote_path": remotePath,
 	}).Debug("Copying file via SSH")
-	
+
 	// TODO: Implement actual file copy using SCP or similar
 	s.logger.Warn("SSH file copy is not yet implemented - this is a placeholder")
 	return nil
@@ -74,7 +74,7 @@ func (s *SSHExecutorImpl) CopyContent(ctx context.Context, nodeIP string, conten
 		"content_len": len(content),
 		"remote_path": remotePath,
 	}).Debug("Copying content via SSH")
-	
+
 	// TODO: Implement actual content copy
 	s.logger.Warn("SSH content copy is not yet implemented - this is a placeholder")
 	return nil

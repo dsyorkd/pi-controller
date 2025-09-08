@@ -124,7 +124,7 @@ func main() {
 			logger.WithError(err).Error("Failed to list CRDs")
 		} else {
 			fmt.Printf("   ✅ Found %d CRDs installed\n", len(crds))
-			
+
 			// Show first few CRDs
 			for i, crd := range crds {
 				if i >= 3 { // Limit output to first 3 CRDs
@@ -171,7 +171,7 @@ func main() {
 	fmt.Println("\n🎉 Kubernetes client-go integration test completed!")
 	fmt.Println("\n📊 Test Results Summary:")
 	fmt.Println("   ✅ API connectivity: Working")
-	fmt.Println("   ✅ Core resources (pods, nodes): Working") 
+	fmt.Println("   ✅ Core resources (pods, nodes): Working")
 	fmt.Println("   ✅ CRD management: Working")
 	fmt.Println("   ✅ Dynamic client: Working")
 	fmt.Println("\n🚀 Client-go integration is ready for Pi Controller!")

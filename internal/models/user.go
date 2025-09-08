@@ -27,9 +27,9 @@ type User struct {
 	APIKeyExpiry *time.Time `json:"api_key_expiry,omitempty"`
 
 	// Security fields
-	FailedLogins  int       `json:"-" gorm:"default:0"`
+	FailedLogins  int        `json:"-" gorm:"default:0"`
 	LockedUntil   *time.Time `json:"-"`
-	PasswordReset string    `json:"-"` // Password reset token
+	PasswordReset string     `json:"-"` // Password reset token
 	ResetExpiry   *time.Time `json:"-"`
 }
 
@@ -97,7 +97,7 @@ func (u *User) IsLocked() bool {
 // IncrementFailedLogins increments the failed login counter and locks account if threshold is reached
 func (u *User) IncrementFailedLogins() {
 	u.FailedLogins++
-	
+
 	// Lock account for 15 minutes after 5 failed attempts
 	if u.FailedLogins >= 5 {
 		lockUntil := time.Now().Add(15 * time.Minute)

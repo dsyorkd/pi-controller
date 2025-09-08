@@ -19,8 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/dsyorkd/pi-controller/internal/services"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // PWMControllerReconciler reconciles a PWMController object
@@ -77,7 +77,7 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	targetNode, err := r.findTargetNode(ctx, &pwmController, logger)
 	if err != nil {
 		logger.WithError(err).Error("Failed to find target node")
-		return r.updateStatus(ctx, &pwmController, gpiov1.PWMPhaseFailed, 
+		return r.updateStatus(ctx, &pwmController, gpiov1.PWMPhaseFailed,
 			"Failed to find target node", err.Error(), logger)
 	}
 
@@ -195,11 +195,11 @@ func (r *PWMControllerReconciler) configurePWMController(ctx context.Context, pw
 	}
 
 	logger.WithFields(logrus.Fields{
-		"node_id":         request.NodeID,
-		"address":         request.Address,
-		"base_frequency":  request.BaseFrequency,
-		"channel_count":   request.ChannelCount,
-		"channels":        len(request.Channels),
+		"node_id":        request.NodeID,
+		"address":        request.Address,
+		"base_frequency": request.BaseFrequency,
+		"channel_count":  request.ChannelCount,
+		"channels":       len(request.Channels),
 	}).Info("Configuring PWM controller via service")
 
 	// Call the PWM service to configure the controller
@@ -212,7 +212,7 @@ func (r *PWMControllerReconciler) configurePWMController(ctx context.Context, pw
 }
 
 // updateStatus updates the PWMController status
-func (r *PWMControllerReconciler) updateStatus(ctx context.Context, pwmController *gpiov1.PWMController, 
+func (r *PWMControllerReconciler) updateStatus(ctx context.Context, pwmController *gpiov1.PWMController,
 	phase gpiov1.PWMPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
 
 	// Update basic status fields
@@ -271,7 +271,7 @@ func (r *PWMControllerReconciler) updateStatus(ctx context.Context, pwmControlle
 }
 
 // setPWMCondition sets a condition in the PWMController status
-func (r *PWMControllerReconciler) setPWMCondition(status *gpiov1.PWMControllerStatus, 
+func (r *PWMControllerReconciler) setPWMCondition(status *gpiov1.PWMControllerStatus,
 	conditionType gpiov1.PWMConditionType, conditionStatus metav1.ConditionStatus,
 	reason, message string) {
 
@@ -334,7 +334,7 @@ func (r *PWMControllerReconciler) handleDeletion(ctx context.Context, pwmControl
 func (r *PWMControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gpiov1.PWMController{}).
-		Watches(&corev1.Node{}, 
+		Watches(&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToPWMControllers)).
 		Complete(r)
 }
@@ -367,7 +367,7 @@ func (r *PWMControllerReconciler) mapNodeToPWMControllers(ctx context.Context, o
 	}
 
 	r.Logger.WithFields(logrus.Fields{
-		"node":               node.Name,
+		"node":                node.Name,
 		"pwmcontroller_count": len(requests),
 	}).Debug("Mapped node change to PWMController reconcile requests")
 

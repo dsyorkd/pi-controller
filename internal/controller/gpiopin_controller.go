@@ -18,8 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/dsyorkd/pi-controller/internal/services"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // GPIOPinReconciler reconciles a GPIOPin object
@@ -77,7 +77,7 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	targetNode, err := r.findTargetNode(ctx, &gpioPin, logger)
 	if err != nil {
 		logger.WithError(err).Error("Failed to find target node")
-		return r.updateStatus(ctx, &gpioPin, gpiov1.GPIOPhaseFailed, 
+		return r.updateStatus(ctx, &gpioPin, gpiov1.GPIOPhaseFailed,
 			"Failed to find target node", err.Error(), logger)
 	}
 
@@ -185,7 +185,7 @@ func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov
 		"pin_number": gpioPin.Spec.PinNumber,
 		"mode":       string(gpioPin.Spec.Mode),
 	}).Info("GPIO pin configuration would be performed here")
-	
+
 	// Temporary stub - return success for now
 	return nil
 
@@ -194,7 +194,7 @@ func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov
 }
 
 // updateStatus updates the GPIOPin status
-func (r *GPIOPinReconciler) updateStatus(ctx context.Context, gpioPin *gpiov1.GPIOPin, 
+func (r *GPIOPinReconciler) updateStatus(ctx context.Context, gpioPin *gpiov1.GPIOPin,
 	phase gpiov1.GPIOPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
 
 	// Update basic status fields
@@ -252,7 +252,7 @@ func (r *GPIOPinReconciler) updateStatus(ctx context.Context, gpioPin *gpiov1.GP
 }
 
 // setCondition sets a condition in the GPIOPin status
-func (r *GPIOPinReconciler) setCondition(status *gpiov1.GPIOPinStatus, 
+func (r *GPIOPinReconciler) setCondition(status *gpiov1.GPIOPinStatus,
 	conditionType gpiov1.GPIOConditionType, conditionStatus metav1.ConditionStatus,
 	reason, message string) {
 
@@ -315,7 +315,7 @@ func (r *GPIOPinReconciler) handleDeletion(ctx context.Context, gpioPin *gpiov1.
 func (r *GPIOPinReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gpiov1.GPIOPin{}).
-		Watches(&corev1.Node{}, 
+		Watches(&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToGPIOPins)).
 		Complete(r)
 }

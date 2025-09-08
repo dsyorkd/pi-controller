@@ -355,7 +355,7 @@ jobs:
     name: CI Status Check
     runs-on: [self-hosted, ubuntu]
 #    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
-    needs: [validate, test, build, migration-test, performance-test, comprehensive-test]
+    needs: [validate, test, build, migration-test, performance-test, comprehensive-test, hardware-test]
     if: always()
     timeout-minutes: 5
     steps:
@@ -385,4 +385,6 @@ jobs:
           echo "- Code validation: ✅" >> $GITHUB_STEP_SUMMARY
           echo "- Tests: ✅" >> $GITHUB_STEP_SUMMARY
           echo "- Builds: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- Hardware tests: ${{ needs.hardware-test.result == 'success' && '✅' || '⚠️' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Migration tests: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Performance tests: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Hardware tests: ${{ needs.hardware-test.result == 'success' && '✅' || (needs.hardware-test.result == 'skipped' && '⏭️' || '⚠️') }}" >> $GITHUB_STEP_SUMMARY

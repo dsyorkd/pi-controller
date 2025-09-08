@@ -282,11 +282,11 @@ func (s *Service) performMDNSDiscovery() {
 
 	// Channel to receive discovered services
 	entriesCh := make(chan *mdns.ServiceEntry, 16)
-	
+
 	// Start the discovery in a goroutine
 	go func() {
 		defer close(entriesCh)
-		
+
 		// Set up discovery parameters
 		params := mdns.DefaultParams(s.config.ServiceType)
 		params.Timeout = s.timeout
@@ -301,7 +301,7 @@ func (s *Service) performMDNSDiscovery() {
 
 	// Collect discovered nodes
 	discoveredNodes := make([]*Node, 0)
-	
+
 	// Read from the entries channel
 	for entry := range entriesCh {
 		node := s.createNodeFromEntry(entry)
@@ -323,7 +323,7 @@ func (s *Service) createNodeFromEntry(entry *mdns.ServiceEntry) *Node {
 	// Extract TXT records
 	txtRecords := make(map[string]string)
 	var capabilities []string
-	
+
 	for _, txt := range entry.InfoFields {
 		if len(txt) > 0 {
 			// Parse key=value pairs in TXT records
@@ -332,7 +332,7 @@ func (s *Service) createNodeFromEntry(entry *mdns.ServiceEntry) *Node {
 				if len(parts) == 2 {
 					key, value := parts[0], parts[1]
 					txtRecords[key] = value
-					
+
 					// Special handling for capabilities
 					if key == "capabilities" {
 						capabilities = strings.Split(value, ",")
@@ -347,7 +347,7 @@ func (s *Service) createNodeFromEntry(entry *mdns.ServiceEntry) *Node {
 
 	// Use the IPv4 address (AddrV4 is net.IP)
 	ipAddr := entry.AddrV4
-	
+
 	// Generate a unique ID based on hostname and IP
 	nodeID := fmt.Sprintf("mdns-%s-%s", entry.Name, ipAddr.String())
 
@@ -377,12 +377,12 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 			existingNode.LastSeen = node.LastSeen
 			existingNode.TXTRecords = node.TXTRecords
 			existingNode.Capabilities = node.Capabilities
-			
+
 			s.emitEvent(NodeEvent{
 				Type: NodeUpdated,
 				Node: *existingNode,
 			})
-			
+
 			s.logger.WithFields(logrus.Fields{
 				"id":         node.ID,
 				"ip_address": node.IPAddress,

@@ -327,9 +327,9 @@ func init() {
 func setupClusterHandlerTest() (*TestClusterHandler, *MockClusterService, *gin.Engine) {
 	mockService := &MockClusterService{}
 	handler := NewTestClusterHandler(mockService, logger.Default())
-	
+
 	router := gin.New()
-	
+
 	// Setup routes
 	v1 := router.Group("/api/v1")
 	clusters := v1.Group("/clusters")
@@ -342,7 +342,7 @@ func setupClusterHandlerTest() (*TestClusterHandler, *MockClusterService, *gin.E
 		clusters.GET("/:id/nodes", handler.ListNodes)
 		clusters.GET("/:id/status", handler.Status)
 	}
-	
+
 	return handler, mockService, router
 }
 
@@ -552,9 +552,9 @@ func TestClusterHandler_Get(t *testing.T) {
 			expectCluster:  true,
 		},
 		{
-			name:      "invalid cluster ID",
-			clusterID: "invalid",
-			mockSetup: func(m *MockClusterService) {},
+			name:           "invalid cluster ID",
+			clusterID:      "invalid",
+			mockSetup:      func(m *MockClusterService) {},
 			expectedStatus: http.StatusBadRequest,
 			expectCluster:  false,
 		},

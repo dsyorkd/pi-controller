@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"github.com/pkg/sftp"
 
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	"github.com/dsyorkd/pi-controller/internal/logger"
@@ -34,12 +34,12 @@ type SSHClientConfig struct {
 	PassphrasePrompt func() (string, error)
 
 	// Connection settings
-	Timeout         time.Duration
-	KeepAlive       time.Duration
-	MaxRetries      int
-	RetryDelay      time.Duration
-	PoolSize        int
-	IdleTimeout     time.Duration
+	Timeout     time.Duration
+	KeepAlive   time.Duration
+	MaxRetries  int
+	RetryDelay  time.Duration
+	PoolSize    int
+	IdleTimeout time.Duration
 
 	// SSH client config overrides
 	HostKeyCallback ssh.HostKeyCallback
@@ -72,12 +72,12 @@ func (c SSHClientConfig) SSHAuthSocket() string {
 
 // SSHConnection represents an active SSH connection with session management
 type SSHConnection struct {
-	client     *ssh.Client
-	config     SSHClientConfig
-	lastUsed   time.Time
-	inUse      bool
-	mutex      sync.Mutex
-	logger     logger.Interface
+	client   *ssh.Client
+	config   SSHClientConfig
+	lastUsed time.Time
+	inUse    bool
+	mutex    sync.Mutex
+	logger   logger.Interface
 }
 
 // SSHClient manages a pool of SSH connections with retry logic
@@ -365,7 +365,7 @@ func (c *SSHClient) cleanupDeadConnections() {
 func (c *SSHClient) releaseConnection(conn *SSHConnection) {
 	conn.mutex.Lock()
 	defer conn.mutex.Unlock()
-	
+
 	conn.inUse = false
 	conn.lastUsed = time.Now()
 }
@@ -398,11 +398,11 @@ func (c *SSHClient) ExecuteCommand(ctx context.Context, command string) (*Comman
 	duration := time.Since(start)
 
 	result := &CommandResult{
-		Command:    command,
-		Stdout:     stdout.String(),
-		Stderr:     stderr.String(),
-		Duration:   duration,
-		Success:    err == nil,
+		Command:  command,
+		Stdout:   stdout.String(),
+		Stderr:   stderr.String(),
+		Duration: duration,
+		Success:  err == nil,
 	}
 
 	if err != nil {
@@ -427,7 +427,7 @@ func (c *SSHClient) ExecuteCommand(ctx context.Context, command string) (*Comman
 // ExecuteCommands executes multiple commands in sequence
 func (c *SSHClient) ExecuteCommands(ctx context.Context, commands []string) ([]*CommandResult, error) {
 	results := make([]*CommandResult, len(commands))
-	
+
 	for i, command := range commands {
 		select {
 		case <-ctx.Done():

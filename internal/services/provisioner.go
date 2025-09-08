@@ -42,21 +42,21 @@ type K3sConfig struct {
 	DatastoreToken string `json:"datastore_token,omitempty"` // Token for external datastore
 
 	// Network settings
-	ClusterCIDR    string   `json:"cluster_cidr,omitempty"`    // Pod CIDR (default: 10.42.0.0/16)
-	ServiceCIDR    string   `json:"service_cidr,omitempty"`    // Service CIDR (default: 10.43.0.0/16)
-	ClusterDNS     string   `json:"cluster_dns,omitempty"`     // Cluster DNS IP (default: 10.43.0.10)
-	ClusterDomain  string   `json:"cluster_domain,omitempty"`  // Cluster domain (default: cluster.local)
-	FlannelBackend string   `json:"flannel_backend,omitempty"` // Flannel backend (vxlan, host-gw, wireguard)
-	NodeExternalIP string   `json:"node_external_ip,omitempty"` // Node external IP
-	NodeIP         string   `json:"node_ip,omitempty"`         // Node IP address
-	AdvertiseIP    string   `json:"advertise_ip,omitempty"`    // IP address to advertise for API server
+	ClusterCIDR    string `json:"cluster_cidr,omitempty"`     // Pod CIDR (default: 10.42.0.0/16)
+	ServiceCIDR    string `json:"service_cidr,omitempty"`     // Service CIDR (default: 10.43.0.0/16)
+	ClusterDNS     string `json:"cluster_dns,omitempty"`      // Cluster DNS IP (default: 10.43.0.10)
+	ClusterDomain  string `json:"cluster_domain,omitempty"`   // Cluster domain (default: cluster.local)
+	FlannelBackend string `json:"flannel_backend,omitempty"`  // Flannel backend (vxlan, host-gw, wireguard)
+	NodeExternalIP string `json:"node_external_ip,omitempty"` // Node external IP
+	NodeIP         string `json:"node_ip,omitempty"`          // Node IP address
+	AdvertiseIP    string `json:"advertise_ip,omitempty"`     // IP address to advertise for API server
 
 	// TLS settings
 	TLSSan []string `json:"tls_san,omitempty"` // Additional TLS SANs for server certificate
 
 	// Component settings
-	DisableComponents []string `json:"disable_components,omitempty"` // Components to disable (traefik, servicelb, etc.)
-	KubeAPIArgs       []string `json:"kube_api_args,omitempty"`       // Additional kube-apiserver arguments
+	DisableComponents  []string `json:"disable_components,omitempty"`   // Components to disable (traefik, servicelb, etc.)
+	KubeAPIArgs        []string `json:"kube_api_args,omitempty"`        // Additional kube-apiserver arguments
 	KubeControllerArgs []string `json:"kube_controller_args,omitempty"` // Additional kube-controller-manager args
 	KubeSchedulerArgs  []string `json:"kube_scheduler_args,omitempty"`  // Additional kube-scheduler arguments
 	KubeletArgs        []string `json:"kubelet_args,omitempty"`         // Additional kubelet arguments
@@ -66,11 +66,11 @@ type K3sConfig struct {
 	PrivateRegistry string `json:"private_registry,omitempty"` // Private registry configuration file path
 
 	// Advanced settings
-	DataDir            string `json:"data_dir,omitempty"`             // K3s data directory
-	SelinuxWarning     bool   `json:"selinux_warning,omitempty"`      // Disable SELinux warning
+	DataDir             string `json:"data_dir,omitempty"`              // K3s data directory
+	SelinuxWarning      bool   `json:"selinux_warning,omitempty"`       // Disable SELinux warning
 	DefaultLocalStorage bool   `json:"default_local_storage,omitempty"` // Enable default local-path storage
-	WriteKubeconfig    string `json:"write_kubeconfig,omitempty"`     // Kubeconfig file path
-	KubeconfigMode     string `json:"kubeconfig_mode,omitempty"`      // Kubeconfig file permissions
+	WriteKubeconfig     string `json:"write_kubeconfig,omitempty"`      // Kubeconfig file path
+	KubeconfigMode      string `json:"kubeconfig_mode,omitempty"`       // Kubeconfig file permissions
 }
 
 // DefaultK3sConfig returns a K3s configuration with sensible defaults
@@ -93,32 +93,32 @@ func DefaultK3sConfig() K3sConfig {
 
 // ProvisionClusterRequest represents a request to provision a K3s cluster
 type ProvisionClusterRequest struct {
-	ClusterID     uint                      `json:"cluster_id" validate:"required"`
-	MasterNodeID  uint                      `json:"master_node_id" validate:"required"`
-	WorkerNodeIDs []uint                    `json:"worker_node_ids,omitempty"`
-	K3sConfig     K3sConfig                 `json:"k3s_config,omitempty"`
+	ClusterID     uint                        `json:"cluster_id" validate:"required"`
+	MasterNodeID  uint                        `json:"master_node_id" validate:"required"`
+	WorkerNodeIDs []uint                      `json:"worker_node_ids,omitempty"`
+	K3sConfig     K3sConfig                   `json:"k3s_config,omitempty"`
 	SSHConfig     provisioner.SSHClientConfig `json:"ssh_config"`
 }
 
 // ProvisionNodeRequest represents a request to provision a single node
 type ProvisionNodeRequest struct {
-	NodeID    uint                      `json:"node_id" validate:"required"`
-	ClusterID uint                      `json:"cluster_id" validate:"required"`
-	Role      models.NodeRole           `json:"role" validate:"required,oneof=master worker"`
-	K3sConfig K3sConfig                 `json:"k3s_config,omitempty"`
+	NodeID    uint                        `json:"node_id" validate:"required"`
+	ClusterID uint                        `json:"cluster_id" validate:"required"`
+	Role      models.NodeRole             `json:"role" validate:"required,oneof=master worker"`
+	K3sConfig K3sConfig                   `json:"k3s_config,omitempty"`
 	SSHConfig provisioner.SSHClientConfig `json:"ssh_config"`
 }
 
 // ProvisioningResult represents the result of a provisioning operation
 type ProvisioningResult struct {
-	NodeID       uint                          `json:"node_id"`
-	NodeName     string                        `json:"node_name"`
-	Success      bool                          `json:"success"`
-	Error        string                        `json:"error,omitempty"`
-	Duration     time.Duration                 `json:"duration"`
-	Commands     []*provisioner.CommandResult  `json:"commands,omitempty"`
-	ClusterToken string                        `json:"cluster_token,omitempty"` // Generated for master nodes
-	KubeConfig   string                        `json:"kube_config,omitempty"`   // Retrieved from master nodes
+	NodeID       uint                         `json:"node_id"`
+	NodeName     string                       `json:"node_name"`
+	Success      bool                         `json:"success"`
+	Error        string                       `json:"error,omitempty"`
+	Duration     time.Duration                `json:"duration"`
+	Commands     []*provisioner.CommandResult `json:"commands,omitempty"`
+	ClusterToken string                       `json:"cluster_token,omitempty"` // Generated for master nodes
+	KubeConfig   string                       `json:"kube_config,omitempty"`   // Retrieved from master nodes
 }
 
 // ProvisionCluster provisions a complete K3s cluster with master and worker nodes
@@ -176,7 +176,7 @@ func (s *ProvisioningService) ProvisionCluster(ctx context.Context, req Provisio
 	// Provision worker nodes in parallel
 	if len(req.WorkerNodeIDs) > 0 {
 		s.logger.WithField("worker_count", len(req.WorkerNodeIDs)).Info("Provisioning worker nodes")
-		
+
 		// TODO: Implement parallel worker node provisioning
 		// For now, provision sequentially
 		for _, workerNodeID := range req.WorkerNodeIDs {
@@ -298,7 +298,7 @@ func (s *ProvisioningService) ProvisionNode(ctx context.Context, req ProvisionNo
 	if err != nil {
 		// Update node status to failed
 		s.updateNodeStatus(req.NodeID, models.NodeStatusFailed)
-		
+
 		return &ProvisioningResult{
 			NodeID:   req.NodeID,
 			NodeName: node.Name,
@@ -387,7 +387,7 @@ func (s *ProvisioningService) generateMasterInstallCommands(node *models.Node, c
 	if config.Channel != "" {
 		envVars = append(envVars, "INSTALL_K3S_CHANNEL="+config.Channel)
 	}
-	
+
 	if len(envVars) > 0 {
 		installCmd.WriteString(strings.Join(envVars, " ") + " ")
 	}
@@ -396,7 +396,7 @@ func (s *ProvisioningService) generateMasterInstallCommands(node *models.Node, c
 
 	// Server arguments
 	var serverArgs []string
-	
+
 	if config.NodeIP != "" {
 		serverArgs = append(serverArgs, "--node-ip="+config.NodeIP)
 	} else if node.IPAddress != "" {
@@ -464,8 +464,8 @@ func (s *ProvisioningService) generateMasterInstallCommands(node *models.Node, c
 	}
 
 	// Pre-installation commands
-	commands = append(commands, 
-		"sudo apt-get update", 
+	commands = append(commands,
+		"sudo apt-get update",
 		"sudo apt-get install -y curl",
 	)
 
@@ -476,7 +476,7 @@ func (s *ProvisioningService) generateMasterInstallCommands(node *models.Node, c
 	commands = append(commands,
 		"sudo systemctl enable k3s",
 		"sudo systemctl start k3s",
-		"sleep 30", // Wait for K3s to start
+		"sleep 30",                   // Wait for K3s to start
 		"sudo k3s kubectl get nodes", // Verify installation
 	)
 
@@ -514,7 +514,7 @@ func (s *ProvisioningService) generateWorkerInstallCommands(node *models.Node, c
 
 	// Agent arguments
 	var agentArgs []string
-	
+
 	if config.NodeIP != "" {
 		agentArgs = append(agentArgs, "--node-ip="+config.NodeIP)
 	} else if node.IPAddress != "" {
@@ -539,8 +539,8 @@ func (s *ProvisioningService) generateWorkerInstallCommands(node *models.Node, c
 	}
 
 	// Pre-installation commands
-	commands = append(commands, 
-		"sudo apt-get update", 
+	commands = append(commands,
+		"sudo apt-get update",
 		"sudo apt-get install -y curl",
 	)
 
@@ -571,7 +571,7 @@ func (s *ProvisioningService) updateNodeStatus(nodeID uint, status models.NodeSt
 func (s *ProvisioningService) updateNodeKubeInfo(nodeID uint, nodeName string) {
 	// TODO: In a real implementation, we might want to query the node for actual K3s version
 	kubeVersion := "v1.28.2+k3s1" // Default, should be detected
-	
+
 	updateReq := UpdateNodeRequest{
 		NodeName:    &nodeName,
 		KubeVersion: &kubeVersion,
@@ -619,7 +619,7 @@ func (s *ProvisioningService) DeprovisionNode(ctx context.Context, nodeID uint, 
 	commands := []string{
 		"sudo systemctl stop k3s || sudo systemctl stop k3s-agent || true",
 		"sudo systemctl disable k3s || sudo systemctl disable k3s-agent || true",
-		"sudo /usr/local/bin/k3s-uninstall.sh || true", // For server nodes
+		"sudo /usr/local/bin/k3s-uninstall.sh || true",       // For server nodes
 		"sudo /usr/local/bin/k3s-agent-uninstall.sh || true", // For agent nodes
 		"sudo rm -rf /var/lib/rancher/k3s || true",
 		"sudo rm -rf /etc/rancher/k3s || true",
@@ -628,7 +628,7 @@ func (s *ProvisioningService) DeprovisionNode(ctx context.Context, nodeID uint, 
 
 	// Execute deprovisioning commands
 	results, err := sshClient.ExecuteCommands(ctx, commands)
-	
+
 	success := err == nil
 	var errorMsg string
 	if !success {

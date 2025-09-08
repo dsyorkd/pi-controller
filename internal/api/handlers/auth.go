@@ -59,15 +59,15 @@ type LoginResponse struct {
 
 // UserInfo represents safe user information for API responses
 type UserInfo struct {
-	ID        uint              `json:"id"`
-	Username  string            `json:"username"`
-	Email     string            `json:"email"`
-	Role      models.UserRole   `json:"role"`
-	FirstName string            `json:"first_name"`
-	LastName  string            `json:"last_name"`
-	IsActive  bool              `json:"is_active"`
-	LastLogin *time.Time        `json:"last_login,omitempty"`
-	CreatedAt time.Time         `json:"created_at"`
+	ID        uint            `json:"id"`
+	Username  string          `json:"username"`
+	Email     string          `json:"email"`
+	Role      models.UserRole `json:"role"`
+	FirstName string          `json:"first_name"`
+	LastName  string          `json:"last_name"`
+	IsActive  bool            `json:"is_active"`
+	LastLogin *time.Time      `json:"last_login,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 // RefreshTokenRequest represents the token refresh request payload

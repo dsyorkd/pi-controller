@@ -31,27 +31,27 @@ func NewCAHandler(caService services.CAService, logger logger.Interface) *CAHand
 // IssueCertificateRestRequest represents a REST API certificate issuance request
 type IssueCertificateRestRequest struct {
 	CommonName     string   `json:"common_name" binding:"required"`
-	Type          string   `json:"type" binding:"required"`
-	SANs          []string `json:"sans,omitempty"`
+	Type           string   `json:"type" binding:"required"`
+	SANs           []string `json:"sans,omitempty"`
 	ValidityPeriod string   `json:"validity_period,omitempty"`
-	KeyUsage      []string `json:"key_usage,omitempty"`
-	ExtKeyUsage   []string `json:"ext_key_usage,omitempty"`
-	NodeID        *uint    `json:"node_id,omitempty"`
-	ClusterID     *uint    `json:"cluster_id,omitempty"`
-	AutoRenew     bool     `json:"auto_renew"`
+	KeyUsage       []string `json:"key_usage,omitempty"`
+	ExtKeyUsage    []string `json:"ext_key_usage,omitempty"`
+	NodeID         *uint    `json:"node_id,omitempty"`
+	ClusterID      *uint    `json:"cluster_id,omitempty"`
+	AutoRenew      bool     `json:"auto_renew"`
 }
 
 // CreateCSRRestRequest represents a REST API CSR creation request
 type CreateCSRRestRequest struct {
 	CommonName     string   `json:"common_name" binding:"required"`
-	Type          string   `json:"type" binding:"required"`
-	CSRPEM        string   `json:"csr_pem" binding:"required"`
-	SANs          []string `json:"sans,omitempty"`
+	Type           string   `json:"type" binding:"required"`
+	CSRPEM         string   `json:"csr_pem" binding:"required"`
+	SANs           []string `json:"sans,omitempty"`
 	ValidityPeriod string   `json:"validity_period,omitempty"`
-	KeyUsage      []string `json:"key_usage,omitempty"`
-	ExtKeyUsage   []string `json:"ext_key_usage,omitempty"`
-	NodeID        *uint    `json:"node_id,omitempty"`
-	ClusterID     *uint    `json:"cluster_id,omitempty"`
+	KeyUsage       []string `json:"key_usage,omitempty"`
+	ExtKeyUsage    []string `json:"ext_key_usage,omitempty"`
+	NodeID         *uint    `json:"node_id,omitempty"`
+	ClusterID      *uint    `json:"cluster_id,omitempty"`
 }
 
 // ProcessCSRRestRequest represents a REST API CSR processing request
@@ -74,19 +74,19 @@ type RevokeCertificateRestRequest struct {
 // InitializeCA initializes the Certificate Authority
 func (h *CAHandler) InitializeCA(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	err := h.caService.InitializeCA(ctx)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to initialize CA")
 		return
 	}
-	
+
 	// Get CA info after initialization
 	caInfo, err := h.caService.GetCAInfo(ctx)
 	if err != nil {
 		h.logger.WithError(err).Warn("Failed to get CA info after initialization")
 	}
-	
+
 	h.logger.Info("CA initialized successfully")
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -98,26 +98,26 @@ func (h *CAHandler) InitializeCA(c *gin.Context) {
 // GetCAInfo returns information about the Certificate Authority
 func (h *CAHandler) GetCAInfo(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	caInfo, err := h.caService.GetCAInfo(ctx)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to get CA info")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, caInfo)
 }
 
 // GetCACertificate returns the CA certificate
 func (h *CAHandler) GetCACertificate(c *gin.Context) {
 	ctx := c.Request.Context()
-	
+
 	caCert, err := h.caService.GetCACertificate(ctx)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to get CA certificate")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"certificate_pem": string(caCert.Raw),
 		"serial_number":   caCert.SerialNumber.String(),
@@ -140,7 +140,7 @@ func (h *CAHandler) IssueCertificate(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Convert string type to models.CertificateType
 	certType, err := h.parseStringToCertificateType(req.Type)
 	if err != nil {
@@ -150,7 +150,7 @@ func (h *CAHandler) IssueCertificate(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Parse validity period if provided
 	var validityPeriod time.Duration
 	if req.ValidityPeriod != "" {
@@ -164,33 +164,33 @@ func (h *CAHandler) IssueCertificate(c *gin.Context) {
 			return
 		}
 	}
-	
+
 	// Create service request
 	serviceReq := &services.IssueCertificateRequest{
 		CommonName:     req.CommonName,
-		Type:          certType,
-		SANs:          req.SANs,
+		Type:           certType,
+		SANs:           req.SANs,
 		ValidityPeriod: validityPeriod,
-		KeyUsage:      req.KeyUsage,
-		ExtKeyUsage:   req.ExtKeyUsage,
-		NodeID:        req.NodeID,
-		ClusterID:     req.ClusterID,
-		AutoRenew:     req.AutoRenew,
+		KeyUsage:       req.KeyUsage,
+		ExtKeyUsage:    req.ExtKeyUsage,
+		NodeID:         req.NodeID,
+		ClusterID:      req.ClusterID,
+		AutoRenew:      req.AutoRenew,
 	}
-	
+
 	ctx := c.Request.Context()
 	certificate, err := h.caService.IssueCertificate(ctx, serviceReq)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to issue certificate")
 		return
 	}
-	
+
 	h.logger.WithFields(map[string]interface{}{
 		"cert_id":       certificate.ID,
 		"common_name":   certificate.CommonName,
 		"serial_number": certificate.SerialNumber,
 	}).Info("Certificate issued successfully")
-	
+
 	c.JSON(http.StatusCreated, certificate)
 }
 
@@ -204,14 +204,14 @@ func (h *CAHandler) GetCertificate(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	certificate, err := h.caService.GetCertificate(ctx, uint(id))
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to get certificate")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, certificate)
 }
 
@@ -225,14 +225,14 @@ func (h *CAHandler) GetCertificateBySerial(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	certificate, err := h.caService.GetCertificateBySerial(ctx, serialNumber)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to get certificate")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, certificate)
 }
 
@@ -241,52 +241,52 @@ func (h *CAHandler) ListCertificates(c *gin.Context) {
 	// Parse query parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	
+
 	opts := services.ListCertificatesOptions{
 		Limit:  limit,
 		Offset: offset,
 	}
-	
+
 	// Parse optional filters
 	if certType := c.Query("type"); certType != "" {
 		if parsed, err := h.parseStringToCertificateType(certType); err == nil {
 			opts.Type = &parsed
 		}
 	}
-	
+
 	if status := c.Query("status"); status != "" {
 		if parsed, err := h.parseStringToCertificateStatus(status); err == nil {
 			opts.Status = &parsed
 		}
 	}
-	
+
 	if backend := c.Query("backend"); backend != "" {
 		if parsed, err := h.parseStringToCertificateBackend(backend); err == nil {
 			opts.Backend = &parsed
 		}
 	}
-	
+
 	if nodeIDStr := c.Query("node_id"); nodeIDStr != "" {
 		if nodeID, err := strconv.ParseUint(nodeIDStr, 10, 32); err == nil {
 			id := uint(nodeID)
 			opts.NodeID = &id
 		}
 	}
-	
+
 	if clusterIDStr := c.Query("cluster_id"); clusterIDStr != "" {
 		if clusterID, err := strconv.ParseUint(clusterIDStr, 10, 32); err == nil {
 			id := uint(clusterID)
 			opts.ClusterID = &id
 		}
 	}
-	
+
 	ctx := c.Request.Context()
 	certificates, total, err := h.caService.ListCertificates(ctx, opts)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to list certificates")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"certificates": certificates,
 		"count":        len(certificates),
@@ -306,19 +306,19 @@ func (h *CAHandler) RenewCertificate(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	certificate, err := h.caService.RenewCertificate(ctx, uint(id))
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to renew certificate")
 		return
 	}
-	
+
 	h.logger.WithFields(map[string]interface{}{
 		"old_cert_id": id,
 		"new_cert_id": certificate.ID,
 	}).Info("Certificate renewed successfully")
-	
+
 	c.JSON(http.StatusOK, certificate)
 }
 
@@ -332,7 +332,7 @@ func (h *CAHandler) RevokeCertificate(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	var req RevokeCertificateRestRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -341,19 +341,19 @@ func (h *CAHandler) RevokeCertificate(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	err = h.caService.RevokeCertificate(ctx, uint(id), req.Reason)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to revoke certificate")
 		return
 	}
-	
+
 	h.logger.WithFields(map[string]interface{}{
 		"cert_id": id,
 		"reason":  req.Reason,
 	}).Info("Certificate revoked successfully")
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Certificate revoked successfully",
@@ -370,14 +370,14 @@ func (h *CAHandler) ValidateCertificate(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	validation, err := h.caService.ValidateCertificate(ctx, req.CertificatePEM)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to validate certificate")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, validation)
 }
 
@@ -393,7 +393,7 @@ func (h *CAHandler) CreateCertificateRequest(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Convert string type to models.CertificateType
 	certType, err := h.parseStringToCertificateType(req.Type)
 	if err != nil {
@@ -403,32 +403,32 @@ func (h *CAHandler) CreateCertificateRequest(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Create service request
 	serviceReq := &services.CreateCSRRequest{
 		CommonName:     req.CommonName,
-		Type:          certType,
-		CSRPEM:        req.CSRPEM,
-		SANs:          req.SANs,
+		Type:           certType,
+		CSRPEM:         req.CSRPEM,
+		SANs:           req.SANs,
 		ValidityPeriod: req.ValidityPeriod,
-		KeyUsage:      req.KeyUsage,
-		ExtKeyUsage:   req.ExtKeyUsage,
-		NodeID:        req.NodeID,
-		ClusterID:     req.ClusterID,
+		KeyUsage:       req.KeyUsage,
+		ExtKeyUsage:    req.ExtKeyUsage,
+		NodeID:         req.NodeID,
+		ClusterID:      req.ClusterID,
 	}
-	
+
 	ctx := c.Request.Context()
 	csr, err := h.caService.CreateCertificateRequest(ctx, serviceReq)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to create certificate request")
 		return
 	}
-	
+
 	h.logger.WithFields(map[string]interface{}{
 		"csr_id":      csr.ID,
 		"common_name": csr.CommonName,
 	}).Info("Certificate request created successfully")
-	
+
 	c.JSON(http.StatusCreated, csr)
 }
 
@@ -442,7 +442,7 @@ func (h *CAHandler) ProcessCertificateRequest(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	var req ProcessCSRRestRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -451,24 +451,24 @@ func (h *CAHandler) ProcessCertificateRequest(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	certificate, err := h.caService.ProcessCertificateRequest(ctx, uint(id), req.Approve)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to process certificate request")
 		return
 	}
-	
+
 	action := "rejected"
 	if req.Approve {
 		action = "approved"
 	}
-	
+
 	h.logger.WithFields(map[string]interface{}{
 		"csr_id": id,
 		"action": action,
 	}).Info("Certificate request processed successfully")
-	
+
 	if req.Approve && certificate != nil {
 		c.JSON(http.StatusOK, certificate)
 	} else {
@@ -484,46 +484,46 @@ func (h *CAHandler) ListCertificateRequests(c *gin.Context) {
 	// Parse query parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	
+
 	opts := services.ListCSROptions{
 		Limit:  limit,
 		Offset: offset,
 	}
-	
+
 	// Parse optional filters
 	if status := c.Query("status"); status != "" {
 		if parsed, err := h.parseStringToCSRStatus(status); err == nil {
 			opts.Status = &parsed
 		}
 	}
-	
+
 	if certType := c.Query("type"); certType != "" {
 		if parsed, err := h.parseStringToCertificateType(certType); err == nil {
 			opts.Type = &parsed
 		}
 	}
-	
+
 	if nodeIDStr := c.Query("node_id"); nodeIDStr != "" {
 		if nodeID, err := strconv.ParseUint(nodeIDStr, 10, 32); err == nil {
 			id := uint(nodeID)
 			opts.NodeID = &id
 		}
 	}
-	
+
 	if clusterIDStr := c.Query("cluster_id"); clusterIDStr != "" {
 		if clusterID, err := strconv.ParseUint(clusterIDStr, 10, 32); err == nil {
 			id := uint(clusterID)
 			opts.ClusterID = &id
 		}
 	}
-	
+
 	ctx := c.Request.Context()
 	requests, total, err := h.caService.ListCertificateRequests(ctx, opts)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to list certificate requests")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"requests": requests,
 		"count":    len(requests),
@@ -543,7 +543,7 @@ func (h *CAHandler) GetCertificateStats(c *gin.Context) {
 		h.handleServiceError(c, err, "Failed to get certificate statistics")
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, stats)
 }
 
@@ -555,7 +555,7 @@ func (h *CAHandler) CleanupExpiredCertificates(c *gin.Context) {
 		h.handleServiceError(c, err, "Failed to cleanup expired certificates")
 		return
 	}
-	
+
 	h.logger.Info("Certificate cleanup completed successfully")
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -567,7 +567,7 @@ func (h *CAHandler) CleanupExpiredCertificates(c *gin.Context) {
 
 func (h *CAHandler) handleServiceError(c *gin.Context, err error, message string) {
 	h.logger.WithError(err).Error(message)
-	
+
 	// TODO: Add specific error type handling like in cluster handler
 	// For now, default to internal server error
 	c.JSON(http.StatusInternalServerError, gin.H{

@@ -16,7 +16,7 @@ type VaultCABackend struct {
 	config   *config.VaultCAConfig
 	database *storage.Database
 	logger   logger.Interface
-	
+
 	// Cached CA certificate and info
 	caInfo *models.CAInfo
 	caCert *x509.Certificate
@@ -33,9 +33,9 @@ func NewVaultCABackend(
 		database: database,
 		logger:   logger.WithField("component", "vault-ca"),
 	}
-	
+
 	// TODO: Initialize Vault client and validate connection
-	
+
 	return backend, nil
 }
 

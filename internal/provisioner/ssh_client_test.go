@@ -222,10 +222,10 @@ func generateTestKeyPair(t *testing.T) ([]byte, ssh.Signer) {
 
 func TestSSHClientConfig(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         SSHClientConfig
-		expectedError  string
-		setupCallback  func(*testing.T) SSHClientConfig
+		name          string
+		config        SSHClientConfig
+		expectedError string
+		setupCallback func(*testing.T) SSHClientConfig
 	}{
 		{
 			name: "valid configuration",
@@ -283,10 +283,10 @@ func TestSSHClientConfig(t *testing.T) {
 
 func TestSSHClientAuthMethods(t *testing.T) {
 	tests := []struct {
-		name           string
-		setupConfig    func(*testing.T) SSHClientConfig
+		name            string
+		setupConfig     func(*testing.T) SSHClientConfig
 		expectedMethods int
-		expectError    bool
+		expectError     bool
 	}{
 		{
 			name: "password authentication",
@@ -418,7 +418,7 @@ func TestSSHClientCommandExecution(t *testing.T) {
 			expectedSuccess:  true,
 			expectedExitCode: 0,
 			// Note: Our mock server writes stderr to stdout for simplicity
-			expectStdout:     "error\n",
+			expectStdout: "error\n",
 		},
 	}
 

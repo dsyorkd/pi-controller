@@ -19,8 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/dsyorkd/pi-controller/internal/services"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // I2CDeviceReconciler reconciles an I2CDevice object
@@ -77,7 +77,7 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	targetNode, err := r.findTargetNode(ctx, &i2cDevice, logger)
 	if err != nil {
 		logger.WithError(err).Error("Failed to find target node")
-		return r.updateStatus(ctx, &i2cDevice, gpiov1.I2CPhaseFailed, 
+		return r.updateStatus(ctx, &i2cDevice, gpiov1.I2CPhaseFailed,
 			"Failed to find target node", err.Error(), logger)
 	}
 
@@ -120,12 +120,12 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Update phase to ready and schedule periodic scans if configured
 	result, err := r.updateStatus(ctx, &i2cDevice, gpiov1.I2CPhaseReady,
 		"I2C device ready", "Hardware configured successfully", logger)
-	
+
 	// If scan interval is configured, schedule the next scan
 	if i2cDevice.Spec.ScanInterval > 0 {
 		result.RequeueAfter = time.Duration(i2cDevice.Spec.ScanInterval) * time.Second
 	}
-	
+
 	return result, err
 }
 
@@ -221,7 +221,7 @@ func (r *I2CDeviceReconciler) configureI2CDevice(ctx context.Context, i2cDevice 
 }
 
 // updateStatus updates the I2CDevice status
-func (r *I2CDeviceReconciler) updateStatus(ctx context.Context, i2cDevice *gpiov1.I2CDevice, 
+func (r *I2CDeviceReconciler) updateStatus(ctx context.Context, i2cDevice *gpiov1.I2CDevice,
 	phase gpiov1.I2CPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
 
 	// Update basic status fields
@@ -310,7 +310,7 @@ func (r *I2CDeviceReconciler) readDeviceData(ctx context.Context, i2cDevice *gpi
 }
 
 // setI2CCondition sets a condition in the I2CDevice status
-func (r *I2CDeviceReconciler) setI2CCondition(status *gpiov1.I2CDeviceStatus, 
+func (r *I2CDeviceReconciler) setI2CCondition(status *gpiov1.I2CDeviceStatus,
 	conditionType gpiov1.I2CConditionType, conditionStatus metav1.ConditionStatus,
 	reason, message string) {
 
@@ -373,7 +373,7 @@ func (r *I2CDeviceReconciler) handleDeletion(ctx context.Context, i2cDevice *gpi
 func (r *I2CDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gpiov1.I2CDevice{}).
-		Watches(&corev1.Node{}, 
+		Watches(&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToI2CDevices)).
 		Complete(r)
 }

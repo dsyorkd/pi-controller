@@ -41,17 +41,17 @@ func (c *Client) NewCRDClient() (*CRDClient, error) {
 
 // CRDInfo represents information about a Custom Resource Definition
 type CRDInfo struct {
-	Name              string                  `json:"name"`
-	Group             string                  `json:"group"`
-	Kind              string                  `json:"kind"`
-	Version           string                  `json:"version"`
-	Scope             string                  `json:"scope"`
-	ShortNames        []string                `json:"short_names"`
-	Categories        []string                `json:"categories"`
-	StoredVersions    []string                `json:"stored_versions"`
-	ServedVersions    []string                `json:"served_versions"`
-	Conditions        []CRDCondition          `json:"conditions"`
-	AdditionalColumns []CRDAdditionalColumn   `json:"additional_columns"`
+	Name              string                           `json:"name"`
+	Group             string                           `json:"group"`
+	Kind              string                           `json:"kind"`
+	Version           string                           `json:"version"`
+	Scope             string                           `json:"scope"`
+	ShortNames        []string                         `json:"short_names"`
+	Categories        []string                         `json:"categories"`
+	StoredVersions    []string                         `json:"stored_versions"`
+	ServedVersions    []string                         `json:"served_versions"`
+	Conditions        []CRDCondition                   `json:"conditions"`
+	AdditionalColumns []CRDAdditionalColumn            `json:"additional_columns"`
 	Schema            *apiextensionsv1.JSONSchemaProps `json:"schema,omitempty"`
 }
 
@@ -210,7 +210,7 @@ func (crd *CRDClient) ListCustomResources(ctx context.Context, gvr schema.GroupV
 func (crd *CRDClient) CheckPiControllerCRDs(ctx context.Context) (bool, []string, error) {
 	expectedCRDs := []string{
 		"gpiopins.gpio.pi-controller.io",
-		"pwmcontrollers.gpio.pi-controller.io", 
+		"pwmcontrollers.gpio.pi-controller.io",
 		"i2cdevices.gpio.pi-controller.io",
 	}
 

@@ -754,11 +754,11 @@ func (s *GPIOService) CleanupExpiredReservations() (int64, error) {
 // ConfigurePin configures a GPIO pin for Kubernetes controller integration
 func (s *GPIOService) ConfigurePin(ctx context.Context, req *GPIORequest) error {
 	s.logger.WithFields(map[string]interface{}{
-		"node_id":     req.NodeID,
-		"pin_number":  req.PinNumber,
-		"mode":        req.Mode,
-		"direction":   req.Direction,
-		"value":       req.Value,
+		"node_id":    req.NodeID,
+		"pin_number": req.PinNumber,
+		"mode":       req.Mode,
+		"direction":  req.Direction,
+		"value":      req.Value,
 	}).Info("Configuring GPIO pin for Kubernetes controller")
 
 	// Handle cleanup mode
@@ -775,9 +775,9 @@ func (s *GPIOService) ConfigurePin(ctx context.Context, req *GPIORequest) error 
 
 	// TODO: Implement actual gRPC communication
 	s.logger.WithFields(map[string]interface{}{
-		"node_id":     req.NodeID,
-		"pin_number":  req.PinNumber,
-		"mode":        req.Mode,
+		"node_id":    req.NodeID,
+		"pin_number": req.PinNumber,
+		"mode":       req.Mode,
 	}).Info("GPIO pin configuration complete (stub implementation)")
 
 	return nil

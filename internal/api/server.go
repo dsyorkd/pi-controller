@@ -18,19 +18,19 @@ import (
 
 // Server represents the REST API server
 type Server struct {
-	config               *config.APIConfig
-	logger               logger.Interface
-	database             *storage.Database
-	clusterService       *services.ClusterService
-	nodeService          *services.NodeService
-	gpioService          *services.GPIOService
-	provisioningService  *services.ProvisioningService
-	caService            services.CAService
-	authManager          *middleware.AuthManager
-	validator            *middleware.Validator
-	rateLimiter          *middleware.RateLimiter
-	router               *gin.Engine
-	server               *http.Server
+	config              *config.APIConfig
+	logger              logger.Interface
+	database            *storage.Database
+	clusterService      *services.ClusterService
+	nodeService         *services.NodeService
+	gpioService         *services.GPIOService
+	provisioningService *services.ProvisioningService
+	caService           services.CAService
+	authManager         *middleware.AuthManager
+	validator           *middleware.Validator
+	rateLimiter         *middleware.RateLimiter
+	router              *gin.Engine
+	server              *http.Server
 }
 
 // New creates a new API server instance
@@ -188,12 +188,12 @@ func (s *Server) setupRoutes() {
 			{
 				// CA Management - require admin role for initialization
 				ca.POST("/initialize", s.requireRole("admin"), caHandler.InitializeCA)
-				
+
 				// CA Information - require viewer role
 				ca.GET("/info", s.requireRole("viewer"), caHandler.GetCAInfo)
 				ca.GET("/certificate", s.requireRole("viewer"), caHandler.GetCACertificate)
 				ca.GET("/stats", s.requireRole("viewer"), caHandler.GetCertificateStats)
-				
+
 				// Certificate Management
 				certs := ca.Group("/certificates")
 				{
@@ -201,25 +201,25 @@ func (s *Server) setupRoutes() {
 					certs.GET("", s.requireRole("viewer"), caHandler.ListCertificates)
 					certs.GET("/:id", s.requireRole("viewer"), caHandler.GetCertificate)
 					certs.GET("/serial/:serial", s.requireRole("viewer"), caHandler.GetCertificateBySerial)
-					
+
 					// Certificate operations - require admin role
 					certs.POST("", s.requireRole("admin"), caHandler.IssueCertificate)
 					certs.POST("/:id/renew", s.requireRole("admin"), caHandler.RenewCertificate)
 					certs.POST("/:id/revoke", s.requireRole("admin"), caHandler.RevokeCertificate)
 					certs.POST("/validate", s.requireRole("viewer"), caHandler.ValidateCertificate)
 				}
-				
+
 				// Certificate Requests (CSR)
 				requests := ca.Group("/requests")
 				{
 					// Read operations - require operator role (can see their own requests)
 					requests.GET("", s.requireRole("operator"), caHandler.ListCertificateRequests)
-					
+
 					// CSR operations - require operator role to create, admin to process
 					requests.POST("", s.requireRole("operator"), caHandler.CreateCertificateRequest)
 					requests.POST("/:id/process", s.requireRole("admin"), caHandler.ProcessCertificateRequest)
 				}
-				
+
 				// Maintenance operations - require admin role
 				ca.POST("/cleanup", s.requireRole("admin"), caHandler.CleanupExpiredCertificates)
 			}
@@ -227,14 +227,14 @@ func (s *Server) setupRoutes() {
 
 		// K3s Provisioning endpoints
 		provisionerHandler := handlers.NewProvisionerHandler(s.provisioningService, s.logger)
-		
+
 		// Cluster-level provisioning operations
 		clusters.POST("/:id/provision", s.requireRole("admin"), provisionerHandler.ProvisionCluster)
-		
-		// Individual node provisioning operations  
+
+		// Individual node provisioning operations
 		nodes.POST("/:id/provision", s.requireRole("admin"), provisionerHandler.ProvisionNode)
 		nodes.POST("/:id/deprovision", s.requireRole("admin"), provisionerHandler.DeprovisionNode)
-		
+
 		// Utility operations for master nodes
 		nodes.POST("/:id/cluster-token", s.requireRole("operator"), provisionerHandler.GetClusterToken)
 		nodes.POST("/:id/kubeconfig", s.requireRole("operator"), provisionerHandler.GetKubeConfig)

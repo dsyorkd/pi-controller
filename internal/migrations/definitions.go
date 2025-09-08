@@ -362,7 +362,7 @@ func createCertificatesTable(db *gorm.DB) error {
 		FOREIGN KEY (renewed_from_id) REFERENCES certificates(id)
 	);
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -397,7 +397,7 @@ func createCertificateRequestsTable(db *gorm.DB) error {
 		FOREIGN KEY (certificate_id) REFERENCES certificates(id)
 	);
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -430,7 +430,7 @@ func createCAInfoTable(db *gorm.DB) error {
 		FOREIGN KEY (certificate_id) REFERENCES certificates(id)
 	);
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -471,7 +471,7 @@ func addCertificateIndexes(db *gorm.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_certificates_cluster_status ON certificates(cluster_id, status) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificates_expiring_soon ON certificates(not_after, auto_renew) WHERE status = 'active' AND not_after < datetime('now', '+30 days');
 	`
-	
+
 	return db.Exec(sql).Error
 }
 
@@ -507,7 +507,7 @@ func dropCertificateIndexes(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_certificates_common_name;
 	DROP INDEX IF EXISTS idx_certificates_serial_number;
 	`
-	
+
 	return db.Exec(sql).Error
 }
 

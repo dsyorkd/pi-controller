@@ -12,45 +12,45 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // ControllerManagerConfig holds configuration for the controller manager
 type ControllerManagerConfig struct {
-	MetricsAddr         string
-	HealthAddr          string
-	LeaderElection      bool
-	LeaderElectionID    string
-	LeaderElectionNS    string
-	ReconcileTimeout    time.Duration
-	LogLevel            string
+	MetricsAddr      string
+	HealthAddr       string
+	LeaderElection   bool
+	LeaderElectionID string
+	LeaderElectionNS string
+	ReconcileTimeout time.Duration
+	LogLevel         string
 }
 
 // DefaultControllerManagerConfig returns default configuration
 func DefaultControllerManagerConfig() *ControllerManagerConfig {
 	return &ControllerManagerConfig{
-		MetricsAddr:         ":8080",
-		HealthAddr:          ":8081",
-		LeaderElection:      true,
-		LeaderElectionID:    "pi-controller-leader-election",
-		LeaderElectionNS:    "kube-system",
-		ReconcileTimeout:    60 * time.Second,
-		LogLevel:            "info",
+		MetricsAddr:      ":8080",
+		HealthAddr:       ":8081",
+		LeaderElection:   true,
+		LeaderElectionID: "pi-controller-leader-election",
+		LeaderElectionNS: "kube-system",
+		ReconcileTimeout: 60 * time.Second,
+		LogLevel:         "info",
 	}
 }
 
 // ControllerManager manages all Kubernetes controllers
 type ControllerManager struct {
-	config         *ControllerManagerConfig
-	logger         *logrus.Entry
-	db             *storage.Database
-	gpioService    *services.GPIOService
-	pwmService     *services.PWMService
-	i2cService     *services.I2CService
-	nodeService    *services.NodeServiceAdapter
+	config      *ControllerManagerConfig
+	logger      *logrus.Entry
+	db          *storage.Database
+	gpioService *services.GPIOService
+	pwmService  *services.PWMService
+	i2cService  *services.I2CService
+	nodeService *services.NodeServiceAdapter
 }
 
 // NewControllerManager creates a new controller manager
@@ -124,8 +124,8 @@ func (cm *ControllerManager) Start(ctx context.Context) error {
 	}
 
 	cm.logger.WithFields(logrus.Fields{
-		"metrics_addr": cm.config.MetricsAddr,
-		"health_addr":  cm.config.HealthAddr,
+		"metrics_addr":    cm.config.MetricsAddr,
+		"health_addr":     cm.config.HealthAddr,
 		"leader_election": cm.config.LeaderElection,
 	}).Info("Controller manager configured successfully")
 

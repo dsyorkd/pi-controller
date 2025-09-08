@@ -177,7 +177,7 @@ type CAConfig struct {
 	// Local CA configuration
 	Local LocalCAConfig `yaml:"local"`
 
-	// Vault CA configuration  
+	// Vault CA configuration
 	Vault VaultCAConfig `yaml:"vault"`
 
 	// SSH configuration for remote certificate operations
@@ -191,16 +191,16 @@ type CAConfig struct {
 type LocalCAConfig struct {
 	// Directory to store CA certificates and keys (on server nodes)
 	DataDir string `yaml:"data_dir"`
-	
+
 	// CA certificate validity period
 	CAValidityPeriod string `yaml:"ca_validity_period"`
-	
+
 	// Default certificate validity period for issued certificates
 	CertValidityPeriod string `yaml:"cert_validity_period"`
-	
+
 	// Key size for RSA keys
 	KeySize int `yaml:"key_size"`
-	
+
 	// Organization information for CA certificate
 	Organization       string `yaml:"organization"`
 	OrganizationalUnit string `yaml:"organizational_unit"`
@@ -213,26 +213,26 @@ type LocalCAConfig struct {
 type VaultCAConfig struct {
 	// Vault server address
 	Address string `yaml:"address"`
-	
+
 	// PKI mount path
 	MountPath string `yaml:"mount_path"`
-	
+
 	// AppRole authentication settings
 	AppRoleID   string `yaml:"app_role_id"`
 	SecretID    string `yaml:"secret_id"`
 	SecretIDEnv string `yaml:"secret_id_env"` // Environment variable for secret_id
-	
+
 	// Admin token for initial setup (dev only)
 	AdminToken    string `yaml:"admin_token"`
 	AdminTokenEnv string `yaml:"admin_token_env"` // Environment variable for admin_token
-	
+
 	// Connection settings
-	Timeout   string `yaml:"timeout"`
+	Timeout   string         `yaml:"timeout"`
 	TLSConfig VaultTLSConfig `yaml:"tls"`
-	
+
 	// Certificate role name in Vault
 	CertRole string `yaml:"cert_role"`
-	
+
 	// Allow insecure connections (dev only)
 	AllowInsecure bool `yaml:"allow_insecure"`
 }
@@ -251,19 +251,19 @@ type SSHConfig struct {
 	// SSH key for authenticating to server nodes
 	PrivateKeyPath string `yaml:"private_key_path"`
 	PrivateKeyEnv  string `yaml:"private_key_env"` // Environment variable for private key
-	
+
 	// Default SSH user for server nodes
 	User string `yaml:"user"`
-	
+
 	// Default SSH port
 	Port int `yaml:"port"`
-	
+
 	// Connection timeout
 	Timeout string `yaml:"timeout"`
-	
+
 	// Host key checking
 	StrictHostKeyChecking bool `yaml:"strict_host_key_checking"`
-	
+
 	// Known hosts file path
 	KnownHostsFile string `yaml:"known_hosts_file"`
 }
@@ -272,22 +272,22 @@ type SSHConfig struct {
 type CertificateConfig struct {
 	// Default certificate validity period
 	DefaultValidityPeriod string `yaml:"default_validity_period"`
-	
+
 	// Certificate renewal threshold (renew when this much time is left)
 	RenewalThreshold string `yaml:"renewal_threshold"`
-	
+
 	// Key usage settings
 	DefaultKeyUsage    []string `yaml:"default_key_usage"`
 	DefaultExtKeyUsage []string `yaml:"default_ext_key_usage"`
-	
+
 	// Subject Alternative Name settings
 	AllowWildcardDNS bool     `yaml:"allow_wildcard_dns"`
 	AllowedDomains   []string `yaml:"allowed_domains"`
-	
+
 	// Certificate storage and cleanup
-	StoragePath       string `yaml:"storage_path"`        // Path to store certificates on control machine
-	CleanupInterval   string `yaml:"cleanup_interval"`    // How often to clean up expired certificates
-	RetentionPeriod   string `yaml:"retention_period"`    // How long to keep expired certificates
+	StoragePath     string `yaml:"storage_path"`     // Path to store certificates on control machine
+	CleanupInterval string `yaml:"cleanup_interval"` // How often to clean up expired certificates
+	RetentionPeriod string `yaml:"retention_period"` // How long to keep expired certificates
 }
 
 // AgentServerConfig contains Pi Agent gRPC server settings
@@ -558,11 +558,11 @@ func getProductionDefaults() Config {
 					"server_auth",
 					"client_auth",
 				},
-				AllowWildcardDNS:  false,
-				AllowedDomains:    []string{"*.pi-controller.local", "*.cluster.local"},
-				StoragePath:       "./data/certificates",
-				CleanupInterval:   "24h",
-				RetentionPeriod:   "2160h", // 90 days
+				AllowWildcardDNS: false,
+				AllowedDomains:   []string{"*.pi-controller.local", "*.cluster.local"},
+				StoragePath:      "./data/certificates",
+				CleanupInterval:  "24h",
+				RetentionPeriod:  "2160h", // 90 days
 			},
 		},
 	}

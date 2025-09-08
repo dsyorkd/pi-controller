@@ -126,7 +126,7 @@ func loginUser(t *testing.T, server *api.Server, username, password string) (acc
 
 	accessToken = response["access_token"].(string)
 	refreshToken = response["refresh_token"].(string)
-	
+
 	require.NotEmpty(t, accessToken)
 	require.NotEmpty(t, refreshToken)
 
@@ -156,7 +156,7 @@ func testAuthenticationFlow(t *testing.T, server *api.Server, testUsers []struct
 			var profile map[string]interface{}
 			err := json.Unmarshal(w.Body.Bytes(), &profile)
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, user.username, profile["username"])
 			assert.Equal(t, user.email, profile["email"])
 			assert.Equal(t, user.role, profile["role"])

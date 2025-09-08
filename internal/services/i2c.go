@@ -76,9 +76,9 @@ func (s *I2CService) ReadDevice(ctx context.Context, req *I2CReadRequest) (map[s
 	}
 
 	s.logger.WithFields(map[string]interface{}{
-		"node_id":    req.NodeID,
-		"address":    req.Address,
-		"data_keys":  len(mockData),
+		"node_id":   req.NodeID,
+		"address":   req.Address,
+		"data_keys": len(mockData),
 	}).Debug("I2C device read complete (stub implementation)")
 
 	return mockData, nil

@@ -17,7 +17,7 @@ import (
 // ProvisionerHandler handles provisioning-related HTTP requests
 type ProvisionerHandler struct {
 	provisionerService *services.ProvisioningService
-	logger            logger.Interface
+	logger             logger.Interface
 }
 
 // NewProvisionerHandler creates a new provisioner handler
@@ -32,17 +32,17 @@ func NewProvisionerHandler(provisionerService *services.ProvisioningService, log
 
 // ProvisionClusterRequest represents the HTTP request body for cluster provisioning
 type ProvisionClusterRequest struct {
-	MasterNodeID  uint                      `json:"master_node_id" binding:"required"`
-	WorkerNodeIDs []uint                    `json:"worker_node_ids,omitempty"`
-	K3sConfig     services.K3sConfig        `json:"k3s_config,omitempty"`
-	SSHConfig     ProvisionerSSHConfig      `json:"ssh_config" binding:"required"`
+	MasterNodeID  uint                 `json:"master_node_id" binding:"required"`
+	WorkerNodeIDs []uint               `json:"worker_node_ids,omitempty"`
+	K3sConfig     services.K3sConfig   `json:"k3s_config,omitempty"`
+	SSHConfig     ProvisionerSSHConfig `json:"ssh_config" binding:"required"`
 }
 
 // ProvisionNodeRequest represents the HTTP request body for single node provisioning
 type ProvisionNodeRequest struct {
-	Role      string                   `json:"role" binding:"required,oneof=master worker"`
-	K3sConfig services.K3sConfig       `json:"k3s_config,omitempty"`
-	SSHConfig ProvisionerSSHConfig     `json:"ssh_config" binding:"required"`
+	Role      string               `json:"role" binding:"required,oneof=master worker"`
+	K3sConfig services.K3sConfig   `json:"k3s_config,omitempty"`
+	SSHConfig ProvisionerSSHConfig `json:"ssh_config" binding:"required"`
 }
 
 // ProvisionerSSHConfig represents SSH configuration for provisioning
@@ -113,7 +113,7 @@ func (h *ProvisionerHandler) ProvisionCluster(c *gin.Context) {
 	result, err := h.provisionerService.ProvisionCluster(c.Request.Context(), serviceReq)
 	if err != nil {
 		h.logger.WithError(err).Error("Cluster provisioning failed")
-		
+
 		if errors.Is(err, services.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": err.Error(),
@@ -218,7 +218,7 @@ func (h *ProvisionerHandler) ProvisionNode(c *gin.Context) {
 	result, err := h.provisionerService.ProvisionNode(c.Request.Context(), serviceReq)
 	if err != nil {
 		h.logger.WithError(err).Error("Node provisioning failed")
-		
+
 		if errors.Is(err, services.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": err.Error(),
@@ -283,7 +283,7 @@ func (h *ProvisionerHandler) DeprovisionNode(c *gin.Context) {
 	result, err := h.provisionerService.DeprovisionNode(c.Request.Context(), uint(nodeID), h.convertSSHConfig(req.SSHConfig))
 	if err != nil {
 		h.logger.WithError(err).Error("Node deprovisioning failed")
-		
+
 		if errors.Is(err, services.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": err.Error(),
@@ -348,7 +348,7 @@ func (h *ProvisionerHandler) GetClusterToken(c *gin.Context) {
 	token, err := h.provisionerService.GetClusterToken(c.Request.Context(), uint(nodeID), h.convertSSHConfig(sshConfig))
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to retrieve cluster token")
-		
+
 		if errors.Is(err, services.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": err.Error(),
@@ -411,7 +411,7 @@ func (h *ProvisionerHandler) GetKubeConfig(c *gin.Context) {
 	kubeConfig, err := h.provisionerService.GetKubeConfig(c.Request.Context(), uint(nodeID), h.convertSSHConfig(sshConfig))
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to retrieve kubeconfig")
-		
+
 		if errors.Is(err, services.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": err.Error(),

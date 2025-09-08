@@ -28,28 +28,28 @@ type GPIOPin struct {
 type GPIOPinSpec struct {
 	// NodeSelector specifies which node this GPIO pin should be managed on
 	NodeSelector map[string]string `json:"nodeSelector"`
-	
+
 	// PinNumber is the GPIO pin number on the target node
 	PinNumber int `json:"pinNumber"`
-	
+
 	// Mode specifies the pin mode (input, output, pwm)
 	Mode GPIOMode `json:"mode"`
-	
+
 	// Direction specifies the pin direction for input/output modes
 	Direction *GPIODirection `json:"direction,omitempty"`
-	
+
 	// InitialValue sets the initial pin value for output mode
 	InitialValue *GPIOValue `json:"initialValue,omitempty"`
-	
+
 	// PullMode configures internal pull resistors for input mode
 	PullMode *GPIOPullMode `json:"pullMode,omitempty"`
-	
+
 	// DebounceMs sets debounce time in milliseconds for input mode
 	DebounceMs *int `json:"debounceMs,omitempty"`
-	
+
 	// PWMFrequency sets the PWM frequency in Hz (PWM mode only)
 	PWMFrequency *int `json:"pwmFrequency,omitempty"`
-	
+
 	// PWMDutyCycle sets the PWM duty cycle as percentage (0-100)
 	PWMDutyCycle *float64 `json:"pwmDutyCycle,omitempty"`
 }
@@ -58,28 +58,28 @@ type GPIOPinSpec struct {
 type GPIOPinStatus struct {
 	// Phase represents the current lifecycle phase
 	Phase GPIOPhase `json:"phase,omitempty"`
-	
+
 	// NodeID is the ID of the node managing this pin
 	NodeID string `json:"nodeId,omitempty"`
-	
+
 	// CurrentValue is the current pin state (high/low)
 	CurrentValue GPIOValue `json:"currentValue,omitempty"`
-	
+
 	// ActualMode is the currently configured pin mode
 	ActualMode GPIOMode `json:"actualMode,omitempty"`
-	
+
 	// ActualFrequency is the currently configured PWM frequency
 	ActualFrequency *int `json:"actualFrequency,omitempty"`
-	
+
 	// ActualDutyCycle is the currently configured PWM duty cycle
 	ActualDutyCycle *float64 `json:"actualDutyCycle,omitempty"`
-	
+
 	// LastUpdated is the timestamp of the last status update
 	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
-	
+
 	// Conditions represent the current service state
 	Conditions []GPIOCondition `json:"conditions,omitempty"`
-	
+
 	// Message provides additional information about the current state
 	Message string `json:"message,omitempty"`
 }
@@ -88,16 +88,16 @@ type GPIOPinStatus struct {
 type GPIOCondition struct {
 	// Type of condition
 	Type GPIOConditionType `json:"type"`
-	
+
 	// Status of the condition (True, False, Unknown)
 	Status metav1.ConditionStatus `json:"status"`
-	
+
 	// LastTransitionTime is the last time the condition transitioned
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-	
+
 	// Reason is the reason for the condition's last transition
 	Reason string `json:"reason,omitempty"`
-	
+
 	// Message is a human readable message indicating details
 	Message string `json:"message,omitempty"`
 }
@@ -157,10 +157,10 @@ type GPIOConditionType string
 const (
 	// GPIOConditionConfigured indicates whether the GPIO pin is properly configured
 	GPIOConditionConfigured GPIOConditionType = "Configured"
-	
+
 	// GPIOConditionReady indicates whether the GPIO pin is ready for use
 	GPIOConditionReady GPIOConditionType = "Ready"
-	
+
 	// GPIOConditionNodeReachable indicates whether the target node is reachable
 	GPIOConditionNodeReachable GPIOConditionType = "NodeReachable"
 )
@@ -197,25 +197,25 @@ type PWMController struct {
 type PWMControllerSpec struct {
 	// NodeSelector specifies which node this PWM controller should be managed on
 	NodeSelector map[string]string `json:"nodeSelector"`
-	
+
 	// Address is the I2C address of the PWM controller (e.g., 0x40)
 	Address int `json:"address"`
-	
+
 	// BaseFrequency sets the base PWM frequency in Hz for all channels
 	BaseFrequency int `json:"baseFrequency"`
-	
+
 	// ChannelCount is the number of PWM channels supported by this controller
 	ChannelCount int `json:"channelCount"`
-	
+
 	// Channels defines the configuration for individual PWM channels
 	Channels []PWMChannel `json:"channels,omitempty"`
-	
+
 	// OutputEnable controls whether outputs are enabled globally
 	OutputEnable bool `json:"outputEnable"`
-	
+
 	// InvertOutput inverts all PWM outputs if true
 	InvertOutput bool `json:"invertOutput,omitempty"`
-	
+
 	// ExternalClock uses external clock source if true
 	ExternalClock bool `json:"externalClock,omitempty"`
 }
@@ -224,13 +224,13 @@ type PWMControllerSpec struct {
 type PWMChannel struct {
 	// Channel is the channel number (0-15 for PCA9685)
 	Channel int `json:"channel"`
-	
+
 	// DutyCycle sets the PWM duty cycle as percentage (0.0-100.0)
 	DutyCycle float64 `json:"dutyCycle"`
-	
+
 	// PhaseOffset sets the phase offset for this channel in degrees (0-360)
 	PhaseOffset int `json:"phaseOffset,omitempty"`
-	
+
 	// Enabled controls whether this channel is active
 	Enabled bool `json:"enabled"`
 }
@@ -239,22 +239,22 @@ type PWMChannel struct {
 type PWMControllerStatus struct {
 	// Phase represents the current lifecycle phase
 	Phase PWMPhase `json:"phase,omitempty"`
-	
+
 	// NodeID is the ID of the node managing this controller
 	NodeID string `json:"nodeId,omitempty"`
-	
+
 	// ActualFrequency is the currently configured base frequency
 	ActualFrequency int `json:"actualFrequency,omitempty"`
-	
+
 	// ChannelStatus provides status for each channel
 	ChannelStatus []PWMChannelStatus `json:"channelStatus,omitempty"`
-	
+
 	// LastUpdated is the timestamp of the last status update
 	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
-	
+
 	// Conditions represent the current service state
 	Conditions []PWMCondition `json:"conditions,omitempty"`
-	
+
 	// Message provides additional information about the current state
 	Message string `json:"message,omitempty"`
 }
@@ -263,13 +263,13 @@ type PWMControllerStatus struct {
 type PWMChannelStatus struct {
 	// Channel is the channel number
 	Channel int `json:"channel"`
-	
+
 	// ActualDutyCycle is the currently configured duty cycle
 	ActualDutyCycle float64 `json:"actualDutyCycle"`
-	
+
 	// ActualPhaseOffset is the currently configured phase offset
 	ActualPhaseOffset int `json:"actualPhaseOffset"`
-	
+
 	// Enabled indicates if this channel is currently active
 	Enabled bool `json:"enabled"`
 }
@@ -278,16 +278,16 @@ type PWMChannelStatus struct {
 type PWMCondition struct {
 	// Type of condition
 	Type PWMConditionType `json:"type"`
-	
+
 	// Status of the condition (True, False, Unknown)
 	Status metav1.ConditionStatus `json:"status"`
-	
+
 	// LastTransitionTime is the last time the condition transitioned
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-	
+
 	// Reason is the reason for the condition's last transition
 	Reason string `json:"reason,omitempty"`
-	
+
 	// Message is a human readable message indicating details
 	Message string `json:"message,omitempty"`
 }
@@ -309,13 +309,13 @@ type PWMConditionType string
 const (
 	// PWMConditionConfigured indicates whether the PWM controller is properly configured
 	PWMConditionConfigured PWMConditionType = "Configured"
-	
+
 	// PWMConditionReady indicates whether the PWM controller is ready for use
 	PWMConditionReady PWMConditionType = "Ready"
-	
+
 	// PWMConditionNodeReachable indicates whether the target node is reachable
 	PWMConditionNodeReachable PWMConditionType = "NodeReachable"
-	
+
 	// PWMConditionI2CConnected indicates whether the I2C device is accessible
 	PWMConditionI2CConnected PWMConditionType = "I2CConnected"
 )
@@ -352,22 +352,22 @@ type I2CDevice struct {
 type I2CDeviceSpec struct {
 	// NodeSelector specifies which node this I2C device should be managed on
 	NodeSelector map[string]string `json:"nodeSelector"`
-	
+
 	// Address is the I2C address of the device (e.g., "0x48")
 	Address string `json:"address"`
-	
+
 	// DeviceType identifies the type of I2C device
 	DeviceType I2CDeviceType `json:"deviceType"`
-	
+
 	// BusNumber specifies the I2C bus number (default: 1)
 	BusNumber int `json:"busNumber,omitempty"`
-	
+
 	// Registers defines the register configuration for the device
 	Registers []I2CRegister `json:"registers,omitempty"`
-	
+
 	// DataFormat specifies how to interpret device data
 	DataFormat I2CDataFormat `json:"dataFormat,omitempty"`
-	
+
 	// ScanInterval sets how often to read from the device (in seconds)
 	ScanInterval int `json:"scanInterval,omitempty"`
 }
@@ -376,16 +376,16 @@ type I2CDeviceSpec struct {
 type I2CRegister struct {
 	// Address is the register address
 	Address int `json:"address"`
-	
+
 	// Name is a human-readable name for this register
 	Name string `json:"name"`
-	
+
 	// Mode defines whether this register is readable, writable, or both
 	Mode I2CRegisterMode `json:"mode"`
-	
+
 	// Size is the register size in bytes (1, 2, or 4)
 	Size int `json:"size"`
-	
+
 	// InitialValue sets the initial value to write (for writable registers)
 	InitialValue *int `json:"initialValue,omitempty"`
 }
@@ -394,22 +394,22 @@ type I2CRegister struct {
 type I2CDeviceStatus struct {
 	// Phase represents the current lifecycle phase
 	Phase I2CPhase `json:"phase,omitempty"`
-	
+
 	// NodeID is the ID of the node managing this device
 	NodeID string `json:"nodeId,omitempty"`
-	
+
 	// RegisterData contains the latest data read from device registers
 	RegisterData map[string]interface{} `json:"registerData,omitempty"`
-	
+
 	// LastScan is the timestamp of the last successful device scan
 	LastScan *metav1.Time `json:"lastScan,omitempty"`
-	
+
 	// LastUpdated is the timestamp of the last status update
 	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
-	
+
 	// Conditions represent the current service state
 	Conditions []I2CCondition `json:"conditions,omitempty"`
-	
+
 	// Message provides additional information about the current state
 	Message string `json:"message,omitempty"`
 }
@@ -418,16 +418,16 @@ type I2CDeviceStatus struct {
 type I2CCondition struct {
 	// Type of condition
 	Type I2CConditionType `json:"type"`
-	
+
 	// Status of the condition (True, False, Unknown)
 	Status metav1.ConditionStatus `json:"status"`
-	
+
 	// LastTransitionTime is the last time the condition transitioned
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
-	
+
 	// Reason is the reason for the condition's last transition
 	Reason string `json:"reason,omitempty"`
-	
+
 	// Message is a human readable message indicating details
 	Message string `json:"message,omitempty"`
 }
@@ -487,13 +487,13 @@ type I2CConditionType string
 const (
 	// I2CConditionConfigured indicates whether the I2C device is properly configured
 	I2CConditionConfigured I2CConditionType = "Configured"
-	
+
 	// I2CConditionReady indicates whether the I2C device is ready for use
 	I2CConditionReady I2CConditionType = "Ready"
-	
+
 	// I2CConditionNodeReachable indicates whether the target node is reachable
 	I2CConditionNodeReachable I2CConditionType = "NodeReachable"
-	
+
 	// I2CConditionDeviceConnected indicates whether the I2C device is accessible
 	I2CConditionDeviceConnected I2CConditionType = "DeviceConnected"
 )

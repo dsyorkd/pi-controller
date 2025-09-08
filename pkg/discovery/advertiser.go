@@ -48,12 +48,12 @@ func DefaultAdvertiserConfig() *AdvertiserConfig {
 
 // Advertiser provides mDNS advertisement functionality for Pi Agents
 type Advertiser struct {
-	config    *AdvertiserConfig
-	logger    *logrus.Entry
-	server    *mdns.Server
-	mu        sync.Mutex
-	running   bool
-	stopChan  chan struct{}
+	config   *AdvertiserConfig
+	logger   *logrus.Entry
+	server   *mdns.Server
+	mu       sync.Mutex
+	running  bool
+	stopChan chan struct{}
 }
 
 // NewAdvertiser creates a new mDNS advertiser
@@ -198,7 +198,7 @@ func (a *Advertiser) IsRunning() bool {
 func (a *Advertiser) GetConfig() *AdvertiserConfig {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	
+
 	// Return a copy to prevent external modification
 	configCopy := *a.config
 	txtCopy := make(map[string]string)
@@ -206,7 +206,7 @@ func (a *Advertiser) GetConfig() *AdvertiserConfig {
 		txtCopy[k] = v
 	}
 	configCopy.TXTRecords = txtCopy
-	
+
 	return &configCopy
 }
 
@@ -295,7 +295,7 @@ func (a *Advertiser) isPrivateIP(ip net.IP) bool {
 	if ip == nil {
 		return false
 	}
-	
+
 	ip = ip.To4()
 	if ip == nil {
 		return false
@@ -305,9 +305,9 @@ func (a *Advertiser) isPrivateIP(ip net.IP) bool {
 	private := []struct {
 		start, end byte
 	}{
-		{10, 10},       // 10.0.0.0/8
-		{172, 172},     // 172.16.0.0/12 (we'll check second octet below)
-		{192, 192},     // 192.168.0.0/16
+		{10, 10},   // 10.0.0.0/8
+		{172, 172}, // 172.16.0.0/12 (we'll check second octet below)
+		{192, 192}, // 192.168.0.0/16
 	}
 
 	for _, p := range private {
@@ -385,13 +385,13 @@ func (a *Advertiser) SetCapabilities(capabilities []string) error {
 	for k, v := range a.config.TXTRecords {
 		records[k] = v
 	}
-	
+
 	if len(capabilities) > 0 {
 		records["capabilities"] = strings.Join(capabilities, ",")
 	} else {
 		delete(records, "capabilities")
 	}
-	
+
 	return a.UpdateTXTRecords(records)
 }
 
@@ -401,12 +401,12 @@ func (a *Advertiser) SetVersion(version string) error {
 	for k, v := range a.config.TXTRecords {
 		records[k] = v
 	}
-	
+
 	if version != "" {
 		records["version"] = version
 	} else {
 		delete(records, "version")
 	}
-	
+
 	return a.UpdateTXTRecords(records)
 }

@@ -161,7 +161,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 		log.WithError(err).Warn("Failed to initialize CA service - running without CA functionality")
 	} else {
 		log.Info("CA service initialized successfully")
-		
+
 		// Initialize CA if it hasn't been initialized yet (this is idempotent)
 		if err := caService.InitializeCA(context.Background()); err != nil {
 			log.WithError(err).Warn("CA initialization failed - manual initialization may be required")
@@ -360,14 +360,14 @@ func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log
 		if err := nodeService.UpdateLastSeen(existingNode.ID); err != nil {
 			return errors.Wrapf(err, "failed to update last seen for existing node")
 		}
-		
+
 		log.WithFields(map[string]interface{}{
 			"node_id":      existingNode.ID,
 			"node_name":    existingNode.Name,
 			"ip_address":   existingNode.IPAddress,
 			"discovery_id": node.ID,
 		}).Info("Updated existing node last seen timestamp")
-		
+
 		return nil
 	}
 
@@ -376,7 +376,7 @@ func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log
 	model := node.TXTRecords["model"]
 	version := node.TXTRecords["version"]
 	nodeIdFromTXT := node.TXTRecords["node_id"]
-	
+
 	// Use discovery node_id if available from TXT records, otherwise use discovery ID
 	nodeName := node.Name
 	if nodeIdFromTXT != "" {
@@ -394,7 +394,7 @@ func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log
 		Role:         role,
 		Architecture: architecture,
 		Model:        model,
-		CPUCores:     1, // Default, will be updated when node connects
+		CPUCores:     1,                  // Default, will be updated when node connects
 		Memory:       1024 * 1024 * 1024, // Default 1GB, will be updated when node connects
 	}
 
@@ -416,14 +416,14 @@ func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log
 
 	// TODO: Generate and distribute client certificates for secure gRPC communication
 	// This will be implemented in a future task (Task 28: Certificate Authority)
-	
+
 	return nil
 }
 
 // handleNodeLost processes node lost events and updates node status
 func handleNodeLost(event discovery.NodeEvent, db *storage.Database, log *logger.Logger) error {
 	node := event.Node
-	
+
 	log.WithFields(map[string]interface{}{
 		"node_id":    node.ID,
 		"ip_address": node.IPAddress,
@@ -453,10 +453,10 @@ func handleNodeLost(event discovery.NodeEvent, db *storage.Database, log *logger
 	}
 
 	log.WithFields(map[string]interface{}{
-		"node_id":      existingNode.ID,
-		"node_name":    existingNode.Name,
-		"ip_address":   existingNode.IPAddress,
-		"new_status":   models.NodeStatusUnknown,
+		"node_id":    existingNode.ID,
+		"node_name":  existingNode.Name,
+		"ip_address": existingNode.IPAddress,
+		"new_status": models.NodeStatusUnknown,
 	}).Info("Updated node status due to lost event")
 
 	return nil
@@ -465,7 +465,7 @@ func handleNodeLost(event discovery.NodeEvent, db *storage.Database, log *logger
 // handleNodeUpdate processes node update events and refreshes node information
 func handleNodeUpdate(event discovery.NodeEvent, db *storage.Database, log *logger.Logger) error {
 	node := event.Node
-	
+
 	log.WithFields(map[string]interface{}{
 		"node_id":    node.ID,
 		"ip_address": node.IPAddress,
@@ -493,7 +493,7 @@ func handleNodeUpdate(event discovery.NodeEvent, db *storage.Database, log *logg
 	// Extract updated node information from TXT records
 	architecture := node.TXTRecords["arch"]
 	model := node.TXTRecords["model"]
-	
+
 	updateReq := services.UpdateNodeRequest{}
 	hasUpdates := false
 
@@ -532,8 +532,8 @@ func handleNodeUpdate(event discovery.NodeEvent, db *storage.Database, log *logg
 		}).Info("Updated node information from discovery update")
 	} else {
 		log.WithFields(map[string]interface{}{
-			"node_id":      existingNode.ID,
-			"ip_address":   existingNode.IPAddress,
+			"node_id":    existingNode.ID,
+			"ip_address": existingNode.IPAddress,
 		}).Debug("Node update event processed, no changes detected")
 	}
 

@@ -24,12 +24,12 @@ func NewPWMService(db *storage.Database, logger logger.Interface) *PWMService {
 // ConfigureController configures a PWM controller for Kubernetes controller integration
 func (s *PWMService) ConfigureController(ctx context.Context, req *PWMRequest) error {
 	s.logger.WithFields(map[string]interface{}{
-		"node_id":         req.NodeID,
-		"address":         req.Address,
-		"base_frequency":  req.BaseFrequency,
-		"channel_count":   req.ChannelCount,
-		"output_enable":   req.OutputEnable,
-		"channels":        len(req.Channels),
+		"node_id":        req.NodeID,
+		"address":        req.Address,
+		"base_frequency": req.BaseFrequency,
+		"channel_count":  req.ChannelCount,
+		"output_enable":  req.OutputEnable,
+		"channels":       len(req.Channels),
 	}).Info("Configuring PWM controller for Kubernetes controller")
 
 	// Handle cleanup mode

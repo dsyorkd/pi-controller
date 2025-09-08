@@ -21,7 +21,7 @@ import (
 func TestBasicRBAC(t *testing.T) {
 	// Set development environment to disable HTTPS requirement
 	t.Setenv("ENVIRONMENT", "development")
-	
+
 	// Create test database
 	dbConfig := &storage.Config{
 		Path:            ":memory:",

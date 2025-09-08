@@ -163,10 +163,9 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          GOARM: ${{ matrix.goarm || '' }}
           CGO_ENABLED: 0
         run: |
-          echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }}"
+          echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}"
           make build
           
           # Create organized output directory
@@ -217,7 +216,7 @@ jobs:
           Pi Controller Build Information
           ==============================
           
-          Platform: ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }}
+          Platform: ${{ matrix.goos }}/${{ matrix.goarch }}
           Go Version: ${{ env.GO_VERSION }}
           Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           Git Commit: $(git rev-parse --short HEAD)
