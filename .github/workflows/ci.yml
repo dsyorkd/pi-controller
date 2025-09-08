@@ -65,14 +65,24 @@ jobs:
       - name: Generate protobuf code
         run: make proto
 
+      - name: Format generated code after protobuf generation
+        run: |
+          echo "Formatting any generated code..."
+          go fmt ./proto/...
+
       - name: Format check
         run: |
           make fmt
-          if [[ -n $(git status --porcelain) ]]; then
+          # Exclude generated protobuf files from format check
+          git status --porcelain | grep -v "\.pb\.go$" > /tmp/format_changes || true
+          if [[ -s /tmp/format_changes ]]; then
             echo "Code is not properly formatted. Run 'make fmt' locally."
-            git diff
+            echo "Changed files (excluding generated .pb.go files):"
+            cat /tmp/format_changes
+            git diff -- ':(exclude)*.pb.go'
             exit 1
           fi
+          echo "✅ All non-generated code is properly formatted"
 
       - name: Vet check
         run: make vet

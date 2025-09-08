@@ -18,6 +18,10 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Generated protobuf files (regenerated during build)
+*.pb.go
+*_grpc.pb.go
+
 # Dependency directories (when vendoring is used)
 vendor/
 
