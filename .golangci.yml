@@ -67,7 +67,6 @@ linters:
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     
     # Code formatting
