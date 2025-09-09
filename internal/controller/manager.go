@@ -11,6 +11,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
@@ -59,8 +60,19 @@ func NewControllerManager(config *ControllerManagerConfig, logrusLogger *logrus.
 		config = DefaultControllerManagerConfig()
 	}
 
-	// Create a logger instance that implements the logger.Interface
-	internalLogger := logger.NewLogrusAdapter(logrusLogger)
+	// Create internal logger from logrus configuration
+	// Convert logrus config to internal logger config
+	loggerConfig := logger.Config{
+		Level:  logrusLogger.Level.String(),
+		Format: "text", // Default to text format
+		Output: "stdout",
+	}
+	
+	// Create internal logger that implements the logger.Interface
+	internalLogger, err := logger.New(loggerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create internal logger: %w", err)
+	}
 
 	// Create services
 	gpioService := services.NewGPIOService(db, internalLogger)
@@ -91,8 +103,10 @@ func (cm *ControllerManager) Start(ctx context.Context) error {
 
 	// Create controller manager configuration
 	opts := ctrl.Options{
-		Scheme:                  scheme,
-		MetricsBindAddress:      cm.config.MetricsAddr,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: cm.config.MetricsAddr,
+		},
 		HealthProbeBindAddress:  cm.config.HealthAddr,
 		LeaderElection:          cm.config.LeaderElection,
 		LeaderElectionID:        cm.config.LeaderElectionID,

@@ -187,8 +187,6 @@ func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov
 	}).Info("GPIO pin configuration would be performed here")
 
 	// Temporary stub - return success for now
-	return nil
-
 	logger.Info("Successfully configured GPIO pin")
 	return nil
 }
