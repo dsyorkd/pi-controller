@@ -1,65 +1,11 @@
-version: "2"
+# yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
 
-linters-settings:
-  dupl:
-    threshold: 100
-  funlen:
-    lines: 100
-    statements: 50
-  gci:
-    sections:
-      - standard
-      - default
-      - prefix(github.com/dsyorkd/pi-controller)
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-    ignore-tests: true
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-    disabled-checks:
-      - dupImport # https://github.com/go-critic/go-critic/issues/845
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
-      - hugeParam # Allow large structs to be passed by value for now
-      - rangeValCopy # Allow copying in loops for readability  
-      - paramTypeCombine # Allow separate parameters for readability
-      - stringXbytes # Allow string/byte comparisons
-      - unnamedResult # Allow unnamed results
-  gocyclo:
-    min-complexity: 15
-  goimports:
-    local-prefixes: github.com/dsyorkd/pi-controller
-  govet:
-    enable:
-      - shadow
-    settings:
-      printf:
-        funcs:
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
-  lll:
-    line-length: 160  # Increased for long security headers
-  mnd:
-    settings:
-      mnd:
-        # don't include the "operation" and "assign"
-        checks: argument,case,condition,return
-  misspell:
-    locale: US
-  nolintlint:
-    allow-leading-space: true # don't require machine-readable nolint directives (i.e. with no leading space)
-    allow-unused: false # report any unused nolint directives
-    require-explanation: false # don't require an explanation for nolint directives
-    require-specific: false # don't require nolint directives to be specific about which linter is being skipped
+run:
+  timeout: 5m
+  modules-download-mode: readonly
 
 linters:
+  default: fast
   enable:
     # Essential linters
     - errcheck
@@ -84,43 +30,120 @@ linters:
     - unconvert
     - unparam
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - dupl
-        - gosec
-        - unparam
+  settings:
+    dupl:
+      threshold: 100
+    
+    funlen:
+      lines: 100
+      statements: 50
+    
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/dsyorkd/pi-controller)
+    
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+      ignore-tests: true
+    
+    gocritic:
+      settings:
+        enabled-tags:
+          - diagnostic
+          - performance
+        disabled-checks:
+          - dupImport # https://github.com/go-critic/go-critic/issues/845
+          - ifElseChain
+          - octalLiteral
+          - whyNoLint
+          - wrapperFunc
+          - hugeParam # Allow large structs to be passed by value for now
+          - rangeValCopy # Allow copying in loops for readability  
+          - paramTypeCombine # Allow separate parameters for readability
+          - stringXbytes # Allow string/byte comparisons
+          - unnamedResult # Allow unnamed results
+    
+    gocyclo:
+      min-complexity: 15
+    
+    goimports:
+      local-prefixes: github.com/dsyorkd/pi-controller
+    
+    govet:
+      settings:
+        shadow:
+          strict: true
+        printf:
+          funcs:
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+            - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+    
+    lll:
+      line-length: 160  # Increased for long security headers
+    
+    mnd:
+      settings:
+        mnd:
+          # don't include the "operation" and "assign"
+          checks: argument,case,condition,return
+    
+    misspell:
+      locale: US
+    
+    nolintlint:
+      allow-leading-space: true # don't require machine-readable nolint directives (i.e. with no leading space)
+      allow-unused: false # report any unused nolint directives
+      require-explanation: false # don't require an explanation for nolint directives
+      require-specific: false # don't require nolint directives to be specific about which linter is being skipped
 
-    # Allow stub files to be duplicated
-    - path: _stub\.go
-      linters:
-        - dupl
+  exclusions:
+    warn-unused: true
+    generated: lax
+    
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl
+          - gosec
+          - unparam
 
-    # Ignore deprecated warnings in test files
-    - path: _test\.go
-      linters:
-        - staticcheck
-      text: "SA1019:"
-        
-    # Allow empty branches in security checks
-    - linters:
-        - staticcheck
-      text: "SA9003:"
-        
-    # Allow integer overflow conversions in gRPC code for now
-    - path: internal/grpc/
-      linters:
-        - gosec
-      text: "G115:"
+      # Allow stub files to be duplicated
+      - path: _stub\.go
+        linters:
+          - dupl
 
-  exclude-dirs:
-    - build
-    - vendor
-  exclude-files:
-    - ".*\\.pb\\.go$"
-    - ".*_mock\\.go$"
+      # Ignore deprecated warnings in test files
+      - path: _test\.go
+        linters:
+          - staticcheck
+        text: "SA1019:"
+          
+      # Allow empty branches in security checks
+      - linters:
+          - staticcheck
+        text: "SA9003:"
+          
+      # Allow integer overflow conversions in gRPC code for now
+      - path: internal/grpc/
+        linters:
+          - gosec
+        text: "G115:"
 
-run:
-  timeout: 5m
-  modules-download-mode: readonly
+      # Exclude protobuf generated files
+      - path: ".*\\.pb\\.go$"
+        linters:
+          - all
+      
+      # Exclude mock files
+      - path: ".*_mock\\.go$"
+        linters:
+          - all
+    
+    paths:
+      - build
+      - vendor
