@@ -87,11 +87,11 @@ jobs:
       - name: Vet check
         run: make vet
 
-      - name: Install golangci-lint
-        run: make install-lint
-
-      - name: Lint
-        run: make lint
+      - name: Install and run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          skip-cache: true
 
   # Unit and integration tests on Ubuntu runner
   test:
