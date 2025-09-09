@@ -36,7 +36,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"  # Use Go 1.25 for consistency
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 

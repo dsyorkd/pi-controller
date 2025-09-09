@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"
-  GOLANGCI_LINT_VERSION: "v1.54"
+  GO_VERSION: "1.25"  # Use Go 1.25 with compatible golangci-lint v2.4.0
+  GOLANGCI_LINT_VERSION: "v2.4.0"
 
 jobs:
   # Quick validation job using Ubuntu self-hosted runner (no container)
@@ -58,11 +58,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Install dependencies
-        run: make deps
-
-      - name: Generate protobuf code
+      - name: Generate protobuf code first
         run: make proto
+
+      - name: Install dependencies after protobuf generation
+        run: make proto && make deps
 
       - name: Format check
         run: |
@@ -104,7 +104,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: make deps
+        run: make proto && make deps
 
       - name: Generate protobuf code
         run: make proto
