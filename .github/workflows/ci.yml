@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.23.4"  # Use specific version to avoid Go 1.25+ compatibility issues
-  GOLANGCI_LINT_VERSION: "v1.54"
+  GO_VERSION: "1.25"  # Use Go 1.25 with compatible golangci-lint v2.4.0
+  GOLANGCI_LINT_VERSION: "v2.4.0"
 
 jobs:
   # Quick validation job using Ubuntu self-hosted runner
@@ -90,7 +90,7 @@ jobs:
       - name: Install and run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.4.0  # Explicit version with Go 1.25 support
           skip-cache: true
 
   # Unit and integration tests on Ubuntu runner
