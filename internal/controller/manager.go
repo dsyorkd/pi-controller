@@ -67,7 +67,7 @@ func NewControllerManager(config *ControllerManagerConfig, logrusLogger *logrus.
 		Format: "text", // Default to text format
 		Output: "stdout",
 	}
-	
+
 	// Create internal logger that implements the logger.Interface
 	internalLogger, err := logger.New(loggerConfig)
 	if err != nil {
