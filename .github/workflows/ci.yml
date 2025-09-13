@@ -20,34 +20,13 @@ jobs:
   validate:
     name: Code Validation
     runs-on: [self-hosted, ubuntu]
-    # container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0  # Disabled until Docker is available
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0  # Updated image with Go 1.25 and all dependencies
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
-
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -62,8 +41,8 @@ jobs:
       - name: Generate protobuf code first
         run: make proto
 
-      - name: Install dependencies after protobuf generation
-        run: make proto && make deps
+      - name: Install Go dependencies after protobuf generation
+        run: make deps
 
       - name: Format generated code after protobuf generation
         run: |
@@ -87,39 +66,35 @@ jobs:
       - name: Vet check
         run: make vet
 
-      - name: Install and run golangci-lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.4.0  # Explicit version with Go 1.25 support
-          skip-cache: true
+      - name: Run golangci-lint
+        run: golangci-lint run --config=.golangci.yml
 
   # Unit and integration tests on Ubuntu runner
   test:
     name: Tests
     runs-on: [self-hosted, ubuntu]
-    # container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0  # Disabled until Docker is available
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0  # Updated image with Go 1.25 and all dependencies
     needs: validate
     timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Cache dependencies
+        uses: actions/cache@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Install dependencies
-        run: make proto && make deps
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Generate protobuf code
         run: make proto
+
+      - name: Install Go dependencies
+        run: make deps
 
       - name: Run unit tests
         run: make test-unit
@@ -151,7 +126,7 @@ jobs:
   build:
     name: Build Binaries
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: validate
     timeout-minutes: 8
     strategy:
@@ -176,11 +151,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: make proto && make deps
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Generate protobuf code
         run: make proto
+
+      - name: Install Go dependencies
+        run: make deps
 
       - name: Build binaries
         env:
@@ -275,18 +260,28 @@ jobs:
   migration-test:
     name: Database Migration Tests
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: validate
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: make proto && make deps
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Generate protobuf code
         run: make proto
+
+      - name: Install Go dependencies
+        run: make deps
 
       - name: Test database migrations
         run: make db-test-migrations
@@ -303,18 +298,28 @@ jobs:
   performance-test:
     name: Performance & Race Tests
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: [validate, test]
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: make proto && make deps
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Generate protobuf code
         run: make proto
+
+      - name: Install Go dependencies
+        run: make deps
 
       - name: Run race condition tests
         run: make test-race
@@ -329,18 +334,28 @@ jobs:
   comprehensive-test:
     name: Comprehensive Test Suite
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: [test, build, migration-test, performance-test]
     timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: make proto && make deps
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Generate protobuf code
         run: make proto
+
+      - name: Install Go dependencies
+        run: make deps
 
       - name: Run comprehensive test suite
         run: make test-comprehensive
@@ -364,7 +379,7 @@ jobs:
   status-check:
     name: CI Status Check
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
+    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: [validate, test, build, migration-test, performance-test, comprehensive-test, hardware-test]
     if: always()
     timeout-minutes: 5
