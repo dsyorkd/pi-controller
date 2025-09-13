@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -88,6 +89,11 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	}
 
 	structuredLogger.Info("Configuration loaded")
+
+	// Initialize Sentry SDK
+	if err := initializeSentry(cfg, structuredLogger); err != nil {
+		structuredLogger.WithError(err).Warn("Failed to initialize Sentry - continuing without error tracking")
+	}
 
 	// Override configuration with command-line flags
 	if serverAddress != "" {
@@ -278,10 +284,66 @@ func runAgent(cmd *cobra.Command, args []string) error {
 			cancel()
 
 		case <-ctx.Done():
+			// Flush any pending Sentry events
+			sentry.Flush(2 * time.Second)
+
 			structuredLogger.Info("Pi Agent shutdown complete")
 			return nil
 		}
 	}
+}
+
+// initializeSentry initializes the Sentry SDK with the provided configuration
+func initializeSentry(cfg *config.Config, log logger.Interface) error {
+	// Skip initialization if DSN is not provided
+	if cfg.Sentry.DSN == "" {
+		log.Debug("Sentry DSN not configured, skipping initialization")
+		return nil
+	}
+
+	// Set release to application version if not configured
+	release := cfg.Sentry.Release
+	if release == "" {
+		release = version
+	}
+
+	// Initialize Sentry SDK
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:                cfg.Sentry.DSN,
+		Environment:        cfg.Sentry.Environment,
+		Release:            release,
+		Debug:              cfg.Sentry.Debug,
+		TracesSampleRate:   cfg.Sentry.TracesSampleRate,
+		SampleRate:         cfg.Sentry.SampleRate,
+		EnableTracing:      cfg.Sentry.EnableTracing,
+		SendDefaultPII:     cfg.Sentry.SendDefaultPII,
+		MaxBreadcrumbs:     cfg.Sentry.MaxBreadcrumbs,
+		AttachStacktrace:   cfg.Sentry.AttachStacktrace,
+		ServerName:         "", // Don't send server name for privacy
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			// Filter out sensitive information from error events
+			if event.Request != nil {
+				// Remove authorization headers
+				if event.Request.Headers != nil {
+					delete(event.Request.Headers, "authorization")
+					delete(event.Request.Headers, "Authorization")
+				}
+			}
+			return event
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to initialize Sentry SDK: %w", err)
+	}
+
+	log.WithFields(map[string]interface{}{
+		"environment": cfg.Sentry.Environment,
+		"release":     release,
+		"debug":       cfg.Sentry.Debug,
+	}).Info("Sentry SDK initialized successfully")
+
+	return nil
 }
 
 // setupStructuredLogger creates a structured logger compatible with our logger interface

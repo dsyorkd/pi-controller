@@ -651,16 +651,16 @@
       },
       {
         "id": 34,
-        "title": "Complete CRUD Operations for All Models",
-        "description": "Ensure all database models (Cluster, Node, GPIO, etc.) have complete and tested Create, Read, Update, and Delete operations exposed through the service layer and API.",
-        "details": "Review all models defined in the database layer. For each model, implement the corresponding service methods and Gin API handlers for all CRUD operations. Ensure proper transaction handling is used for operations that modify multiple tables.\n<info added on 2025-09-02T04:19:52.117Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:19:52.117Z>",
-        "testStrategy": "Write integration tests for each API endpoint. For each model, test creating a new entry, retrieving it, updating it, and finally deleting it, verifying the database state and API responses at each step.",
-        "priority": "medium",
+        "title": "Implement Business-Aligned API Operations",
+        "description": "Refactor the API from generic CRUD to expose business-aligned operations for managing Raspberry Pi Kubernetes clusters. This involves creating new service methods and API endpoints for cluster lifecycle, node management, GPIO control, and certificate authority tasks, moving beyond simple database table manipulation.",
+        "status": "todo",
         "dependencies": [
           13,
           14
         ],
-        "status": "todo",
+        "priority": "medium",
+        "details": "Instead of generic CRUD, implement a business-logic-focused API. This involves creating new methods in the service layer (`internal/services/`) that orchestrate complex actions and exposing them via new, action-oriented Gin handlers (`internal/api/handlers/`).\n\n**1. Cluster Lifecycle Operations:**\n- Implement `ProvisionCluster`, `DeprovisionCluster`, `GetClusterStatus`, and `ScaleCluster` methods in `internal/services/cluster_service.go`.\n- These methods should integrate with the Kubernetes provisioner in `pkg/k8s/provisioner.go`.\n- Expose these via the following endpoints in `internal/api/handlers/cluster_handler.go`:\n  - `POST /api/v1/clusters/{id}/provision`\n  - `POST /api/v1/clusters/{id}/deprovision`\n  - `GET /api/v1/clusters/{id}/status`\n  - `POST /api/v1/clusters/{id}/scale`\n\n**2. Node Discovery & Management:**\n- Implement `DiscoverNodes`, `ProvisionNode`, `DeprovisionNode`, and `RebootNode` in `internal/services/node_service.go`.\n- The discovery service should leverage the network scanner in `pkg/network/scanner.go`.\n- Expose these via the following endpoints in `internal/api/handlers/node_handler.go`:\n  - `POST /api/v1/nodes/discover`\n  - `POST /api/v1/nodes/{id}/provision`\n  - `POST /api/v1/nodes/{id}/deprovision`\n  - `POST /api/v1/nodes/{id}/reboot`\n\n**3. GPIO-as-a-Service Operations:**\n- Implement `ReservePin`, `ReleasePin`, `ReadPinValue`, and `WritePinValue` in `internal/services/gpio_service.go`.\n- These services will interact with the low-level GPIO controllers in `pkg/gpio/control.go`.\n- Expose these via the following endpoints in `internal/api/handlers/gpio_handler.go`:\n  - `POST /api/v1/gpio/{id}/reserve`\n  - `DELETE /api/v1/gpio/{id}/reserve`\n  - `GET /api/v1/gpio/{id}/read`\n  - `POST /api/v1/gpio/{id}/write`\n\n**4. Certificate Authority Operations:**\n- Implement `InitializeCA`, `IssueCertificate`, and `RevokeCertificate` in `internal/services/ca_service.go`.\n- This service will use the PKI functionality defined in `pkg/pki/ca.go`.\n- Expose these via the following endpoints in `internal/api/handlers/ca_handler.go`:\n  - `POST /api/v1/ca/initialize`\n  - `POST /api/v1/certificates/issue`\n  - `POST /api/v1/certificates/{id}/revoke`\n\nBasic CRUD endpoints for administrative purposes can be maintained but are not the focus of this task.\n<info added on 2025-09-02T04:19:52.117Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:19:52.117Z>",
+        "testStrategy": "Write integration tests for each business-oriented API endpoint. For example, for cluster provisioning, test the `POST /clusters/{id}/provision` endpoint. Mock the underlying `k8s.Provisioner` to simulate success and failure scenarios, and verify that the cluster's state in the database is updated correctly and the API returns the appropriate status code. Similarly, test node discovery by mocking the `network.Scanner` and verifying that new `Node` records are created.",
         "subtasks": []
       },
       {
@@ -1183,7 +1183,7 @@
         "testStrategy": "Run `go mod tidy` to verify dependencies are added correctly. Verify the application compiles with the new configuration struct. Manually test that setting the `SENTRY_DSN` environment variable populates the config struct correctly on startup.",
         "priority": "high",
         "dependencies": [],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1196,7 +1196,7 @@
         "dependencies": [
           43
         ],
-        "status": "todo",
+        "status": "in-progress",
         "subtasks": []
       },
       {
@@ -1305,7 +1305,7 @@
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-04T20:02:13.246Z",
+      "updated": "2025-09-13T18:28:40.810Z",
       "description": "Tasks for master context"
     }
   }

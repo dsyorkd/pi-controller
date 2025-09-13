@@ -48,6 +48,9 @@ type Config struct {
 
 	// Certificate Authority configuration
 	CA CAConfig `yaml:"ca"`
+
+	// Sentry configuration
+	Sentry SentryConfig `yaml:"sentry"`
 }
 
 // AppConfig contains general application settings
@@ -304,6 +307,39 @@ type AgentServerConfig struct {
 	TLSKeyFile  string `yaml:"tls_key_file"`
 }
 
+// SentryConfig contains Sentry error tracking and performance monitoring settings
+type SentryConfig struct {
+	// Sentry DSN (Data Source Name)
+	DSN string `yaml:"dsn"`
+
+	// Environment name (e.g., development, staging, production)
+	Environment string `yaml:"environment"`
+
+	// Release version for tracking
+	Release string `yaml:"release"`
+
+	// Enable debug mode for Sentry SDK
+	Debug bool `yaml:"debug"`
+
+	// Sample rate for performance monitoring (0.0 to 1.0)
+	TracesSampleRate float64 `yaml:"traces_sample_rate"`
+
+	// Sample rate for errors (0.0 to 1.0)
+	SampleRate float64 `yaml:"sample_rate"`
+
+	// Enable performance monitoring
+	EnableTracing bool `yaml:"enable_tracing"`
+
+	// Send PII (Personally Identifiable Information)
+	SendDefaultPII bool `yaml:"send_default_pii"`
+
+	// Maximum number of breadcrumbs
+	MaxBreadcrumbs int `yaml:"max_breadcrumbs"`
+
+	// Attach stack traces to messages
+	AttachStacktrace bool `yaml:"attach_stacktrace"`
+}
+
 // Load loads configuration from YAML file with defaults
 func Load(configPath string) (*Config, error) {
 	// Start with defaults
@@ -381,6 +417,22 @@ func (c *Config) validate() error {
 	}
 	if c.WebSocket.Port < 1 || c.WebSocket.Port > 65535 {
 		return fmt.Errorf("invalid WebSocket port: %d", c.WebSocket.Port)
+	}
+
+	// Set default Sentry environment and release if not specified
+	if c.Sentry.Environment == "" {
+		c.Sentry.Environment = c.App.Environment
+	}
+	if c.Sentry.Release == "" {
+		c.Sentry.Release = c.App.Version
+	}
+
+	// Validate Sentry sample rates
+	if c.Sentry.TracesSampleRate < 0.0 || c.Sentry.TracesSampleRate > 1.0 {
+		return fmt.Errorf("invalid Sentry traces sample rate: %f (must be between 0.0 and 1.0)", c.Sentry.TracesSampleRate)
+	}
+	if c.Sentry.SampleRate < 0.0 || c.Sentry.SampleRate > 1.0 {
+		return fmt.Errorf("invalid Sentry sample rate: %f (must be between 0.0 and 1.0)", c.Sentry.SampleRate)
 	}
 
 	return nil
@@ -565,6 +617,18 @@ func getProductionDefaults() Config {
 				RetentionPeriod:  "2160h", // 90 days
 			},
 		},
+		Sentry: SentryConfig{
+			DSN:                 "", // Must be set via environment variable
+			Environment:         "", // Will be set from App.Environment if not specified
+			Release:             "", // Will be set from App.Version if not specified
+			Debug:               false,
+			TracesSampleRate:    0.1,  // 10% sampling for performance
+			SampleRate:          1.0,  // 100% error sampling
+			EnableTracing:       true,
+			SendDefaultPII:      false, // Security: don't send PII by default
+			MaxBreadcrumbs:      100,
+			AttachStacktrace:    true,
+		},
 	}
 }
 
@@ -587,6 +651,20 @@ func applyEnvOverrides(config *Config) {
 	}
 	if env := os.Getenv("PI_CONTROLLER_DATA_DIR"); env != "" {
 		config.App.DataDir = env
+	}
+
+	// Sentry configuration overrides
+	if env := os.Getenv("SENTRY_DSN"); env != "" {
+		config.Sentry.DSN = env
+	}
+	if env := os.Getenv("SENTRY_ENVIRONMENT"); env != "" {
+		config.Sentry.Environment = env
+	}
+	if env := os.Getenv("SENTRY_RELEASE"); env != "" {
+		config.Sentry.Release = env
+	}
+	if env := os.Getenv("SENTRY_DEBUG"); env == "true" {
+		config.Sentry.Debug = true
 	}
 }
 

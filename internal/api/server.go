@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
@@ -87,6 +89,17 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 func (s *Server) setupRoutes() {
 	// Global middleware
 	s.router.Use(middleware.Logger(s.logger))
+
+	// Add Sentry middleware if Sentry is initialized
+	if sentry.CurrentHub().Client() != nil {
+		s.router.Use(sentrygin.New(sentrygin.Options{
+			Repanic:         true, // Let our recovery middleware handle panics after capturing
+			WaitForDelivery: false, // Don't block requests waiting for Sentry
+			Timeout:         2 * time.Second,
+		}))
+		s.logger.Debug("Sentry Gin middleware enabled")
+	}
+
 	s.router.Use(middleware.Recovery(s.logger))
 	s.router.Use(middleware.RequestID())
 	s.router.Use(s.validator.ValidateRequest()) // Add input validation

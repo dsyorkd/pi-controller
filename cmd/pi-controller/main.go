@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -136,6 +137,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	log.WithField("config", cfg.App.DataDir).Info("Configuration loaded")
+
+	// Initialize Sentry SDK
+	if err := initializeSentry(cfg, log); err != nil {
+		log.WithError(err).Warn("Failed to initialize Sentry - continuing without error tracking")
+	}
 
 	// Initialize database
 	db, err := storage.New(&cfg.Database, log)
@@ -315,6 +321,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 	case <-shutdownCtx.Done():
 		log.Warn("Shutdown timeout exceeded")
 	}
+
+	// Flush any pending Sentry events
+	sentry.Flush(2 * time.Second)
 
 	log.Info("Pi Controller shutdown complete")
 	return nil
@@ -556,6 +565,67 @@ func setupLogger() (*logger.Logger, error) {
 	logger.SetDefault(log)
 
 	return log, nil
+}
+
+// initializeSentry initializes the Sentry SDK with the provided configuration
+func initializeSentry(cfg *config.Config, log *logger.Logger) error {
+	// Skip initialization if DSN is not provided
+	if cfg.Sentry.DSN == "" {
+		log.Debug("Sentry DSN not configured, skipping initialization")
+		return nil
+	}
+
+	// Set release to application version if not configured
+	release := cfg.Sentry.Release
+	if release == "" {
+		release = version
+	}
+
+	// Initialize Sentry SDK
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:                cfg.Sentry.DSN,
+		Environment:        cfg.Sentry.Environment,
+		Release:            release,
+		Debug:              cfg.Sentry.Debug,
+		TracesSampleRate:   cfg.Sentry.TracesSampleRate,
+		SampleRate:         cfg.Sentry.SampleRate,
+		EnableTracing:      cfg.Sentry.EnableTracing,
+		SendDefaultPII:     cfg.Sentry.SendDefaultPII,
+		MaxBreadcrumbs:     cfg.Sentry.MaxBreadcrumbs,
+		AttachStacktrace:   cfg.Sentry.AttachStacktrace,
+		ServerName:         "", // Don't send server name for privacy
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			// Filter out sensitive information from error events
+			if event.Request != nil {
+				// Remove authorization headers
+				if event.Request.Headers != nil {
+					delete(event.Request.Headers, "authorization")
+					delete(event.Request.Headers, "Authorization")
+				}
+			}
+			return event
+		},
+	})
+
+	if err != nil {
+		return errors.Wrapf(err, "failed to initialize Sentry SDK")
+	}
+
+	// Set up a flush function to ensure events are sent on shutdown
+	defer func() {
+		if r := recover(); r != nil {
+			sentry.Flush(2 * time.Second)
+			panic(r)
+		}
+	}()
+
+	log.WithFields(map[string]interface{}{
+		"environment": cfg.Sentry.Environment,
+		"release":     release,
+		"debug":       cfg.Sentry.Debug,
+	}).Info("Sentry SDK initialized successfully")
+
+	return nil
 }
 
 // Migration command handlers
