@@ -22,7 +22,6 @@ jobs:
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -82,7 +81,6 @@ jobs:
   static-analysis:
     name: Static Code Analysis
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 8
     steps:
       - name: Checkout code
@@ -177,7 +175,6 @@ jobs:
   codeql-analysis:
     name: CodeQL Analysis
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 8
     permissions:
       actions: read
@@ -211,7 +208,6 @@ jobs:
   container-scan:
     name: Container Security Scan
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -272,7 +268,6 @@ jobs:
   secrets-scan:
     name: Secrets Scan
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-security:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -320,7 +315,6 @@ jobs:
   license-check:
     name: License Compliance
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -373,7 +367,6 @@ jobs:
   security-summary:
     name: Security Summary
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: [dependency-scan, static-analysis, codeql-analysis, container-scan, secrets-scan, license-check]
     if: always()
     timeout-minutes: 5

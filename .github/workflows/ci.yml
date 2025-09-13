@@ -20,13 +20,33 @@ jobs:
   validate:
     name: Code Validation
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0  # Updated image with Go 1.25 and all dependencies
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Ensure Make is installed
+        run: |
+          if ! command -v make &> /dev/null; then
+            echo "Make could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y make
+          else
+            echo "Make is already installed"
+          fi
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -66,19 +86,32 @@ jobs:
       - name: Vet check
         run: make vet
 
+      - name: Install golangci-lint
+        run: make install-lint
+
       - name: Run golangci-lint
-        run: golangci-lint run --config=.golangci.yml
+        run: make lint
 
   # Unit and integration tests on Ubuntu runner
   test:
     name: Tests
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0  # Updated image with Go 1.25 and all dependencies
     needs: validate
     timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -126,7 +159,6 @@ jobs:
   build:
     name: Build Binaries
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: validate
     timeout-minutes: 8
     strategy:
@@ -150,6 +182,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -260,12 +303,22 @@ jobs:
   migration-test:
     name: Database Migration Tests
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: validate
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -298,12 +351,22 @@ jobs:
   performance-test:
     name: Performance & Race Tests
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: [validate, test]
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -334,12 +397,22 @@ jobs:
   comprehensive-test:
     name: Comprehensive Test Suite
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: [test, build, migration-test, performance-test]
     timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install protobuf compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -379,7 +452,6 @@ jobs:
   status-check:
     name: CI Status Check
     runs-on: [self-hosted, ubuntu]
-    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v2.0
     needs: [validate, test, build, migration-test, performance-test, comprehensive-test, hardware-test]
     if: always()
     timeout-minutes: 5

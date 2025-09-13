@@ -45,7 +45,6 @@ jobs:
   build-matrix:
     name: Build ${{ matrix.name }}
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -262,7 +261,6 @@ jobs:
   docker-multiarch:
     name: Docker Multi-Arch Build
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: build-matrix
     timeout-minutes: 15
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -372,7 +370,6 @@ jobs:
   build-summary:
     name: Build Summary
     runs-on: [self-hosted, ubuntu]
-#    container: ghcr.io/dsyorkd/ci-image/ci-go-npm:v1.0
     needs: [build-matrix, docker-multiarch, test-hardware-matrix]
     if: always()
     timeout-minutes: 5
