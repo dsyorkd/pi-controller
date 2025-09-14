@@ -154,6 +154,7 @@ func (r *PWMControllerReconciler) findTargetNode(ctx context.Context, pwmControl
 
 // checkNodeReachability checks if the target node is reachable
 func (r *PWMControllerReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) {
+	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
 		if condition.Type == corev1.NodeReady {

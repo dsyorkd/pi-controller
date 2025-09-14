@@ -785,6 +785,7 @@ func (s *GPIOService) ConfigurePin(ctx context.Context, req *GPIORequest) error 
 
 // cleanupPin handles GPIO pin cleanup
 func (s *GPIOService) cleanupPin(ctx context.Context, req *GPIORequest) error {
+	_ = ctx // TODO: Use context for gRPC timeout and cancellation in cleanup
 	s.logger.WithFields(map[string]interface{}{
 		"node_id":    req.NodeID,
 		"pin_number": req.PinNumber,

@@ -219,6 +219,7 @@ func (l *LocalCABackend) GetCACertificate(ctx context.Context) (*x509.Certificat
 
 // loadCACertificate loads the CA certificate from the database
 func (l *LocalCABackend) loadCACertificate(ctx context.Context) error {
+	_ = ctx // TODO: Use context for database operation timeout in future
 	if l.caInfo.CertificateID == nil {
 		return fmt.Errorf("CA info has no associated certificate")
 	}

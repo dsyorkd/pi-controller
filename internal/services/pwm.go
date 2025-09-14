@@ -55,6 +55,7 @@ func (s *PWMService) ConfigureController(ctx context.Context, req *PWMRequest) e
 
 // cleanupController handles PWM controller cleanup
 func (s *PWMService) cleanupController(ctx context.Context, req *PWMRequest) error {
+	_ = ctx // TODO: Use context for gRPC timeout and cancellation in cleanup
 	s.logger.WithFields(map[string]interface{}{
 		"node_id": req.NodeID,
 		"address": req.Address,

@@ -346,7 +346,6 @@ func handleNodeDiscoveryEvent(event discovery.NodeEvent, db *storage.Database, l
 
 // handleNodeRegistration processes new node discovery and registration
 func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log *logger.Logger) error {
-
 	node := event.Node
 	log.WithFields(map[string]interface{}{
 		"node_id":    node.ID,

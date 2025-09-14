@@ -156,6 +156,7 @@ func (r *GPIOPinReconciler) findTargetNode(ctx context.Context, gpioPin *gpiov1.
 
 // checkNodeReachability checks if the target node is reachable
 func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) {
+	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
 		if condition.Type == corev1.NodeReady {
@@ -174,6 +175,7 @@ func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *cor
 
 // configureGPIOPin configures the GPIO pin on the target node via gRPC
 func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov1.GPIOPin, node *corev1.Node, logger *logrus.Entry) error {
+	_ = ctx // TODO: Use context for gRPC timeout and cancellation
 	// Convert GPIOPin spec to GPIO service request
 	// TODO: Fix GPIORequest struct definition
 	_ = node.Name
@@ -194,7 +196,6 @@ func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov
 // updateStatus updates the GPIOPin status
 func (r *GPIOPinReconciler) updateStatus(ctx context.Context, gpioPin *gpiov1.GPIOPin,
 	phase gpiov1.GPIOPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
-
 	// Update basic status fields
 	now := metav1.Now()
 	gpioPin.Status.Phase = phase
@@ -253,7 +254,6 @@ func (r *GPIOPinReconciler) updateStatus(ctx context.Context, gpioPin *gpiov1.GP
 func (r *GPIOPinReconciler) setCondition(status *gpiov1.GPIOPinStatus,
 	conditionType gpiov1.GPIOConditionType, conditionStatus metav1.ConditionStatus,
 	reason, message string) {
-
 	now := metav1.Now()
 	newCondition := gpiov1.GPIOCondition{
 		Type:               conditionType,

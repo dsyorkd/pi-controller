@@ -653,7 +653,7 @@
         "id": 34,
         "title": "Implement Business-Aligned API Operations",
         "description": "Refactor the API from generic CRUD to expose business-aligned operations for managing Raspberry Pi Kubernetes clusters. This involves creating new service methods and API endpoints for cluster lifecycle, node management, GPIO control, and certificate authority tasks, moving beyond simple database table manipulation.",
-        "status": "todo",
+        "status": "in-progress",
         "dependencies": [
           13,
           14
@@ -1305,7 +1305,7 @@
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-13T18:28:40.810Z",
+      "updated": "2025-09-14T08:18:20.041Z",
       "description": "Tasks for master context"
     }
   }

@@ -86,6 +86,7 @@ func (s *I2CService) ReadDevice(ctx context.Context, req *I2CReadRequest) (map[s
 
 // cleanupDevice handles I2C device cleanup
 func (s *I2CService) cleanupDevice(ctx context.Context, req *I2CRequest) error {
+	_ = ctx // TODO: Use context for gRPC timeout and cancellation in cleanup
 	s.logger.WithFields(map[string]interface{}{
 		"node_id": req.NodeID,
 		"address": req.Address,

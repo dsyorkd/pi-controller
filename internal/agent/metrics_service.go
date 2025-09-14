@@ -85,6 +85,7 @@ func (m *MetricsService) StreamSystemMetrics(req *pb.StreamSystemMetricsRequest,
 }
 
 // collectMetrics gathers all system metrics
+// nolint:unparam // Error is always nil by design - we return partial metrics on individual failures
 func (m *MetricsService) collectMetrics(ctx context.Context) (*pb.SystemMetrics, error) {
 	metrics := &pb.SystemMetrics{}
 
