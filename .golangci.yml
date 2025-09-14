@@ -138,6 +138,11 @@ linters:
       - path: ".*\\.pb\\.go$"
         linters:
           - all
+
+      # Exclude entire proto directory (generated code)
+      - path: "proto/"
+        linters:
+          - all
       
       # Exclude mock files
       - path: ".*_mock\\.go$"
@@ -147,3 +152,4 @@ linters:
     paths:
       - build
       - vendor
+      - proto  # Exclude entire proto directory with generated code
