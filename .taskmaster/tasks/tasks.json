@@ -653,7 +653,7 @@
         "id": 34,
         "title": "Implement Business-Aligned API Operations",
         "description": "Refactor the API from generic CRUD to expose business-aligned operations for managing Raspberry Pi Kubernetes clusters. This involves creating new service methods and API endpoints for cluster lifecycle, node management, GPIO control, and certificate authority tasks, moving beyond simple database table manipulation.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           13,
           14
@@ -661,7 +661,44 @@
         "priority": "medium",
         "details": "Instead of generic CRUD, implement a business-logic-focused API. This involves creating new methods in the service layer (`internal/services/`) that orchestrate complex actions and exposing them via new, action-oriented Gin handlers (`internal/api/handlers/`).\n\n**1. Cluster Lifecycle Operations:**\n- Implement `ProvisionCluster`, `DeprovisionCluster`, `GetClusterStatus`, and `ScaleCluster` methods in `internal/services/cluster_service.go`.\n- These methods should integrate with the Kubernetes provisioner in `pkg/k8s/provisioner.go`.\n- Expose these via the following endpoints in `internal/api/handlers/cluster_handler.go`:\n  - `POST /api/v1/clusters/{id}/provision`\n  - `POST /api/v1/clusters/{id}/deprovision`\n  - `GET /api/v1/clusters/{id}/status`\n  - `POST /api/v1/clusters/{id}/scale`\n\n**2. Node Discovery & Management:**\n- Implement `DiscoverNodes`, `ProvisionNode`, `DeprovisionNode`, and `RebootNode` in `internal/services/node_service.go`.\n- The discovery service should leverage the network scanner in `pkg/network/scanner.go`.\n- Expose these via the following endpoints in `internal/api/handlers/node_handler.go`:\n  - `POST /api/v1/nodes/discover`\n  - `POST /api/v1/nodes/{id}/provision`\n  - `POST /api/v1/nodes/{id}/deprovision`\n  - `POST /api/v1/nodes/{id}/reboot`\n\n**3. GPIO-as-a-Service Operations:**\n- Implement `ReservePin`, `ReleasePin`, `ReadPinValue`, and `WritePinValue` in `internal/services/gpio_service.go`.\n- These services will interact with the low-level GPIO controllers in `pkg/gpio/control.go`.\n- Expose these via the following endpoints in `internal/api/handlers/gpio_handler.go`:\n  - `POST /api/v1/gpio/{id}/reserve`\n  - `DELETE /api/v1/gpio/{id}/reserve`\n  - `GET /api/v1/gpio/{id}/read`\n  - `POST /api/v1/gpio/{id}/write`\n\n**4. Certificate Authority Operations:**\n- Implement `InitializeCA`, `IssueCertificate`, and `RevokeCertificate` in `internal/services/ca_service.go`.\n- This service will use the PKI functionality defined in `pkg/pki/ca.go`.\n- Expose these via the following endpoints in `internal/api/handlers/ca_handler.go`:\n  - `POST /api/v1/ca/initialize`\n  - `POST /api/v1/certificates/issue`\n  - `POST /api/v1/certificates/{id}/revoke`\n\nBasic CRUD endpoints for administrative purposes can be maintained but are not the focus of this task.\n<info added on 2025-09-02T04:19:52.117Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:19:52.117Z>",
         "testStrategy": "Write integration tests for each business-oriented API endpoint. For example, for cluster provisioning, test the `POST /clusters/{id}/provision` endpoint. Mock the underlying `k8s.Provisioner` to simulate success and failure scenarios, and verify that the cluster's state in the database is updated correctly and the API returns the appropriate status code. Similarly, test node discovery by mocking the `network.Scanner` and verifying that new `Node` records are created.",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Cluster Lifecycle Service and API Endpoints",
+            "description": "Create business-aligned service methods and API endpoints for provisioning, deprovisioning, scaling, and checking the status of Kubernetes clusters, moving beyond simple CRUD operations.",
+            "dependencies": [],
+            "details": "In `internal/services/cluster_service.go`, implement the methods `ProvisionCluster`, `DeprovisionCluster`, `GetClusterStatus`, and `ScaleCluster`. These methods should fetch the cluster entity from the database, invoke the corresponding logic from `pkg/k8s/provisioner.go`, and update the cluster's state in the database. In `internal/api/handlers/cluster_handler.go`, create new Gin handler functions that parse the cluster ID from the URL, call the new service methods, and return appropriate HTTP responses (e.g., 202 Accepted for long-running tasks). Finally, register the new action-oriented routes in `internal/api/router.go`: `POST /api/v1/clusters/{id}/provision`, `POST /api/v1/clusters/{id}/deprovision`, `GET /api/v1/clusters/{id}/status`, and `POST /api/v1/clusters/{id}/scale`.\n<info added on 2025-09-14T23:28:38.582Z>\n{\n  \"message\": \"Request accepted and is being processed\"\n}\n</info added on 2025-09-14T23:28:38.582Z>\n<info added on 2025-09-14T23:33:34.847Z>\n```text\n<info added on 2025-09-14T23:28:38.582Z>\nImplementation is complete. Business logic methods (ProvisionCluster, DeprovisionCluster, GetClusterStatus, ScaleCluster) have been added to `internal/services/cluster_service.go`, integrating with the provisioning service and updating cluster status in the database. Corresponding API handlers were created in `internal/api/handlers/cluster_handler.go` and registered in `server.go` with an admin role requirement for the following action-oriented routes:\n- `POST /api/v1/clusters/{id}/provision`\n- `POST /api/v1/clusters/{id}/deprovision`\n- `POST /api/v1/clusters/{id}/scale`\n- `GET /api/v1/clusters/{id}/status`\nThe asynchronous POST endpoints correctly return a 202 Accepted status with the message \"Request accepted and is being processed\". The GET status endpoint was enhanced to include detailed node information, such as readiness and counts. The `SetDependencies` pattern was used to inject required services.\n</info added on 2025-09-14T23:28:38.582Z>\n```\n</info added on 2025-09-14T23:33:34.847Z>",
+            "status": "done",
+            "testStrategy": "Write integration tests for the new endpoints. Mock the `k8s.Provisioner` interface to simulate success and failure scenarios. Verify that the service correctly updates the cluster's status in the database and that the API returns the expected HTTP status codes."
+          },
+          {
+            "id": 2,
+            "title": "Implement Node Discovery and Management Service and API Endpoints",
+            "description": "Implement service methods and API endpoints for discovering nodes on the network and managing their lifecycle, including provisioning, deprovisioning, and rebooting.",
+            "dependencies": [],
+            "details": "In `internal/services/node_service.go`, implement `DiscoverNodes`, `ProvisionNode`, `DeprovisionNode`, and `RebootNode`. The `DiscoverNodes` method should utilize the network scanner from `pkg/network/scanner.go` to find and register new nodes. The management methods (`ProvisionNode`, etc.) will orchestrate operations on a specific node, likely using an SSH client or gRPC agent. In `internal/api/handlers/node_handler.go`, create corresponding Gin handlers. Register the new routes in `internal/api/router.go`: `POST /api/v1/nodes/discover`, `POST /api/v1/nodes/{id}/provision`, `POST /api/v1/nodes/{id}/deprovision`, and `POST /api/v1/nodes/{id}/reboot`.",
+            "status": "done",
+            "testStrategy": "For node discovery, mock the network scanner to return a predefined list of devices and verify the service correctly processes them. For management endpoints, mock the underlying communication mechanism (e.g., SSH client) to test the service logic and API response."
+          },
+          {
+            "id": 3,
+            "title": "Implement GPIO-as-a-Service and API Endpoints",
+            "description": "Expose GPIO functionality as a service, allowing API clients to reserve, release, read from, and write to GPIO pins on a specific node via RESTful endpoints.",
+            "dependencies": [],
+            "details": "Create a new service `internal/services/gpio_service.go` and implement `ReservePin`, `ReleasePin`, `ReadPinValue`, and `WritePinValue`. These methods will need to communicate with the target node's agent (likely via gRPC) to call the low-level functions in `pkg/gpio/control.go`. The service should also manage pin reservation state in the database. Create a corresponding `internal/api/handlers/gpio_handler.go` to handle the HTTP requests. The `{id}` in the path will likely refer to a specific pin's resource ID in the database, which is associated with a node. Register the routes in `internal/api/router.go`: `POST /api/v1/gpio/{id}/reserve`, `DELETE /api/v1/gpio/{id}/reserve`, `GET /api/v1/gpio/{id}/read`, and `POST /api/v1/gpio/{id}/write`.",
+            "status": "done",
+            "testStrategy": "Mock the gRPC client that communicates with the Pi Agent. Write tests to verify that the service sends the correct gRPC requests for each GPIO operation and correctly handles the responses. Test the API endpoints for correct request parsing and response formatting."
+          },
+          {
+            "id": 4,
+            "title": "Implement Certificate Authority Service and API Endpoints",
+            "description": "Create service methods and API endpoints for managing the internal Public Key Infrastructure (PKI), including CA initialization and certificate issuance/revocation.",
+            "dependencies": [],
+            "details": "Create a new service `internal/services/ca_service.go` with methods `InitializeCA`, `IssueCertificate`, and `RevokeCertificate`. These methods will act as a business logic layer on top of the functionality provided in `pkg/pki/ca.go`. `InitializeCA` should be an idempotent operation. `IssueCertificate` will take certificate details from the request body and return a new signed certificate. Create a new `internal/api/handlers/ca_handler.go` to expose this functionality. Register the routes in `internal/api/router.go`: `POST /api/v1/ca/initialize`, `POST /api/v1/certificates/issue`, and `POST /api/v1/certificates/{id}/revoke`.\n<info added on 2025-09-14T23:29:30.423Z>\n**CODEBASE ANALYSIS (Completed):**\nA review of the codebase confirms this feature is already fully implemented and exceeds the original specification.\n- **Service:** `internal/services/ca_service.go` contains the required `InitializeCA`, `IssueCertificate`, and `RevokeCertificate` methods.\n- **Handler:** `internal/api/handlers/ca.go` exposes the functionality via REST endpoints.\n- **Routes:** The routes (`POST /api/v1/ca/initialize`, `POST /api/v1/ca/certificates`, `POST /api/v1/ca/certificates/{id}/revoke`) are correctly registered in `internal/api/server.go`.\n- **Architecture:** The implementation uses a more robust pluggable backend system (e.g., `LocalCABackend`, `VaultCABackend`) rather than the single `pkg/pki/ca.go` file initially proposed. It also includes database persistence for certificate metadata and integrates with existing security middleware.\nThis subtask can be considered complete.\n</info added on 2025-09-14T23:29:30.423Z>",
+            "status": "done",
+            "testStrategy": "Write unit tests for the service layer, mocking the `pkg/pki/ca.go` functionality to ensure the service correctly handles inputs, outputs, and persistence of certificate metadata. Test the API endpoints to ensure proper request parsing and response formatting, especially for certificate data."
+          }
+        ]
       },
       {
         "id": 35,
@@ -1196,7 +1233,7 @@
         "dependencies": [
           43
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1305,7 +1342,7 @@
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-14T08:18:20.041Z",
+      "updated": "2025-09-14T23:34:51.900Z",
       "description": "Tasks for master context"
     }
   }

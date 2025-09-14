@@ -48,6 +48,9 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	gpioService := services.NewGPIOService(db, log)
 	provisioningService := services.NewProvisioningService(nodeService, log)
 
+	// Set dependencies after all services are created
+	clusterService.SetDependencies(provisioningService, nodeService)
+
 	// Initialize authentication manager if auth is enabled
 	var authManager *middleware.AuthManager
 	if cfg.AuthEnabled {
@@ -148,6 +151,11 @@ func (s *Server) setupRoutes() {
 			clusters.POST("", s.requireRole("operator"), clusterHandler.Create)
 			clusters.PUT("/:id", s.requireRole("operator"), clusterHandler.Update)
 
+			// Cluster lifecycle operations - require admin role
+			clusters.POST("/:id/provision", s.requireRole("admin"), clusterHandler.ProvisionCluster)
+			clusters.POST("/:id/deprovision", s.requireRole("admin"), clusterHandler.DeprovisionCluster)
+			clusters.POST("/:id/scale", s.requireRole("admin"), clusterHandler.ScaleCluster)
+
 			// Delete operations - require admin role
 			clusters.DELETE("/:id", s.requireRole("admin"), clusterHandler.Delete)
 		}
@@ -238,11 +246,8 @@ func (s *Server) setupRoutes() {
 			}
 		}
 
-		// K3s Provisioning endpoints
+		// K3s Provisioning endpoints for individual nodes
 		provisionerHandler := handlers.NewProvisionerHandler(s.provisioningService, s.logger)
-
-		// Cluster-level provisioning operations
-		clusters.POST("/:id/provision", s.requireRole("admin"), provisionerHandler.ProvisionCluster)
 
 		// Individual node provisioning operations
 		nodes.POST("/:id/provision", s.requireRole("admin"), provisionerHandler.ProvisionNode)
