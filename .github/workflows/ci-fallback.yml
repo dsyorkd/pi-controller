@@ -16,10 +16,10 @@ env:
   GOLANGCI_LINT_VERSION: "v2.4.0"
 
 jobs:
-  # Quick validation job using Ubuntu self-hosted runner (no container)
+  # Quick validation job using GitHub-hosted runner (no container)
   validate:
     name: Code Validation
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -27,20 +27,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
-
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          sudo apt-get install -y make protobuf-compiler
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -85,14 +75,14 @@ jobs:
   # Unit and integration tests on Ubuntu runner (no container)
   test:
     name: Tests
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: validate
     timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
@@ -138,7 +128,7 @@ jobs:
   # Status check job
   status-check:
     name: CI Status Check
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: [validate, test]
     if: always()
     timeout-minutes: 5

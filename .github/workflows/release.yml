@@ -27,7 +27,7 @@ jobs:
   # Pre-release validation
   validate-release:
     name: Validate Release
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -68,7 +68,7 @@ jobs:
           echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
           echo "Is prerelease: ${IS_PRERELEASE}"
 
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
@@ -92,7 +92,7 @@ jobs:
   # Build release artifacts for all platforms
   build-release:
     name: Build Release Artifacts
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: validate-release
     timeout-minutes: 20
     strategy:
@@ -124,20 +124,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
-
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          sudo apt-get install -y make protobuf-compiler
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -276,7 +266,7 @@ jobs:
   # Build and push Docker images
   docker-release:
     name: Build & Push Docker Images
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: [validate-release, build-release]
     timeout-minutes: 30
     steps:
@@ -361,7 +351,7 @@ jobs:
   # Create GitHub release
   create-release:
     name: Create GitHub Release
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: [validate-release, build-release, docker-release, test-release-hardware]
     timeout-minutes: 15
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.version != ''

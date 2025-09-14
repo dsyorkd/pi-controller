@@ -16,10 +16,10 @@ env:
   GOLANGCI_LINT_VERSION: "v2.4.0"
 
 jobs:
-  # Quick validation job using Ubuntu self-hosted runner
+  # Quick validation job using GitHub-hosted runner
   validate:
     name: Code Validation
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -27,20 +27,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
-
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          sudo apt-get install -y make protobuf-compiler
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -92,17 +82,17 @@ jobs:
       - name: Run golangci-lint
         run: make lint
 
-  # Unit and integration tests on Ubuntu runner
+  # Unit and integration tests on GitHub-hosted runner
   test:
     name: Tests
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: validate
     timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
@@ -158,7 +148,7 @@ jobs:
   # Build job for multiple architectures
   build:
     name: Build Binaries
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: validate
     timeout-minutes: 8
     strategy:
@@ -183,7 +173,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
@@ -243,15 +233,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Ensure Make is installed
-        run: |
-          if ! command -v make &> /dev/null; then
-            echo "Make could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install -y make
-          else
-            echo "Make is already installed"
-          fi
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -302,14 +283,14 @@ jobs:
   # Database migration tests
   migration-test:
     name: Database Migration Tests
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: validate
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
@@ -350,14 +331,14 @@ jobs:
   # Performance and race condition tests
   performance-test:
     name: Performance & Race Tests
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: [validate, test]
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
@@ -396,14 +377,14 @@ jobs:
   # Final comprehensive test suite
   comprehensive-test:
     name: Comprehensive Test Suite
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: [test, build, migration-test, performance-test]
     timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
@@ -451,7 +432,7 @@ jobs:
   # Status check job - runs after all tests complete
   status-check:
     name: CI Status Check
-    runs-on: [self-hosted, ubuntu]
+    runs-on: ubuntu-latest
     needs: [validate, test, build, migration-test, performance-test, comprehensive-test, hardware-test]
     if: always()
     timeout-minutes: 5
