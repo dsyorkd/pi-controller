@@ -618,16 +618,16 @@ func getProductionDefaults() Config {
 			},
 		},
 		Sentry: SentryConfig{
-			DSN:                 "", // Must be set via environment variable
-			Environment:         "", // Will be set from App.Environment if not specified
-			Release:             "", // Will be set from App.Version if not specified
-			Debug:               false,
-			TracesSampleRate:    0.1,  // 10% sampling for performance
-			SampleRate:          1.0,  // 100% error sampling
-			EnableTracing:       true,
-			SendDefaultPII:      false, // Security: don't send PII by default
-			MaxBreadcrumbs:      100,
-			AttachStacktrace:    true,
+			DSN:              "", // Must be set via environment variable
+			Environment:      "", // Will be set from App.Environment if not specified
+			Release:          "", // Will be set from App.Version if not specified
+			Debug:            false,
+			TracesSampleRate: 0.1, // 10% sampling for performance
+			SampleRate:       1.0, // 100% error sampling
+			EnableTracing:    true,
+			SendDefaultPII:   false, // Security: don't send PII by default
+			MaxBreadcrumbs:   100,
+			AttachStacktrace: true,
 		},
 	}
 }

@@ -93,7 +93,7 @@ func (s *Server) setupRoutes() {
 	// Add Sentry middleware if Sentry is initialized
 	if sentry.CurrentHub().Client() != nil {
 		s.router.Use(sentrygin.New(sentrygin.Options{
-			Repanic:         true, // Let our recovery middleware handle panics after capturing
+			Repanic:         true,  // Let our recovery middleware handle panics after capturing
 			WaitForDelivery: false, // Don't block requests waiting for Sentry
 			Timeout:         2 * time.Second,
 		}))

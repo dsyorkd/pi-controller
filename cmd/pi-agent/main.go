@@ -309,17 +309,17 @@ func initializeSentry(cfg *config.Config, log logger.Interface) error {
 
 	// Initialize Sentry SDK
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:                cfg.Sentry.DSN,
-		Environment:        cfg.Sentry.Environment,
-		Release:            release,
-		Debug:              cfg.Sentry.Debug,
-		TracesSampleRate:   cfg.Sentry.TracesSampleRate,
-		SampleRate:         cfg.Sentry.SampleRate,
-		EnableTracing:      cfg.Sentry.EnableTracing,
-		SendDefaultPII:     cfg.Sentry.SendDefaultPII,
-		MaxBreadcrumbs:     cfg.Sentry.MaxBreadcrumbs,
-		AttachStacktrace:   cfg.Sentry.AttachStacktrace,
-		ServerName:         "", // Don't send server name for privacy
+		Dsn:              cfg.Sentry.DSN,
+		Environment:      cfg.Sentry.Environment,
+		Release:          release,
+		Debug:            cfg.Sentry.Debug,
+		TracesSampleRate: cfg.Sentry.TracesSampleRate,
+		SampleRate:       cfg.Sentry.SampleRate,
+		EnableTracing:    cfg.Sentry.EnableTracing,
+		SendDefaultPII:   cfg.Sentry.SendDefaultPII,
+		MaxBreadcrumbs:   cfg.Sentry.MaxBreadcrumbs,
+		AttachStacktrace: cfg.Sentry.AttachStacktrace,
+		ServerName:       "", // Don't send server name for privacy
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			// Filter out sensitive information from error events
 			if event.Request != nil {
