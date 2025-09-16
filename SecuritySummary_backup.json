@@ -1,0 +1,377 @@
+{
+  "securityAssessment": {
+    "assessmentDate": "2025-01-13",
+    "assessor": "Security Code Reviewer Agent",
+    "version": "1.0",
+    "scope": "Certificate Authority Implementation - Pi Controller",
+    "findings": [
+      {
+        "id": "SEC-001",
+        "title": "Insecure Host Key Checking in SSH Client",
+        "severity": "CRITICAL",
+        "category": "SSH Security",
+        "location": "/internal/provisioner/ssh_client.go:60",
+        "description": "SSH client uses `ssh.InsecureIgnoreHostKey()` which disables host key verification, making the system vulnerable to man-in-the-middle attacks.",
+        "impact": "An attacker could intercept SSH communications and potentially compromise certificate operations, private keys, or execute malicious commands on server nodes.",
+        "exploitScenario": "Attacker positions themselves between control plane and server nodes, presents fake SSH host key, intercepts all certificate generation commands and private keys.",
+        "remediation": {
+          "immediate": [
+            "Implement proper host key validation using known_hosts file or certificate-based host authentication",
+            "Remove ssh.InsecureIgnoreHostKey() and replace with proper HostKeyCallback",
+            "Add host key fingerprint verification during initial node setup"
+          ],
+          "longTerm": [
+            "Implement SSH certificate-based host authentication",
+            "Add host key pinning for known server nodes",
+            "Implement host key rotation procedures"
+          ]
+        },
+        "codeExample": "HostKeyCallback: ssh.FixedHostKey(knownHostKey) // Replace insecure callback"
+      },
+      {
+        "id": "SEC-002", 
+        "title": "Insufficient Input Validation in Certificate Requests",
+        "severity": "HIGH",
+        "category": "Input Validation",
+        "location": "/internal/services/ca_service.go:607-631",
+        "description": "Certificate request validation only checks basic requirements but lacks comprehensive validation of CN, SANs, and key usage parameters.",
+        "impact": "Malicious users could issue certificates for unauthorized domains, potentially enabling SSL/TLS attacks or privilege escalation.",
+        "exploitScenario": "Attacker requests certificate for critical infrastructure domains (e.g., *.kubernetes.default.svc.cluster.local) or uses malicious CN with special characters to bypass validation.",
+        "remediation": {
+          "immediate": [
+            "Add strict regex validation for Common Name format",
+            "Implement comprehensive SAN validation (DNS name format, IP address validation)",
+            "Add blacklist of prohibited domains/patterns",
+            "Validate key usage combinations for security"
+          ],
+          "longTerm": [
+            "Implement domain ownership verification for external certificates",
+            "Add certificate policy enforcement based on certificate type",
+            "Implement rate limiting per domain/CN"
+          ]
+        },
+        "codeExample": "// Add: validateDNSName(), validateIPAddress(), validateKeyUsageCombo()"
+      },
+      {
+        "id": "SEC-003",
+        "title": "Hardcoded RSA Key Size and Weak Cryptographic Standards", 
+        "severity": "HIGH",
+        "category": "Cryptographic Security",
+        "location": "/internal/services/ca_local.go:292, /internal/config/config.go:526",
+        "description": "RSA key size hardcoded to 2048 bits and no support for modern cryptographic algorithms like ECDSA or Ed25519.",
+        "impact": "2048-bit RSA keys may become vulnerable to quantum attacks and provide suboptimal performance. No future-proofing for post-quantum cryptography.",
+        "exploitScenario": "As quantum computing advances, 2048-bit RSA keys become breakable, compromising all issued certificates and private communications.",
+        "remediation": {
+          "immediate": [
+            "Increase default RSA key size to 4096 bits minimum",
+            "Add support for ECDSA P-256/P-384 algorithms", 
+            "Make key algorithm configurable per certificate type",
+            "Implement key strength validation"
+          ],
+          "longTerm": [
+            "Add Ed25519 support for SSH certificates",
+            "Plan for post-quantum cryptography migration",
+            "Implement crypto-agility for algorithm upgrades"
+          ]
+        },
+        "codeExample": "KeyAlgorithm: \"ecdsa-p256\", KeySize: 4096 // In config struct"
+      },
+      {
+        "id": "SEC-004",
+        "title": "Insecure Random Serial Number Generation",
+        "severity": "HIGH", 
+        "category": "Cryptographic Security",
+        "location": "/internal/services/ca_local.go:331-334",
+        "description": "Certificate serial numbers rely on OpenSSL's default generation which may not provide cryptographically secure randomness.",
+        "impact": "Predictable serial numbers could enable certificate forgery attacks or make it easier to track certificate issuance patterns.",
+        "exploitScenario": "Attacker analyzes serial number patterns to predict future certificate serials, potentially forging certificates or conducting reconnaissance.",
+        "remediation": {
+          "immediate": [
+            "Generate cryptographically secure random serial numbers in Go code",
+            "Use crypto/rand package for serial number generation",
+            "Ensure serial numbers are minimum 160 bits",
+            "Add collision detection for serial numbers"
+          ],
+          "longTerm": [
+            "Implement serial number tracking database",
+            "Add serial number blacklist functionality",
+            "Consider sequential numbering with cryptographic randomness"
+          ]
+        },
+        "codeExample": "serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 160))"
+      },
+      {
+        "id": "SEC-005",
+        "title": "Vault Authentication Credentials in Configuration",
+        "severity": "HIGH",
+        "category": "Credential Management", 
+        "location": "/internal/config/config.go:225-227",
+        "description": "Vault AppRole credentials and admin tokens stored directly in configuration with inadequate protection.",
+        "impact": "Configuration file compromise leads to complete Vault access, potentially exposing all PKI secrets and certificate operations.",
+        "exploitScenario": "Attacker gains read access to config file or environment variables, obtains Vault credentials, and compromises entire PKI infrastructure.",
+        "remediation": {
+          "immediate": [
+            "Move all Vault credentials to secure external sources (files with restricted permissions)",
+            "Implement credential rotation for AppRole secret IDs",
+            "Remove admin token support from production deployments",
+            "Add credential validation and expiry checking"
+          ],
+          "longTerm": [
+            "Integrate with external secret management (AWS Secrets Manager, etc.)",
+            "Implement Vault auth method auto-renewal",
+            "Add credential audit logging"
+          ]
+        },
+        "codeExample": "SecretIDFile: \"/etc/pi-controller/vault-secret-id\" // Use file instead of config"
+      },
+      {
+        "id": "SEC-006",
+        "title": "Missing Certificate Chain Validation",
+        "severity": "MEDIUM",
+        "category": "Certificate Validation",
+        "location": "/internal/services/ca_local.go:484-510", 
+        "description": "Certificate validation only checks against direct CA certificate, missing intermediate certificate chain validation.",
+        "impact": "Compromised intermediate certificates could be used to issue valid certificates without detection.",
+        "exploitScenario": "Attacker compromises intermediate CA, issues certificates that appear valid but bypass revocation checking.",
+        "remediation": {
+          "immediate": [
+            "Implement full certificate chain validation",
+            "Add intermediate certificate management",
+            "Validate complete trust path to root CA",
+            "Add certificate path length constraints checking"
+          ],
+          "longTerm": [
+            "Implement Certificate Transparency logging",
+            "Add OCSP responder support",
+            "Implement automated certificate chain monitoring"
+          ]
+        },
+        "codeExample": "opts.Intermediates = x509.NewCertPool(); // Add intermediate cert support"
+      },
+      {
+        "id": "SEC-007",
+        "title": "Insufficient SSH Command Injection Protection",
+        "severity": "MEDIUM",
+        "category": "Command Injection",
+        "location": "/internal/services/ca_local.go:163-191",
+        "description": "SSH commands constructed using string formatting without proper escaping, potentially vulnerable to command injection.",
+        "impact": "Malicious certificate parameters could lead to command injection on server nodes.",
+        "exploitScenario": "Attacker provides certificate CN containing shell metacharacters, executes arbitrary commands during certificate generation.",
+        "remediation": {
+          "immediate": [
+            "Use parameterized command construction instead of string formatting",
+            "Implement strict input sanitization for all SSH command parameters", 
+            "Add shell escaping for all user-provided data",
+            "Validate all certificate parameters against safe character sets"
+          ],
+          "longTerm": [
+            "Replace shell commands with direct API calls where possible",
+            "Implement command templates with parameter binding",
+            "Add command execution audit logging"
+          ]
+        },
+        "codeExample": "cmd := exec.Command(\"openssl\", \"req\", \"-new\", \"-subj\", fmt.Sprintf(\"/CN=%s\", shellescape(cn)))"
+      },
+      {
+        "id": "SEC-008",
+        "title": "Weak JWT Secret Generation and Management",
+        "severity": "MEDIUM",
+        "category": "Authentication Security",
+        "location": "/internal/api/middleware/auth.go:138-148",
+        "description": "JWT secrets generated at runtime without persistence, invalidating all tokens on restart. No secret rotation mechanism.",
+        "impact": "Service restarts invalidate all user sessions. No protection against secret compromise over time.",
+        "exploitScenario": "Service restart during security incident forces all users to re-authenticate, potentially causing availability issues.",
+        "remediation": {
+          "immediate": [
+            "Implement persistent JWT secret storage with proper encryption",
+            "Add secret rotation mechanism with overlapping validity periods",
+            "Increase secret entropy to 256 bits minimum",
+            "Add secret expiry and automatic rotation"
+          ],
+          "longTerm": [
+            "Implement multiple active secrets for zero-downtime rotation",
+            "Add HSM integration for secret generation and storage",
+            "Implement audit logging for secret operations"
+          ]
+        },
+        "codeExample": "// Store in encrypted file: encryptedSecret := encrypt(secret, masterKey)"
+      },
+      {
+        "id": "SEC-009",
+        "title": "Insufficient Rate Limiting and DoS Protection",
+        "severity": "MEDIUM", 
+        "category": "Availability Security",
+        "location": "/internal/api/middleware/auth.go:61",
+        "description": "Basic rate limiting in authentication but no comprehensive DoS protection for certificate operations.",
+        "impact": "Attackers could overwhelm the CA with certificate requests, causing denial of service.",
+        "exploitScenario": "Attacker floods CA with certificate requests, exhausting system resources and preventing legitimate certificate issuance.",
+        "remediation": {
+          "immediate": [
+            "Implement rate limiting for certificate operations per user/IP",
+            "Add request size limits for certificate requests",
+            "Implement connection limiting for SSH operations",
+            "Add monitoring for unusual request patterns"
+          ],
+          "longTerm": [
+            "Implement adaptive rate limiting based on system load",
+            "Add geographic request analysis for anomaly detection",
+            "Implement request queuing with priority levels"
+          ]
+        },
+        "codeExample": "// Add per-endpoint rate limiting middleware"
+      },
+      {
+        "id": "SEC-010",
+        "title": "Inadequate Audit Logging for Security Events",
+        "severity": "MEDIUM",
+        "category": "Audit and Monitoring",
+        "location": "/internal/api/middleware/auth.go:386-401",
+        "description": "Basic audit logging present but insufficient coverage of security-critical certificate operations.",
+        "impact": "Insufficient forensic capabilities in case of security incidents. Compliance violations.",
+        "exploitScenario": "Security incident occurs but insufficient logging prevents proper forensic analysis and root cause determination.",
+        "remediation": {
+          "immediate": [
+            "Add comprehensive audit logging for all certificate operations",
+            "Log certificate issuance, renewal, revocation with full context",
+            "Add audit logging for SSH command execution",
+            "Implement secure audit log storage with integrity protection"
+          ],
+          "longTerm": [
+            "Implement Security Information and Event Management (SIEM) integration",
+            "Add real-time security event alerting",
+            "Implement audit log analysis and anomaly detection"
+          ]
+        },
+        "codeExample": "auditLogger.LogCertificateOperation(\"issued\", certID, userID, clientIP, details)"
+      },
+      {
+        "id": "SEC-011",
+        "title": "Private Key Storage and Protection Weaknesses",
+        "severity": "HIGH",
+        "category": "Key Management",
+        "location": "/internal/services/ca_local.go:169-173",
+        "description": "Private keys stored on filesystem with basic permissions (600) but no encryption at rest or HSM protection.",
+        "impact": "Filesystem compromise leads to complete CA private key exposure, allowing certificate forgery.",
+        "exploitScenario": "Attacker gains root access to server node, reads CA private key from filesystem, can now forge any certificate.",
+        "remediation": {
+          "immediate": [
+            "Implement private key encryption at rest using strong encryption",
+            "Add key derivation from master password for key encryption",
+            "Store encrypted keys with separate key encryption keys",
+            "Implement key access logging and monitoring"
+          ],
+          "longTerm": [
+            "Integrate with Hardware Security Modules (HSM) for key protection",
+            "Implement key sharding across multiple nodes",
+            "Add remote attestation for key protection verification"
+          ]
+        },
+        "codeExample": "encryptedKey := encrypt(privateKey, deriveKey(masterPassword, salt))"
+      },
+      {
+        "id": "SEC-012",
+        "title": "Missing Certificate Revocation List (CRL) Implementation",
+        "severity": "MEDIUM",
+        "category": "Certificate Lifecycle",
+        "location": "/internal/services/ca_local.go:428-444",
+        "description": "Certificate revocation implemented in database but no CRL generation or OCSP responder for revocation checking.",
+        "impact": "Revoked certificates cannot be verified as revoked by external systems, allowing continued use of compromised certificates.",
+        "exploitScenario": "Certificate is compromised and revoked, but external services cannot verify revocation status, allowing attacker to continue using compromised certificate.",
+        "remediation": {
+          "immediate": [
+            "Implement CRL generation and publishing functionality",
+            "Add CRL Distribution Points to issued certificates",
+            "Implement automated CRL updates and publishing",
+            "Add CRL validation in certificate verification"
+          ],
+          "longTerm": [
+            "Implement OCSP responder for real-time revocation checking",
+            "Add delta CRL support for efficient updates",
+            "Implement Certificate Transparency integration"
+          ]
+        },
+        "codeExample": "// Generate and publish CRL periodically with all revoked certificates"
+      }
+    ],
+    "summary": {
+      "totalFindings": 12,
+      "severityBreakdown": {
+        "critical": 1,
+        "high": 4, 
+        "medium": 7,
+        "low": 0
+      },
+      "categoriesAffected": [
+        "SSH Security",
+        "Input Validation", 
+        "Cryptographic Security",
+        "Credential Management",
+        "Certificate Validation",
+        "Command Injection",
+        "Authentication Security",
+        "Availability Security", 
+        "Audit and Monitoring",
+        "Key Management",
+        "Certificate Lifecycle"
+      ],
+      "riskAssessment": "HIGH",
+      "overallSecurityPosture": "The Certificate Authority implementation has several significant security vulnerabilities that need immediate attention. The most critical issue is the insecure SSH host key validation which could allow man-in-the-middle attacks. Multiple high-severity cryptographic and key management issues also pose substantial risks to the PKI security.",
+      "prioritizedRemediation": [
+        "1. Implement proper SSH host key validation (SEC-001) - CRITICAL",
+        "2. Fix private key storage and protection (SEC-011) - HIGH", 
+        "3. Improve cryptographic standards and key sizes (SEC-003) - HIGH",
+        "4. Secure Vault credential management (SEC-005) - HIGH",
+        "5. Implement comprehensive input validation (SEC-002) - HIGH",
+        "6. Add certificate chain validation (SEC-006) - MEDIUM",
+        "7. Implement secure random serial generation (SEC-004) - HIGH",
+        "8. Add comprehensive audit logging (SEC-010) - MEDIUM"
+      ]
+    },
+    "complianceAssessment": {
+      "standards": {
+        "NIST_SP_800-57": "PARTIAL - Key management practices need improvement",
+        "RFC_5280": "PARTIAL - Certificate profiles and CRL missing", 
+        "FIPS_140-2": "NON-COMPLIANT - No HSM integration or validated crypto",
+        "Common_Criteria": "NOT_EVALUATED",
+        "WebTrust_CA": "NON-COMPLIANT - Multiple baseline requirements not met"
+      },
+      "gaps": [
+        "No Hardware Security Module integration",
+        "Insufficient key protection mechanisms",
+        "Missing Certificate Revocation List implementation",
+        "Inadequate audit logging for compliance requirements",
+        "No cryptographic module validation"
+      ]
+    },
+    "recommendations": {
+      "immediate": [
+        "Address CRITICAL and HIGH severity findings within 30 days",
+        "Implement proper SSH host key validation immediately",
+        "Enhance private key protection with encryption at rest",
+        "Secure Vault credential management",
+        "Implement comprehensive input validation for certificate requests"
+      ],
+      "shortTerm": [
+        "Implement Certificate Revocation List generation and distribution",
+        "Add comprehensive audit logging for all security events",
+        "Implement proper certificate chain validation",
+        "Add rate limiting and DoS protection mechanisms"
+      ],
+      "longTerm": [
+        "Plan for Hardware Security Module integration",
+        "Implement post-quantum cryptography readiness",
+        "Add Security Information and Event Management integration",
+        "Implement certificate transparency logging",
+        "Add OCSP responder for real-time revocation checking"
+      ]
+    },
+    "testingRecommendations": [
+      "Perform penetration testing focusing on SSH command injection",
+      "Test certificate validation with malicious certificate requests", 
+      "Conduct load testing to verify DoS protection mechanisms",
+      "Test private key extraction scenarios",
+      "Verify host key validation bypass attempts",
+      "Test Vault credential compromise scenarios"
+    ]
+  }
+}

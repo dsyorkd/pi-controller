@@ -488,3 +488,47 @@ func (c *Client) DeletePod(ctx context.Context, namespace, name string) error {
 	}
 	return c.clientset.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 }
+
+// CreateService creates a new service in the specified namespace
+func (c *Client) CreateService(ctx context.Context, namespace string, service *corev1.Service) (*corev1.Service, error) {
+	if namespace == "" {
+		namespace = c.namespace
+	}
+	return c.clientset.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
+}
+
+// GetService retrieves a service by name from the specified namespace
+func (c *Client) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
+	if namespace == "" {
+		namespace = c.namespace
+	}
+	return c.clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+// ListServices retrieves all services from the specified namespace
+func (c *Client) ListServices(ctx context.Context, namespace string) ([]corev1.Service, error) {
+	if namespace == "" {
+		namespace = c.namespace
+	}
+	services, err := c.clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return services.Items, nil
+}
+
+// UpdateService updates a service in the specified namespace
+func (c *Client) UpdateService(ctx context.Context, namespace string, service *corev1.Service) (*corev1.Service, error) {
+	if namespace == "" {
+		namespace = c.namespace
+	}
+	return c.clientset.CoreV1().Services(namespace).Update(ctx, service, metav1.UpdateOptions{})
+}
+
+// DeleteService deletes a service by name from the specified namespace
+func (c *Client) DeleteService(ctx context.Context, namespace, name string) error {
+	if namespace == "" {
+		namespace = c.namespace
+	}
+	return c.clientset.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+}

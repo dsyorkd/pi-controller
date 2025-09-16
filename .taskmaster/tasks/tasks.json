@@ -618,7 +618,7 @@
         "dependencies": [
           30
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -632,7 +632,7 @@
           19,
           31
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -646,7 +646,7 @@
           29,
           31
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -817,7 +817,7 @@
         "dependencies": [
           36
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -855,8 +855,8 @@
             "dependencies": [
               "37.1"
             ],
-            "details": "Instantiate the `PodHandler` with the mock `PodService`. Test the `GetPods` handler by simulating successful data retrieval and error conditions from the service. For `GetPodLogs`, ensure the handler correctly extracts path parameters (e.g., namespace, pod name) and passes them to the mock service. Validate the HTTP responses accordingly.",
-            "status": "pending",
+            "details": "Instantiate the `PodHandler` with the mock `PodService`. Test the `GetPods` handler by simulating successful data retrieval and error conditions from the service. For `GetPodLogs`, ensure the handler correctly extracts path parameters (e.g., namespace, pod name) and passes them to the mock service. Validate the HTTP responses accordingly.\n<info added on 2025-09-16T23:06:53.999Z>\n**Update:** Your investigation correctly identified that a handler for pod operations is missing, despite the existence of a `DeploymentService`. Before writing tests, you must first create this handler.\n\n1.  Create a new file: `internal/api/handlers/deployment_handler.go`.\n2.  Inside this file, define a `DeploymentHandler` struct that contains an instance of the `service.DeploymentService` interface. Follow the existing dependency injection pattern seen in other handlers like `cluster_handler.go`.\n3.  Implement the `GetPods` and `GetPodLogs` methods on the `DeploymentHandler`. These methods should extract necessary parameters (like `namespace`) from the HTTP request and call the corresponding methods on the service.\n4.  Register these new handler methods in the main API router (likely in `cmd/server/main.go`) to expose the endpoints (e.g., `/api/v1/namespaces/{namespace}/pods`).\n5.  After implementing the handler, create `internal/api/handlers/deployment_handler_test.go` and proceed with the unit tests as originally planned, using a mock of the `DeploymentService`.\n</info added on 2025-09-16T23:06:53.999Z>",
+            "status": "done",
             "testStrategy": "Focus on the handler's ability to correctly parse URL parameters and query strings, and to format responses based on the data or errors returned by the mocked `PodService`."
           },
           {
@@ -867,7 +867,7 @@
               "37.1"
             ],
             "details": "Instantiate the `ServiceHandler` with the mock `K8sService`. Write test cases for `GetServices` that cover both successful retrieval of a list of services and scenarios where the service layer returns an error. Verify that the handler returns the correct HTTP status code and a properly formatted JSON response in each case.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Mock the `K8sService` to isolate the `ServiceHandler`. Test the handler's logic for processing requests and translating service layer responses (both data and errors) into appropriate HTTP responses."
           }
         ]
@@ -1246,7 +1246,7 @@
         "dependencies": [
           44
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1259,7 +1259,7 @@
         "dependencies": [
           44
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1270,7 +1270,7 @@
         "testStrategy": "Run `npm install` or `yarn install` in the `web/` directory and ensure it completes successfully. Verify that the packages are listed in `package.json` and `node_modules`.",
         "priority": "high",
         "dependencies": [],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1283,7 +1283,7 @@
         "dependencies": [
           47
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1296,7 +1296,7 @@
         "dependencies": [
           48
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1309,7 +1309,7 @@
         "dependencies": [
           48
         ],
-        "status": "todo",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -1342,7 +1342,7 @@
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-14T23:34:51.900Z",
+      "updated": "2025-09-16T23:12:34.794Z",
       "description": "Tasks for master context"
     }
   }
