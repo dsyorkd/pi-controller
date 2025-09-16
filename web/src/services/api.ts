@@ -1,5 +1,17 @@
 import axios, { type AxiosResponse } from 'axios';
-import type { PaginatedResponse, Cluster, Node, GPIODevice, SystemInfo } from '../types';
+import { storeTokens, clearStoredTokens, getCurrentToken, getCurrentRefreshToken } from '../utils/session';
+import type {
+  PaginatedResponse,
+  Cluster,
+  Node,
+  GPIODevice,
+  SystemInfo,
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+  TokenRefreshResponse,
+  User
+} from '../types';
 
 // Create axios instance with default configuration
 const api = axios.create({
@@ -14,7 +26,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // Add auth token if available
-    const token = localStorage.getItem('authToken');
+    const token = getCurrentToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -23,21 +35,110 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+// Response interceptor for error handling and token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized - redirect to login
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // Try to refresh token
+      const refreshToken = getCurrentRefreshToken();
+      if (refreshToken) {
+        try {
+          const response = await api.post<TokenRefreshResponse>('/auth/refresh', {
+            refreshToken
+          });
+
+          const { token: newToken, refreshToken: newRefreshToken, expiresIn } = response.data;
+
+          // Store new tokens with proper expiration
+          storeTokens(newToken, newRefreshToken, expiresIn);
+
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed, clear tokens and redirect to login
+          clearStoredTokens();
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        }
+      } else {
+        // No refresh token, clear tokens and redirect to login
+        clearStoredTokens();
+        window.location.href = '/login';
+      }
     }
+
     return Promise.reject(error);
   }
 );
 
 // API service methods
 export const apiService = {
+  // Authentication operations
+  auth: {
+    login: async (credentials: LoginRequest): Promise<AuthResponse> => {
+      const response: AxiosResponse<AuthResponse> = await api.post('/auth/login', credentials);
+
+      // Store tokens with proper expiration using session utility
+      storeTokens(response.data.token, response.data.refreshToken, response.data.expiresIn);
+
+      return response.data;
+    },
+
+    register: async (userData: RegisterRequest): Promise<AuthResponse> => {
+      const response: AxiosResponse<AuthResponse> = await api.post('/auth/register', userData);
+
+      // Store tokens with proper expiration using session utility
+      storeTokens(response.data.token, response.data.refreshToken, response.data.expiresIn);
+
+      return response.data;
+    },
+
+    logout: async (): Promise<void> => {
+      try {
+        // Call logout endpoint to invalidate token on server
+        await api.post('/auth/logout');
+      } catch (error) {
+        // Continue with logout even if server request fails
+        console.warn('Logout request failed, continuing with local cleanup:', error);
+      } finally {
+        // Always clear stored tokens using session utility
+        clearStoredTokens();
+      }
+    },
+
+    refreshToken: async (refreshToken: string): Promise<TokenRefreshResponse> => {
+      const response: AxiosResponse<TokenRefreshResponse> = await api.post('/auth/refresh', {
+        refreshToken
+      });
+
+      // Update stored tokens with proper expiration using session utility
+      storeTokens(response.data.token, response.data.refreshToken, response.data.expiresIn);
+
+      return response.data;
+    },
+
+    getProfile: async (): Promise<User> => {
+      const response: AxiosResponse<User> = await api.get('/auth/profile');
+      return response.data;
+    },
+
+    // Check if user is currently authenticated
+    isAuthenticated: (): boolean => {
+      return getCurrentToken() !== null;
+    },
+
+    // Get current auth token
+    getToken: (): string | null => {
+      return getCurrentToken();
+    }
+  },
+
   // Cluster operations
   clusters: {
     getAll: async (): Promise<PaginatedResponse<Cluster>> => {
@@ -148,6 +249,48 @@ export const apiService = {
 
     write: async (id: string, value: boolean): Promise<void> => {
       await api.post(`/gpio/${id}/write`, { value });
+    },
+
+    // Pin management by node and pin number
+    getPin: async (nodeId: string, pin: number): Promise<GPIODevice> => {
+      const response: AxiosResponse<GPIODevice> = await api.get(`/nodes/${nodeId}/gpio/${pin}`);
+      return response.data;
+    },
+
+    configurePin: async (nodeId: string, pin: number, direction: 'input' | 'output', name?: string): Promise<GPIODevice> => {
+      const response: AxiosResponse<GPIODevice> = await api.post(`/nodes/${nodeId}/gpio/${pin}/configure`, {
+        direction,
+        name,
+      });
+      return response.data;
+    },
+
+    readPin: async (nodeId: string, pin: number): Promise<{ value: boolean }> => {
+      const response: AxiosResponse<{ value: boolean }> = await api.get(`/nodes/${nodeId}/gpio/${pin}/read`);
+      return response.data;
+    },
+
+    writePin: async (nodeId: string, pin: number, value: boolean): Promise<void> => {
+      await api.post(`/nodes/${nodeId}/gpio/${pin}/write`, { value });
+    },
+
+    // Pin reservation operations
+    reservePin: async (nodeId: string, pin: number, userId: string, duration?: number): Promise<void> => {
+      await api.post(`/nodes/${nodeId}/gpio/${pin}/reserve`, { userId, duration });
+    },
+
+    releasePin: async (nodeId: string, pin: number): Promise<void> => {
+      await api.delete(`/nodes/${nodeId}/gpio/${pin}/reserve`);
+    },
+
+    getReservations: async (nodeId: string): Promise<any[]> => {
+      const response: AxiosResponse<{ reservations: any[] }> = await api.get(`/nodes/${nodeId}/gpio/reservations`);
+      return response.data.reservations;
+    },
+
+    checkReservation: async (nodeId: string, pin: number): Promise<any> => {
+      const response: AxiosResponse<any> = await api.get(`/nodes/${nodeId}/gpio/${pin}/reservation`);
+      return response.data;
     },
   },
 
