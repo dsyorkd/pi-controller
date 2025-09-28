@@ -1,7 +1,7 @@
 # =============================================================================
 # Pi Controller Project .gitignore
 # =============================================================================
-
+.mcp.json
 # ========================================
 # Go specific
 # ========================================
@@ -329,3 +329,9 @@ test-local*
 # Examples:
 # /custom-scripts/
 # /local-configs/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

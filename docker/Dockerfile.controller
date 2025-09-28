@@ -1,7 +1,16 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
-# Install build dependencies
+# Build arguments
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG DATE=unknown
+
+# Install build dependencies for cross-compilation
 RUN apk add --no-cache git make build-base
 
 # Set working directory
@@ -16,18 +25,46 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build arguments
-ARG VERSION=dev
-ARG COMMIT=unknown
-ARG DATE=unknown
-
-# Build the binary
-RUN CGO_ENABLED=1 GOOS=linux CGO_CFLAGS="-DSQLITE_MAX_MMAP_SIZE=0" CGO_LDFLAGS="-lsqlite3" go build \
-    -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
-    -o pi-controller ./cmd/pi-controller
+# Configure cross-compilation and build the binary
+# SQLite requires CGO, so we need proper cross-compilation setup
+RUN set -eux; \
+    case "$TARGETARCH" in \
+        amd64) \
+            export CC=gcc; \
+            export CXX=g++; \
+            ;; \
+        arm64) \
+            apk add --no-cache gcc-aarch64-linux-musl; \
+            export CC=aarch64-linux-musl-gcc; \
+            export CXX=aarch64-linux-musl-g++; \
+            ;; \
+        arm) \
+            apk add --no-cache gcc-arm-linux-musleabihf; \
+            export CC=arm-linux-musleabihf-gcc; \
+            export CXX=arm-linux-musleabihf-g++; \
+            ;; \
+        *) \
+            echo "Unsupported architecture: $TARGETARCH"; \
+            exit 1; \
+            ;; \
+    esac; \
+    CGO_ENABLED=1 \
+    GOOS=$TARGETOS \
+    GOARCH=$TARGETARCH \
+    CGO_CFLAGS="-DSQLITE_MAX_MMAP_SIZE=0" \
+    CGO_LDFLAGS="-lsqlite3" \
+    go build \
+        -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE} -linkmode external -extldflags '-static'" \
+        -a -installsuffix cgo \
+        -o pi-controller ./cmd/pi-controller
 
 # Final stage
-FROM alpine:3.22
+FROM --platform=$TARGETPLATFORM alpine:3.22
+
+# Build arguments for final stage
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
@@ -41,6 +78,9 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/pi-controller .
 
+# Ensure binary is executable
+RUN chmod +x /app/pi-controller
+
 # Create data directory
 RUN mkdir -p /app/data && chown -R picontroller:picontroller /app
 
@@ -53,6 +93,11 @@ EXPOSE 8080 9090 8081
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD /app/pi-controller version || exit 1
+
+# Add labels for multi-arch identification
+LABEL org.opencontainers.image.title="pi-controller"
+LABEL org.opencontainers.image.description="Pi Controller - Kubernetes management platform for Raspberry Pi clusters"
+LABEL org.opencontainers.image.platform="$TARGETPLATFORM"
 
 # Run the binary
 ENTRYPOINT ["/app/pi-controller"]

@@ -2,875 +2,15 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
-        "title": "Write Unit Tests for Configuration Loading",
-        "description": "Implement unit tests for the `internal/config` package to ensure configuration is loaded and parsed correctly from various sources.",
-        "details": "Test cases should cover loading from environment variables and files. Include tests for default values, missing values, and invalid data types to ensure robust error handling. Mock any file system interactions.",
-        "testStrategy": "Unit tests using the standard Go `testing` package. Mock file system reads to test loading from files without actual disk I/O. Use table-driven tests to cover multiple configuration scenarios.",
-        "priority": "high",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Create Test File and Test Default Value Loading",
-            "description": "Create the test file `internal/config/config_test.go` and implement a basic test case. This test should call the configuration loader with no environment variables or files present and assert that the resulting configuration object contains the expected default values.",
-            "dependencies": [],
-            "details": "In `internal/config/config_test.go`, create a test function (e.g., `TestLoadConfig_Defaults`) that invokes the `Load()` function. Use the `testify/assert` package to verify that fields like `Server.Port` and `LogLevel` are populated with their hardcoded default values.",
-            "status": "done",
-            "testStrategy": "Standard unit test using the `testing` package and `testify/assert` for assertions."
-          },
-          {
-            "id": 2,
-            "title": "Implement Test for Loading Configuration from Environment Variables",
-            "description": "Add a test case to verify that configuration can be loaded correctly from environment variables. This test should ensure that environment variables override the default values.",
-            "dependencies": [],
-            "details": "Create a new test function (e.g., `TestLoadConfig_FromEnv`). Use `t.Setenv()` (available in Go 1.17+) to set environment variables that match the configuration structure (e.g., `PI_CONTROLLER_SERVER_PORT=9090`). Call the `Load()` function and assert that the configuration struct is populated with the values from the environment variables.",
-            "status": "done",
-            "testStrategy": "Use a table-driven test to cover multiple environment variables and data types. `t.Setenv` will be used to temporarily set environment variables for the duration of the test."
-          },
-          {
-            "id": 3,
-            "title": "Implement Test for Loading Configuration from a Mocked File",
-            "description": "Write a test to confirm that configuration is loaded correctly from a file. This test must mock the file system to avoid actual disk I/O.",
-            "dependencies": [],
-            "details": "Since the current implementation likely uses Viper, you can mock file loading by creating a temporary config file in the test. Write a sample YAML or JSON config to a temporary file using `os.CreateTemp`. Set the config path for Viper to look in the temp directory, call `Load()`, and then assert the values are correct. Ensure the temporary file is cleaned up using `t.Cleanup()`.",
-            "status": "done",
-            "testStrategy": "Mock file system interaction by creating a temporary configuration file during the test setup and removing it during teardown."
-          },
-          {
-            "id": 4,
-            "title": "Add Test Case for Configuration Source Precedence",
-            "description": "Create a test to verify the correct order of precedence for configuration sources. The test should confirm that environment variables override file values, which in turn override default values.",
-            "dependencies": [],
-            "details": "In a single test function, set a default value, provide a mocked configuration file with a different value for the same key, and set an environment variable with a third value. For example, for `server.port`: default '8080', file '9090', env '9999'. After calling `Load()`, assert that the final value in the config struct is '9999', confirming that environment variables have the highest priority.",
-            "status": "done",
-            "testStrategy": "This test will combine the techniques from previous subtasks (mocked file and `t.Setenv`) to verify the override logic."
-          },
-          {
-            "id": 5,
-            "title": "Implement Test for Error Handling with Invalid Configuration Data",
-            "description": "Write a test to ensure the configuration loader handles errors gracefully when encountering malformed or invalid data.",
-            "dependencies": [],
-            "details": "Create a test case where the mocked configuration file contains invalid syntax (e.g., malformed YAML). Call the `Load()` function and use `assert.Error()` to verify that a non-nil error is returned. This ensures the application will fail to start rather than running with a broken or incomplete configuration.",
-            "status": "done",
-            "testStrategy": "Provide invalid input via a mocked configuration file and assert that the `Load()` function returns an error as expected."
-          }
-        ]
-      },
-      {
-        "id": 2,
-        "title": "Implement Unit Tests for `internal/storage` Package",
-        "description": "Create unit tests for the storage layer in `internal/storage`. The tests should verify all database interaction logic, such as create, read, update, and delete operations.",
-        "details": "Use a mocking library like `testify/mock` or `sqlmock` to create a mock database connection. This will isolate the tests from any actual database, ensuring they run quickly and reliably. Test for correct query formation and handling of database errors.",
-        "testStrategy": "Unit tests focused on the data access layer. All external database dependencies will be mocked to test the logic in isolation.",
-        "priority": "high",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Setup Test Suite with `sqlmock` and Test `Create` Operation",
-            "description": "Create a new test file `internal/storage/postgres_test.go`. Set up the basic test suite structure using `testify/suite` and initialize `sqlmock` in a `SetupTest` function. Implement the first test for the primary 'create' method (e.g., `CreateDeployment`), verifying the correct `INSERT` query is executed and that the method handles both success and database errors.",
-            "dependencies": [],
-            "details": "The test should mock the `db.Exec()` call, expecting a specific SQL `INSERT` statement with placeholder arguments. It must verify that the arguments passed to the query match the input data. A separate test case should simulate a database error from `Exec()` and assert that the method returns that error.",
-            "status": "done",
-            "testStrategy": "Use `DATA-DOG/go-sqlmock` to mock the database connection and `testify/assert` for assertions."
-          },
-          {
-            "id": 2,
-            "title": "Implement Tests for Single-Record `Read` Operation",
-            "description": "Add unit tests for the method responsible for retrieving a single record by its ID (e.g., `GetDeploymentByID`). The tests must cover the success case where a record is found and correctly scanned into the model struct, as well as the case where no record is found (`sql.ErrNoRows`).",
-            "dependencies": [
-              "2.1"
-            ],
-            "details": "Use `sqlmock` to mock the `db.QueryRow()` call. For the success case, provide mock rows using `sqlmock.NewRows` that the `Scan` method can process. For the 'not found' case, configure the mock `QueryRow()` to return `sql.ErrNoRows` and assert that the storage method returns a corresponding application-level error (e.g., `storage.ErrNotFound`).",
-            "status": "done",
-            "testStrategy": "Mock `QueryRow` and test both a successful `Scan` and a `sql.ErrNoRows` failure."
-          },
-          {
-            "id": 3,
-            "title": "Implement Tests for Multi-Record `List` Operation",
-            "description": "Write unit tests for the method that retrieves a collection of records (e.g., `ListDeployments`). Test the scenario where multiple records are returned and correctly mapped to a slice of model structs. Also, test the case where the query returns no rows, ensuring an empty slice and no error is returned.",
-            "dependencies": [
-              "2.1"
-            ],
-            "details": "Use `sqlmock.NewRows` to define the columns and mock data for the result set. The test should mock the `db.Query()` call to return these rows. Verify the returned slice of structs matches the mocked data. A separate test should cover `db.Query()` itself returning an error.",
-            "status": "done",
-            "testStrategy": "Mock `Query` to return a multi-row result set and also test the empty result set scenario."
-          },
-          {
-            "id": 4,
-            "title": "Implement Tests for `Update` Operation",
-            "description": "Create unit tests for the primary 'update' method (e.g., `UpdateDeployment`). Verify that the correct `UPDATE` SQL statement is generated with the correct parameters for a given ID. Test that the method correctly handles the result of the database execution.",
-            "dependencies": [
-              "2.1"
-            ],
-            "details": "Mock the `db.Exec()` call, expecting a specific `UPDATE` query and arguments. Use `sqlmock.NewResult` to simulate the result of the execution (e.g., 1 row affected). Test the case where `Exec()` returns an error. Also, test the scenario where zero rows are affected, which might indicate the record to update didn't exist.",
-            "status": "done",
-            "testStrategy": "Mock `Exec` and use `sqlmock.NewResult` to test the outcome of the update operation."
-          },
-          {
-            "id": 5,
-            "title": "Implement Tests for `Delete` Operation and General Error Handling",
-            "description": "Add tests for the 'delete' method (e.g., `DeleteDeployment`), verifying the correct `DELETE` query and handling of its result. Additionally, review all previously written tests to ensure comprehensive handling of generic database errors (e.g., connection failures, syntax errors) for all CRUD methods.",
-            "dependencies": [
-              "2.1",
-              "2.2",
-              "2.3",
-              "2.4"
-            ],
-            "details": "For the delete test, mock the `db.Exec()` call and its result. For the general error handling review, add test cases to other methods (Create, Get, List, Update) that simulate a generic `errors.New(\"database connection lost\")` from `Query`, `QueryRow`, or `Exec` to ensure these errors are propagated correctly up the call stack.",
-            "status": "done",
-            "testStrategy": "Test the `DELETE` operation and add test cases for unexpected, non-specific database errors to all methods."
-          }
-        ]
-      },
-      {
-        "id": 3,
-        "title": "Write Unit Tests for `pkg/k8s` Kubernetes Client Logic",
-        "description": "Develop unit tests for the Kubernetes client logic in the `pkg/k8s` package. The tests should cover interactions with the Kubernetes API for managing resources.",
-        "details": "Utilize the `k8s.io/client-go/kubernetes/fake` client to simulate the Kubernetes API. This avoids the need for a running Kubernetes cluster. Tests should verify resource creation, retrieval, updates, and deletion logic.",
-        "testStrategy": "Unit testing using the official fake Kubernetes client. This allows for testing API interactions without external dependencies.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Set Up Test Suite for `pkg/k8s` and Initialize Fake Client",
-            "description": "Create the `pkg/k8s/client_test.go` file. Implement the basic test suite structure and a helper function to initialize the `k8s.Client` with a `fake.NewSimpleClientset` for use in subsequent tests.",
-            "dependencies": [],
-            "details": "This initial setup will ensure a consistent and clean testing environment for all other test cases. The fake client can be pre-populated with initial Kubernetes objects if needed for specific tests. The file should be in the `pkg/k8s` package.",
-            "status": "done",
-            "testStrategy": "Use standard Go testing package. The helper function should accept `runtime.Object`s to allow pre-seeding the fake client for different test scenarios."
-          },
-          {
-            "id": 2,
-            "title": "Write Unit Test for Resource Creation Logic",
-            "description": "Develop a test case for a resource creation function (e.g., `CreateDeployment`). The test should use the fake clientset to create a new resource and then verify that the resource was created successfully by retrieving it and checking its properties.",
-            "dependencies": [
-              "3.1"
-            ],
-            "details": "Using the setup from the first subtask, define a sample Kubernetes resource (like an `appsv1.Deployment`). Call the corresponding create function in the client and assert that no error is returned. Use the fake client's `Get` action to verify the object exists in the fake API server.",
-            "status": "done",
-            "testStrategy": "Test the success path for resource creation. Verify that the object returned by the create function matches the object that was intended to be created."
-          },
-          {
-            "id": 3,
-            "title": "Write Unit Tests for Resource Retrieval Logic",
-            "description": "Create test cases for resource retrieval functions (e.g., `GetDeployment`). Tests should cover both successful retrieval of a pre-existing resource and the expected error when trying to retrieve a non-existent resource.",
-            "dependencies": [
-              "3.1"
-            ],
-            "details": "For the success case, pre-populate the fake client with a resource and call the `Get...` function, asserting the correct object is returned. For the failure case, use an empty fake client, call the `Get...` function, and assert that an `errors.IsNotFound` error is returned.",
-            "status": "done",
-            "testStrategy": "Cover both the 'happy path' (resource found) and the error path (resource not found) for get operations."
-          },
-          {
-            "id": 4,
-            "title": "Write Unit Test for Resource Update Logic",
-            "description": "Write a test for a resource update function (e.g., `UpdateDeployment`). The test should first create a resource, then update one of its properties, call the update function, and finally verify that the retrieved resource reflects the changes.",
-            "dependencies": [
-              "3.1"
-            ],
-            "details": "Initialize the fake client with an existing resource. Modify a field in the local copy of the object (e.g., a label or a container image). Call the update function and then use the fake client's `Get` action to confirm the update was persisted correctly.",
-            "status": "done",
-            "testStrategy": "The test should confirm that the resource version or other metadata is correctly handled during the update, and the desired state in the spec is changed."
-          },
-          {
-            "id": 5,
-            "title": "Write Unit Test for Resource Deletion Logic",
-            "description": "Develop a test case for a resource deletion function (e.g., `DeleteDeployment`). The test should ensure that after calling the delete function, the specified resource is no longer retrievable from the fake Kubernetes API.",
-            "dependencies": [
-              "3.1"
-            ],
-            "details": "Pre-populate the fake client with a resource. Call the delete function for that resource. Attempt to `Get` the same resource and assert that an `errors.IsNotFound` error is returned, confirming its successful deletion.",
-            "status": "done",
-            "testStrategy": "Verify that the delete call completes without error and that a subsequent get call for the same resource fails with the expected 'Not Found' error."
-          }
-        ]
-      },
-      {
-        "id": 11,
-        "title": "Fix All `go vet` Errors",
-        "description": "Address all existing compilation and static analysis errors reported by `go vet`, including logger type mismatches, undefined constants, and incorrect test imports.",
-        "status": "done",
-        "dependencies": [],
-        "priority": "high",
-        "details": "Successfully addressed all static analysis errors reported by `go vet`. The codebase now has a clean baseline, enabling further development. Key fixes included resolving import conflicts, correcting type mismatches, and cleaning up unused code.",
-        "testStrategy": "Verified that `make vet` and `make build` both pass without errors. Confirmed that all existing tests compile and pass, establishing a clean baseline for code quality.",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Resolve testing import conflicts using aliases",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Fix logger type mismatches in discovery and k8s packages",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Correct handler method names (e.g., GetByID to Get)",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Remove invalid fields from request structs",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Fix incorrect variable assignments (:= vs =) in tests",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 6,
-            "title": "Remove all unused imports",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 7,
-            "title": "Align CreateNodeRequest struct with service definitions",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 12,
-        "title": "Install and Configure `golangci-lint`",
-        "description": "Integrate `golangci-lint` into the project to enforce a consistent and high-quality coding standard. Configure the linter with a standard set of rules.",
-        "details": "Add a `.golangci.yml` configuration file to the project root. Enable linters such as `errcheck`, `govet`, `staticcheck`, `unused`, and `gofmt`. Integrate the linter into the CI/CD pipeline to fail builds on linting errors.",
-        "testStrategy": "Run `golangci-lint run` on the codebase. The command should execute successfully. Create a sample pull request with a linting error to verify that the CI check fails as expected.",
-        "priority": "high",
-        "dependencies": [
-          11
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 13,
-        "title": "Implement Structured Logging and Error Handling",
-        "description": "Refactor the codebase to use a structured logging library (`slog`) and consistent error handling patterns. The foundational logger and error packages are complete; the remaining work involves migrating all internal packages to use the new system.",
-        "status": "done",
-        "dependencies": [
-          11
-        ],
-        "priority": "high",
-        "details": "The core logger package (using `slog`) and a custom error handling package have been implemented. The `main.go` entrypoint has been updated. The next step is to systematically replace all `fmt.Printf` and `log.Println` calls across all internal packages with the new structured logger and apply the new error wrapping patterns.",
-        "testStrategy": "Unit test error-producing functions to verify that errors are wrapped correctly. Manually inspect application logs during operation to confirm they are structured (e.g., JSON format) and contain contextual information.",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Create foundational logger and error handling packages",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Update pi-controller main.go to use new logger",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Migrate 'storage' package to new logger and error handling",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Migrate 'api' package to new logger and error handling",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "<info added on 2025-09-02T03:24:52.626Z>\nDiscovered a significant dependency issue: migrating the `api` package breaks compilation in dependent packages (`services`, `middleware`, `handlers`) as they all expect the old `logrus.Logger` interface. This tight coupling prevents an isolated, package-by-package migration. The migration strategy must be revised to update all these packages in a coordinated effort, or to create a temporary compatibility layer.\n</info added on 2025-09-02T03:24:52.626Z>",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Migrate 'grpc' package to new logger and error handling",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          },
-          {
-            "id": 6,
-            "title": "Migrate 'websocket' package to new logger and error handling",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 14,
-        "title": "Complete Database Migration System",
-        "description": "Implement a robust database migration system to manage schema changes for the SQLite database.",
-        "details": "Use a library like `golang-migrate/migrate` or `pressly/goose`. Create initial migration scripts for the existing database models. The system should support applying and rolling back migrations.\n<info added on 2025-09-02T04:15:09.657Z>\nAfter implementation, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:15:09.657Z>",
-        "testStrategy": "Create a unit test that initializes an in-memory SQLite database, runs all 'up' migrations, and verifies the schema. Then, run all 'down' migrations and confirm the database is returned to its initial state.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 15,
-        "title": "Finalize Security Middleware Implementation",
-        "description": "Complete the authentication and authorization middleware, including JWT validation and initial RBAC checks.",
-        "details": "Implement JWT token validation logic in the Gin middleware, checking for signature, expiration, and issuer. Create placeholder functions for RBAC checks that can be expanded later. Ensure protected routes return 401/403 errors correctly.",
-        "testStrategy": "Write integration tests for the API router. Test protected endpoints with no token, an invalid token, an expired token, and a valid token to ensure correct HTTP status codes are returned.",
-        "priority": "high",
-        "dependencies": [
-          13
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 16,
-        "title": "Implement Pi Agent gRPC Client Communication",
-        "description": "Implement the gRPC client within the Pi Agent to establish communication with the Pi Controller server.",
-        "details": "Use the existing protobuf definitions to generate gRPC client code. Implement logic for the agent to connect to the controller, handle connection retries with exponential backoff, and send a registration or heartbeat message.\n<info added on 2025-09-02T04:15:27.648Z>\nAfter implementation, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:15:27.648Z>",
-        "testStrategy": "Create a mock gRPC server to test the agent's client. Verify that the agent can connect, send messages, and handle server disconnections gracefully.",
-        "priority": "high",
-        "dependencies": [
-          13
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 17,
-        "title": "Implement Pi Agent GPIO Control Logic",
-        "description": "Implement the core GPIO control functionality within the Pi Agent, including digital I/O and PWM, using a hardware abstraction library.",
-        "details": "Integrate the `periph.io/x/periph` library for hardware access. Implement gRPC service handlers on the agent to set pin levels (HIGH/LOW), read pin states, and configure PWM output (frequency, duty cycle).\n<info added on 2025-09-02T04:15:38.373Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:15:38.373Z>",
-        "testStrategy": "Requires testing on actual Raspberry Pi hardware. Write a test client to send gRPC requests to the agent and verify pin voltage changes with a multimeter or oscilloscope. Mock the `periph.io` library for unit tests.",
-        "priority": "high",
-        "dependencies": [
-          16
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 18,
-        "title": "Implement Pi Agent System Metrics Collection",
-        "description": "Add functionality to the Pi Agent to collect and report system metrics like CPU usage, memory usage, and core temperature.",
-        "details": "Use a library like `gopsutil/gopsutil` to gather system metrics. Expose this data via a new gRPC service endpoint that the controller can poll or stream.\n<info added on 2025-09-02T04:15:48.953Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:15:48.953Z>",
-        "testStrategy": "Run the agent on a Raspberry Pi and call the metrics gRPC endpoint. Compare the returned values with the output of standard Linux commands like `top`, `free`, and `vcgencmd measure_temp` to verify accuracy.",
-        "priority": "medium",
-        "dependencies": [
-          16
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 19,
-        "title": "Replace Mock GPIO Service with Real gRPC Implementation",
-        "description": "Refactor the Pi Controller's GPIO service to remove all mock implementations and replace them with real gRPC calls to the Pi Agents.",
-        "details": "The controller's GPIO service will act as a gRPC client. When an API request to control a GPIO pin is received, the service will look up the target node's address and dispatch a gRPC request to the corresponding agent.\n<info added on 2025-09-02T04:15:59.477Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:15:59.477Z>",
-        "testStrategy": "Write an integration test that starts a controller and a mock agent. The test will call the controller's REST API for GPIO control and verify that the mock agent receives the correct gRPC call with the correct parameters.",
-        "priority": "high",
-        "dependencies": [
-          17
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 20,
-        "title": "Implement GPIO Pin Reservation and Conflict Resolution",
-        "description": "Develop a mechanism within the controller to reserve GPIO pins for specific tasks and prevent conflicting configurations.",
-        "details": "Add a 'reserved_by' field to the GPIO model in the database. When a request to use a pin is made, the service layer must check if it's already reserved. Implement logic to handle and report conflicts.\n<info added on 2025-09-02T04:16:10.659Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:16:10.659Z>",
-        "testStrategy": "Write service-level unit tests. Test scenarios where two clients attempt to reserve the same pin, attempt to use a reserved pin, and successfully release a pin.",
-        "priority": "high",
-        "dependencies": [
-          19
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 21,
-        "title": "Implement mDNS Discovery Service",
-        "description": "Implement a real mDNS discovery service for both the controller and agents to enable automatic discovery on the local network.",
-        "details": "Use the `hashicorp/mdns` library. The controller will listen for mDNS announcements for a specific service type (e.g., `_pi-controller-agent._tcp`). The agents will broadcast their presence and gRPC server address using this service type.\n<info added on 2025-09-02T04:16:23.036Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:16:23.036Z>",
-        "testStrategy": "Run the controller and multiple agents on the same local network. Verify that the controller's logs show the discovery of each agent. Check that the discovered nodes are added to the controller's database.",
-        "priority": "high",
-        "dependencies": [
-          13
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 22,
-        "title": "Implement Automatic Node Registration Workflow",
-        "description": "Create a workflow for newly discovered nodes to be automatically registered and authenticated with the controller.",
-        "details": "Upon mDNS discovery, the controller initiates a registration process. This involves generating a client certificate for the new agent, securely transmitting it, and storing the node's identity in the database. The agent will then use this certificate for all future gRPC communication.\n<info added on 2025-09-02T04:16:40.714Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:16:40.714Z>",
-        "testStrategy": "Set up a fresh agent on the network. Monitor the controller and agent logs to trace the discovery, certificate generation, and secure communication handshake. Verify the node appears as 'registered' or 'active' in the controller's database.",
-        "priority": "high",
-        "dependencies": [
-          21
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 23,
-        "title": "Define and Apply Kubernetes Custom Resource Definitions (CRDs)",
-        "description": "Define the schemas for `GPIOPin`, `PWMController`, and `I2CDevice` CRDs and create the necessary YAML files to apply them to a Kubernetes cluster.",
-        "details": "Use the `kubebuilder` or `Operator SDK` framework to scaffold the CRD definitions. Define the `spec` for desired state (e.g., pin mode, PWM duty cycle) and `status` for observed state (e.g., current pin level).\n<info added on 2025-09-02T04:16:49.994Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:16:49.994Z>",
-        "testStrategy": "Apply the generated CRD YAML files to a test K3s cluster using `kubectl apply -f`. Verify that the new resources can be created, listed, and described using `kubectl get gpiopins`.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 24,
-        "title": "Implement Kubernetes Controller Reconciliation Loop",
-        "description": "Develop the reconciliation loop for the `GPIOPin` CRD that watches for changes and calls the Pi Controller's service to enact hardware changes.",
-        "details": "Using `controller-runtime`, implement the `Reconcile` function. This function will fetch the `GPIOPin` resource, determine the target node, and call the appropriate GPIO service method (which in turn makes a gRPC call) to match the hardware state to the `spec`.\n<info added on 2025-09-02T04:17:00.461Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:17:00.461Z>",
-        "testStrategy": "Write integration tests using `envtest`. Create a `GPIOPin` resource in the test environment and verify that the reconciler calls a mocked version of the GPIO service with the correct parameters.",
-        "priority": "medium",
-        "dependencies": [
-          19,
-          23
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 25,
-        "title": "Integrate `client-go` for Kubernetes API Communication",
-        "description": "Integrate the official Kubernetes `client-go` library into the Pi Controller to enable interaction with the Kubernetes API server.",
-        "details": "Add the `k8s.io/client-go` dependency. Implement logic to create a `clientset` using in-cluster or out-of-cluster configuration. This will be used by the Kubernetes controller component to watch and update CRDs.\n<info added on 2025-09-02T04:17:14.771Z>\nAfter implementation, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:17:14.771Z>",
-        "testStrategy": "Write a simple test program that uses the `client-go` integration to connect to a test K3s cluster and list all pods in the `kube-system` namespace. This verifies connectivity and authentication.",
-        "priority": "medium",
-        "dependencies": [
-          23
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 26,
-        "title": "Implement Secure SSH Client",
-        "description": "Implement a robust SSH client within the provisioner service for executing commands and transferring files to nodes.",
-        "details": "Use the `golang.org/x/crypto/ssh` package. The client should support key-based authentication, connection pooling, and have built-in retry logic for transient network errors.\n<info added on 2025-09-02T04:17:28.393Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:17:28.393Z>",
-        "testStrategy": "Write unit tests that connect to a mock SSH server. Test command execution, file transfer (SFTP), and error handling for connection failures.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 27,
-        "title": "Develop K3s Provisioning Scripts and Logic",
-        "description": "Create the logic and scripts required to install K3s on a target node and have it join a cluster.",
-        "details": "The provisioner service will use the SSH client to connect to a node. It will execute commands to download and run the official K3s installation script (`curl -sfL https://get.k3s.io | sh -`). It will manage join tokens for adding new nodes to an existing cluster.\n<info added on 2025-09-02T04:17:46.714Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:17:46.714Z>",
-        "testStrategy": "Test against a set of virtual machines (e.g., using Vagrant or cloud VMs). Run the provisioning process and verify that a multi-node K3s cluster is successfully created and all nodes are in a 'Ready' state.",
-        "priority": "medium",
-        "dependencies": [
-          26
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 28,
-        "title": "Implement Comprehensive Certificate Authority System",
-        "description": "Design and implement a comprehensive Certificate Authority (CA) system supporting multiple backends, including a local self-signed CA for development and an enterprise-grade integration with HashiCorp Vault for production.",
-        "status": "done",
-        "dependencies": [
-          15,
-          26
-        ],
-        "priority": "high",
-        "details": "### Core Architecture\n**Primary CA Options:**\n- **Local CA (default)**: A self-signed CA managed locally within the cluster for development and simple deployments.\n- **Vault Integration**: Integration with HashiCorp Vault as an enterprise-grade CA backend, using AppRole-based provisioning.\n\n**External TLS (Separate from internal CA):**\n- **Let's Encrypt**: Optional integration for ingress controllers or other external-facing services.\n\n### Vault Integration Flows\n**Flow A - Existing AppRole:**\n- The user provides an existing AppRole's credentials (RoleID + SecretID) during cluster provisioning.\n- This AppRole is used for all certificate operations.\n\n**Flow B - Admin Token Bootstrap:**\n- The user provides a Vault admin token during cluster provisioning.\n- A server node (not the control machine) uses the token to create a dedicated AppRole with the necessary permissions for CA management.\n- All subsequent certificate operations use the newly created AppRole.\n\n**Key Security Requirement:** The control machine initiating the deployment MUST NEVER store private keys or long-lived tokens. All cryptographic operations and Vault interactions must occur on the server nodes.\n\n### Feature Integration\n1. **K3s Integration**: All internal cluster components (etcd, kubelet, etc.) must use certificates issued by the chosen CA system.\n2. **SSH Integration**: When Vault is the configured CA, integrate with the Vault SSH secrets engine to issue short-lived, signed SSH certificates. This will integrate with the existing SSH client (Task 26).\n3. **Cert-Manager**: Provide an optional integration path for using cert-manager within the Kubernetes cluster for managing application certificates.\n4. **Development Options**: Support 'unsafe' or insecure connection options to Vault for use in development environments (e.g., skipping TLS verification).",
-        "testStrategy": "Develop a multi-faceted testing strategy: \n1. Unit tests for the local CA generation and signing logic. \n2. Integration tests for Vault connectivity using both AppRole and Admin Token flows (with a mock or dev Vault instance). \n3. End-to-end tests verifying that cluster nodes can successfully bootstrap and obtain valid certificates from the configured CA backend. \n4. Test Vault SSH certificate issuance and validate that the integrated SSH client (Task 26) can use them for authentication. \n5. Verify that certificate lifecycle events (issuance, renewal, revocation) are handled correctly for all CA backends.",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Define CA architecture and Vault integration strategy",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "<info added on 2025-09-04T04:49:28.493Z>\n**AGENT ASSIGNMENT: tech-cto-advisor**\n\n**Strategic CA Architecture & Vault Integration Planning**\n\nThis subtask requires CTO-level strategic technology analysis to design the comprehensive certificate authority architecture. The tech-cto-advisor should:\n\n1.  **Architecture Decision Matrix**:\n    *   Evaluate Local CA vs Vault CA vs hybrid deployment scenarios.\n    *   Define when each approach is appropriate (dev/staging/production).\n    *   Analyze cost, complexity, and security trade-offs.\n\n2.  **Vault Integration Strategy**:\n    *   Design AppRole policy structures for CA operations.\n    *   Define certificate hierarchy (root CA, intermediate CAs, leaf certificates).\n    *   Plan multi-tenancy and isolation boundaries.\n    *   Design secret engines configuration (PKI + SSH).\n\n3.  **K3s Certificate Integration Architecture**:\n    *   Strategy for replacing K3s default certificates with CA-issued certificates.\n    *   Integration points with K3s certificate rotation.\n    *   Custom CA certificate distribution to K3s components.\n\n4.  **SSH Certificate Strategy**:\n    *   Plan Vault SSH secrets engine integration with Task 26 SSH client.\n    *   Design short-lived SSH certificate workflow.\n    *   Host key signing and validation strategy.\n\n5.  **Security Model Definition**:\n    *   Key storage and protection strategies.\n    *   Certificate rotation and lifecycle policies.\n    *   Threat model analysis and mitigation strategies.\n    *   Zero-trust principles for certificate distribution.\n\n6.  **Scalability & Multi-Cluster Planning**:\n    *   Certificate distribution across multiple clusters.\n    *   Cross-cluster certificate trust relationships.\n    *   Performance considerations for certificate operations.\n\n7.  **Environment Configuration Strategy**:\n    *   Development environment simplified workflows.\n    *   Production environment security requirements.\n    *   Staging environment testing strategies.\n\n8.  **Let's Encrypt Integration Architecture**:\n    *   External certificate management for ingress controllers.\n    *   DNS challenge and HTTP challenge support.\n    *   Integration with internal CA system.\n\n**DELIVERABLE**: Comprehensive technical specification document covering all architectural decisions, integration strategies, and security considerations. This document will guide all subsequent implementation tasks.\n</info added on 2025-09-04T04:49:28.493Z>",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Coordinate implementation phases and feature integration",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "<info added on 2025-09-04T04:50:08.954Z>\n### Implementation & Integration Plan\n\nThis task involves creating a comprehensive plan to orchestrate the development and integration of the Certificate Authority system. The plan will serve as the master guide for implementation, ensuring parallel workstreams are managed efficiently while maintaining high standards for security and quality.\n\n**1. Implementation Phase Planning**\n- **Architectural Breakdown**: Decompose the CA architecture from subtask 28.1 into discrete, implementable phases (e.g., Core Engine, Local Backend, Vault Backend, API Layer).\n- **Parallel Development**: Identify components that can be developed in parallel to accelerate the timeline.\n- **Dependency Mapping**: Create a dependency graph that clearly illustrates the relationships and build order between CA components (e.g., API depends on Core Engine, which depends on a Backend).\n- **Integration Testing Strategy**: Define a multi-stage integration testing plan, progressing from component-level tests to full system validation.\n\n**2. Feature Integration Coordination**\n- **SSH Client (Task 26)**: Develop a strategy to integrate the CA for issuing short-lived SSH certificates, replacing static key-based authentication.\n- **K3s Certificate Replacement**: Plan the detailed workflow for replacing default K3s cluster certificates with certificates issued by the new CA system.\n- **Cert-Manager Integration**: Outline the integration points and configuration necessary to allow the CA to act as a backend for `cert-manager`.\n- **Let's Encrypt Workflow**: Design the process for managing external certificates, including automated issuance and renewal from Let's Encrypt for public-facing services.\n\n**3. Development Workflow & Resource Management**\n- **Agent Deployment & Workstreams**: Define and assign workstreams to specialized agents:\n  - `elite-developer`: Implement the core CA logic, APIs, and backend integrations.\n  - `security-code-reviewer`: Conduct security validation and code reviews at predefined checkpoints.\n  - `ui-ux-designer`: Design user interfaces for CA configuration, monitoring, and certificate management.\n  - `task-checker`: Validate implementation against requirements at the completion of each phase.\n- **Workflow Scheduling**: Establish a timeline that coordinates development sprints with security checkpoints, UI/UX deliverables, and testing phases.\n\n**4. Risk & Dependency Management**\n- **Critical Path Analysis**: Identify the critical path for the project, focusing on dependencies that could block multiple workstreams.\n- **Mitigation Planning**: Propose mitigation strategies for potential integration challenges, such as API versioning conflicts or performance bottlenecks.\n- **Timeline Management**: Manage the overall project timeline and resource allocation to ensure milestones are met.\n\n**5. Quality Assurance & Validation Plan**\n- **Security Gates**: Schedule mandatory security reviews at key milestones (e.g., post-API implementation, pre-release).\n- **Comprehensive Testing**: Coordinate the execution of the full testing strategy, including unit, integration, performance, and end-to-end tests.\n- **Performance Validation**: Define and execute performance tests for high-throughput certificate issuance and revocation operations.\n- **End-to-End Validation**: Organize a final validation phase to test all integrated features (SSH, K3s, etc.) working together seamlessly.\n\n**DELIVERABLE**: A detailed implementation plan document that consolidates all the above points, including phased timelines, agent assignments, dependency maps, risk mitigation strategies, and a comprehensive integration and validation strategy.\n</info added on 2025-09-04T04:50:08.954Z>",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Implement core CA logic for local and Vault backends",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "<info added on 2025-09-04T04:50:42.823Z>\n**AGENT ASSIGNMENT: elite-developer**\n\n**Core CA Implementation & Backend Development**\n\nThis subtask requires high-quality, efficient implementation of the certificate authority core logic. The elite-developer should focus on business requirements and deliver clean, production-ready code:\n\n1.  **Local CA Implementation**:\n    *   Self-signed root CA generation and storage\n    *   Certificate signing request (CSR) processing\n    *   Certificate lifecycle management (issuance, renewal, revocation)\n    *   Local storage and security for CA private keys\n    *   Integration with K3s certificate requirements\n\n2.  **Vault Backend Implementation**:\n    *   Vault PKI secrets engine integration\n    *   AppRole authentication and token management\n    *   Vault API client with proper error handling and retries\n    *   Certificate request and response handling\n    *   Vault SSH secrets engine integration\n    *   Support for \"unsafe\" development connections\n\n3.  **Core CA Logic**:\n    *   Certificate validation and verification\n    *   Certificate chain building and validation\n    *   Certificate revocation list (CRL) management\n    *   Certificate expiration tracking and alerts\n    *   Automatic certificate rotation workflows\n\n4.  **SSH Certificate Integration**:\n    *   Integration with existing SSH client (Task 26)\n    *   Vault-signed SSH certificate authentication\n    *   Host key signing and validation\n    *   Short-lived SSH certificate management\n\n5.  **API Layer Implementation**:\n    *   gRPC endpoints for certificate operations\n    *   REST API for certificate management\n    *   Authentication and authorization for API access\n    *   Rate limiting and abuse prevention\n    *   Comprehensive error handling and logging\n\n6.  **K3s Integration**:\n    *   K3s certificate replacement workflows\n    *   Custom CA certificate distribution\n    *   Integration with K3s certificate rotation\n    *   Cluster bootstrap certificate provisioning\n\n7.  **Configuration Management**:\n    *   Configuration file parsing and validation\n    *   Environment variable support\n    *   Runtime configuration updates\n    *   Configuration validation and testing\n\n**DELIVERABLE**: Production-ready CA implementation with comprehensive error handling, logging, and documentation. All code should follow Go best practices and include proper testing coverage.\n</info added on 2025-09-04T04:50:42.823Z>",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Perform security review of Vault flows and key handling",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "<info added on 2025-09-04T04:51:23.265Z>\nThis subtask requires deep security analysis of the CA implementation to identify vulnerabilities and ensure best practices. The review should cover the following areas:\n\n**1. Cryptographic Security Review:**\n   - Review key generation algorithms and entropy sources.\n   - Validate certificate signing and verification implementations.\n   - Analyze cryptographic key storage and protection mechanisms.\n   - Review certificate chain validation logic.\n   - Validate random number generation for security-critical operations.\n\n**2. Vault Integration Security:**\n   - Review AppRole policy configurations and permissions.\n   - Analyze Vault token handling and lifecycle management.\n   - Validate Vault API authentication and authorization.\n   - Review secret engine configurations for PKI and SSH.\n   - Analyze \"unsafe\" development mode security implications.\n   - Validate secure communication with Vault (TLS, certificate validation).\n\n**3. Key Management Security:**\n   - Review private key storage and protection mechanisms.\n   - Analyze key rotation and lifecycle management.\n   - Validate secure key distribution to cluster nodes.\n   - Review key access controls and audit logging.\n   - Analyze threat model for key compromise scenarios.\n\n**4. API Security Review:**\n   - Review API authentication and authorization mechanisms.\n   - Analyze rate limiting and abuse prevention measures.\n   - Validate input sanitization and validation.\n   - Review API error handling to prevent information disclosure.\n   - Analyze RBAC implementation for certificate operations.\n\n**5. SSH Certificate Security:**\n   - Review SSH certificate validation and authentication.\n   - Analyze host key signing and validation security.\n   - Validate short-lived certificate expiration handling.\n   - Review SSH certificate authority trust relationships.\n   - Analyze integration security with existing SSH client.\n\n**6. Network Security Analysis:**\n   - Review TLS configuration and certificate validation.\n   - Analyze network communication security.\n   - Validate secure cluster node communication.\n   - Review certificate distribution security.\n   - Analyze man-in-the-middle attack prevention.\n\n**7. Operational Security:**\n   - Review audit logging and monitoring capabilities.\n   - Analyze certificate revocation and CRL handling.\n   - Validate incident response procedures.\n   - Review backup and recovery security.\n   - Analyze compliance with security best practices.\n\n**8. Penetration Testing & Vulnerability Assessment:**\n   - Conduct security testing of all CA endpoints.\n   - Analyze common CA vulnerabilities (certificate spoofing, etc.).\n   - Test for SQL injection, XSS, and other web application vulnerabilities.\n   - Validate defense against certificate-based attacks.\n   - Review for timing attacks and side-channel vulnerabilities.\n\n**DELIVERABLE:** A comprehensive security assessment report with identified vulnerabilities, risk ratings, remediation recommendations, and validation that the implementation follows cryptographic and CA security best practices.\n</info added on 2025-09-04T04:51:23.265Z>",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Design configuration interface (CLI/UI) for CA options",
-            "description": "",
-            "status": "done",
-            "dependencies": [],
-            "details": "",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 29,
-        "title": "Implement Full Role-Based Access Control (RBAC)",
-        "description": "Expand the placeholder RBAC middleware to a fully functional system that controls access to API endpoints based on user roles.",
-        "details": "Define roles (e.g., 'admin', 'viewer') and their associated permissions in the configuration or database. The JWT token will contain a user's roles. The middleware will check if the user's roles grant permission for the requested API endpoint and method.\n<info added on 2025-09-02T04:18:09.718Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:18:09.718Z>",
-        "testStrategy": "Write integration tests for the API. Create tokens for different roles. For each role, test access to permitted and forbidden endpoints, verifying that the correct HTTP status codes (200 OK, 403 Forbidden) are returned.",
-        "priority": "high",
-        "dependencies": [
-          15
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 30,
-        "title": "Set Up React/TypeScript Project for Web UI",
-        "description": "Initialize a new frontend project using React and TypeScript for the management dashboard.",
-        "details": "Use `create-react-app` with the TypeScript template or Vite. Set up basic project structure with components, services, and state management (e.g., Zustand or Redux Toolkit). Configure ESLint and Prettier for code quality.\n<info added on 2025-09-02T04:18:40.486Z>\nAfter implementing the feature, run the linter to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:18:40.486Z>",
-        "testStrategy": "Run the development server and confirm the default application page loads correctly. Create a simple 'Hello World' component and a unit test for it using Jest and React Testing Library to verify the test setup.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 31,
-        "title": "Implement Cluster Overview and Node Management UI",
-        "description": "Develop the main dashboard UI components for viewing cluster status and managing individual nodes.",
-        "details": "Create a React component to display a list of nodes fetched from the controller's `/api/v1/nodes` REST endpoint. The view should show node status, IP address, and system metrics. Implement a detail view for a single node.\n<info added on 2025-09-02T04:19:07.061Z>\nAfter implementing the feature, run `npm run lint` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:19:07.061Z>",
-        "testStrategy": "Use a mock API server (e.g., MSW - Mock Service Worker) to provide data to the UI. Write component tests to verify that the node list and detail views render correctly based on the mock data.",
-        "priority": "medium",
-        "dependencies": [
-          30
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 32,
-        "title": "Implement GPIO Control Panel with WebSocket Updates",
-        "description": "Create a UI component for controlling a node's GPIO pins and displaying their real-time status using WebSockets.",
-        "details": "Develop a visual representation of the GPIO header. Implement API calls to set pin modes and states. Establish a WebSocket connection to the controller to receive real-time updates on pin state changes and display them in the UI.\n<info added on 2025-09-02T04:19:21.658Z>\nAfter implementing the feature, run the linter to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:19:21.658Z>",
-        "testStrategy": "In component tests, mock the WebSocket server to send state change messages and verify that the UI updates accordingly. Manually test against a live controller and a real Raspberry Pi to confirm end-to-end functionality.",
-        "priority": "medium",
-        "dependencies": [
-          19,
-          31
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 33,
-        "title": "Implement User Authentication Flow in Web UI",
-        "description": "Build the login page and handle the authentication flow, including JWT storage and authenticated API requests.",
-        "details": "Create a login form that sends credentials to the controller's auth endpoint. Upon successful login, store the received JWT securely (e.g., in an HttpOnly cookie or local storage). Implement an API client (e.g., using Axios) that automatically attaches the JWT to the `Authorization` header for all subsequent requests.\n<info added on 2025-09-02T04:19:38.050Z>\nAfter implementing the feature, run `npm run lint` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:19:38.050Z>",
-        "testStrategy": "Mock the authentication API. Write tests for the login component to check for successful login (token is stored, user is redirected) and failed login (error message is displayed). Test that the API client correctly attaches the auth header.",
-        "priority": "medium",
-        "dependencies": [
-          29,
-          31
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 34,
-        "title": "Implement Business-Aligned API Operations",
-        "description": "Refactor the API from generic CRUD to expose business-aligned operations for managing Raspberry Pi Kubernetes clusters. This involves creating new service methods and API endpoints for cluster lifecycle, node management, GPIO control, and certificate authority tasks, moving beyond simple database table manipulation.",
-        "status": "done",
-        "dependencies": [
-          13,
-          14
-        ],
-        "priority": "medium",
-        "details": "Instead of generic CRUD, implement a business-logic-focused API. This involves creating new methods in the service layer (`internal/services/`) that orchestrate complex actions and exposing them via new, action-oriented Gin handlers (`internal/api/handlers/`).\n\n**1. Cluster Lifecycle Operations:**\n- Implement `ProvisionCluster`, `DeprovisionCluster`, `GetClusterStatus`, and `ScaleCluster` methods in `internal/services/cluster_service.go`.\n- These methods should integrate with the Kubernetes provisioner in `pkg/k8s/provisioner.go`.\n- Expose these via the following endpoints in `internal/api/handlers/cluster_handler.go`:\n  - `POST /api/v1/clusters/{id}/provision`\n  - `POST /api/v1/clusters/{id}/deprovision`\n  - `GET /api/v1/clusters/{id}/status`\n  - `POST /api/v1/clusters/{id}/scale`\n\n**2. Node Discovery & Management:**\n- Implement `DiscoverNodes`, `ProvisionNode`, `DeprovisionNode`, and `RebootNode` in `internal/services/node_service.go`.\n- The discovery service should leverage the network scanner in `pkg/network/scanner.go`.\n- Expose these via the following endpoints in `internal/api/handlers/node_handler.go`:\n  - `POST /api/v1/nodes/discover`\n  - `POST /api/v1/nodes/{id}/provision`\n  - `POST /api/v1/nodes/{id}/deprovision`\n  - `POST /api/v1/nodes/{id}/reboot`\n\n**3. GPIO-as-a-Service Operations:**\n- Implement `ReservePin`, `ReleasePin`, `ReadPinValue`, and `WritePinValue` in `internal/services/gpio_service.go`.\n- These services will interact with the low-level GPIO controllers in `pkg/gpio/control.go`.\n- Expose these via the following endpoints in `internal/api/handlers/gpio_handler.go`:\n  - `POST /api/v1/gpio/{id}/reserve`\n  - `DELETE /api/v1/gpio/{id}/reserve`\n  - `GET /api/v1/gpio/{id}/read`\n  - `POST /api/v1/gpio/{id}/write`\n\n**4. Certificate Authority Operations:**\n- Implement `InitializeCA`, `IssueCertificate`, and `RevokeCertificate` in `internal/services/ca_service.go`.\n- This service will use the PKI functionality defined in `pkg/pki/ca.go`.\n- Expose these via the following endpoints in `internal/api/handlers/ca_handler.go`:\n  - `POST /api/v1/ca/initialize`\n  - `POST /api/v1/certificates/issue`\n  - `POST /api/v1/certificates/{id}/revoke`\n\nBasic CRUD endpoints for administrative purposes can be maintained but are not the focus of this task.\n<info added on 2025-09-02T04:19:52.117Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:19:52.117Z>",
-        "testStrategy": "Write integration tests for each business-oriented API endpoint. For example, for cluster provisioning, test the `POST /clusters/{id}/provision` endpoint. Mock the underlying `k8s.Provisioner` to simulate success and failure scenarios, and verify that the cluster's state in the database is updated correctly and the API returns the appropriate status code. Similarly, test node discovery by mocking the `network.Scanner` and verifying that new `Node` records are created.",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Implement Cluster Lifecycle Service and API Endpoints",
-            "description": "Create business-aligned service methods and API endpoints for provisioning, deprovisioning, scaling, and checking the status of Kubernetes clusters, moving beyond simple CRUD operations.",
-            "dependencies": [],
-            "details": "In `internal/services/cluster_service.go`, implement the methods `ProvisionCluster`, `DeprovisionCluster`, `GetClusterStatus`, and `ScaleCluster`. These methods should fetch the cluster entity from the database, invoke the corresponding logic from `pkg/k8s/provisioner.go`, and update the cluster's state in the database. In `internal/api/handlers/cluster_handler.go`, create new Gin handler functions that parse the cluster ID from the URL, call the new service methods, and return appropriate HTTP responses (e.g., 202 Accepted for long-running tasks). Finally, register the new action-oriented routes in `internal/api/router.go`: `POST /api/v1/clusters/{id}/provision`, `POST /api/v1/clusters/{id}/deprovision`, `GET /api/v1/clusters/{id}/status`, and `POST /api/v1/clusters/{id}/scale`.\n<info added on 2025-09-14T23:28:38.582Z>\n{\n  \"message\": \"Request accepted and is being processed\"\n}\n</info added on 2025-09-14T23:28:38.582Z>\n<info added on 2025-09-14T23:33:34.847Z>\n```text\n<info added on 2025-09-14T23:28:38.582Z>\nImplementation is complete. Business logic methods (ProvisionCluster, DeprovisionCluster, GetClusterStatus, ScaleCluster) have been added to `internal/services/cluster_service.go`, integrating with the provisioning service and updating cluster status in the database. Corresponding API handlers were created in `internal/api/handlers/cluster_handler.go` and registered in `server.go` with an admin role requirement for the following action-oriented routes:\n- `POST /api/v1/clusters/{id}/provision`\n- `POST /api/v1/clusters/{id}/deprovision`\n- `POST /api/v1/clusters/{id}/scale`\n- `GET /api/v1/clusters/{id}/status`\nThe asynchronous POST endpoints correctly return a 202 Accepted status with the message \"Request accepted and is being processed\". The GET status endpoint was enhanced to include detailed node information, such as readiness and counts. The `SetDependencies` pattern was used to inject required services.\n</info added on 2025-09-14T23:28:38.582Z>\n```\n</info added on 2025-09-14T23:33:34.847Z>",
-            "status": "done",
-            "testStrategy": "Write integration tests for the new endpoints. Mock the `k8s.Provisioner` interface to simulate success and failure scenarios. Verify that the service correctly updates the cluster's status in the database and that the API returns the expected HTTP status codes."
-          },
-          {
-            "id": 2,
-            "title": "Implement Node Discovery and Management Service and API Endpoints",
-            "description": "Implement service methods and API endpoints for discovering nodes on the network and managing their lifecycle, including provisioning, deprovisioning, and rebooting.",
-            "dependencies": [],
-            "details": "In `internal/services/node_service.go`, implement `DiscoverNodes`, `ProvisionNode`, `DeprovisionNode`, and `RebootNode`. The `DiscoverNodes` method should utilize the network scanner from `pkg/network/scanner.go` to find and register new nodes. The management methods (`ProvisionNode`, etc.) will orchestrate operations on a specific node, likely using an SSH client or gRPC agent. In `internal/api/handlers/node_handler.go`, create corresponding Gin handlers. Register the new routes in `internal/api/router.go`: `POST /api/v1/nodes/discover`, `POST /api/v1/nodes/{id}/provision`, `POST /api/v1/nodes/{id}/deprovision`, and `POST /api/v1/nodes/{id}/reboot`.",
-            "status": "done",
-            "testStrategy": "For node discovery, mock the network scanner to return a predefined list of devices and verify the service correctly processes them. For management endpoints, mock the underlying communication mechanism (e.g., SSH client) to test the service logic and API response."
-          },
-          {
-            "id": 3,
-            "title": "Implement GPIO-as-a-Service and API Endpoints",
-            "description": "Expose GPIO functionality as a service, allowing API clients to reserve, release, read from, and write to GPIO pins on a specific node via RESTful endpoints.",
-            "dependencies": [],
-            "details": "Create a new service `internal/services/gpio_service.go` and implement `ReservePin`, `ReleasePin`, `ReadPinValue`, and `WritePinValue`. These methods will need to communicate with the target node's agent (likely via gRPC) to call the low-level functions in `pkg/gpio/control.go`. The service should also manage pin reservation state in the database. Create a corresponding `internal/api/handlers/gpio_handler.go` to handle the HTTP requests. The `{id}` in the path will likely refer to a specific pin's resource ID in the database, which is associated with a node. Register the routes in `internal/api/router.go`: `POST /api/v1/gpio/{id}/reserve`, `DELETE /api/v1/gpio/{id}/reserve`, `GET /api/v1/gpio/{id}/read`, and `POST /api/v1/gpio/{id}/write`.",
-            "status": "done",
-            "testStrategy": "Mock the gRPC client that communicates with the Pi Agent. Write tests to verify that the service sends the correct gRPC requests for each GPIO operation and correctly handles the responses. Test the API endpoints for correct request parsing and response formatting."
-          },
-          {
-            "id": 4,
-            "title": "Implement Certificate Authority Service and API Endpoints",
-            "description": "Create service methods and API endpoints for managing the internal Public Key Infrastructure (PKI), including CA initialization and certificate issuance/revocation.",
-            "dependencies": [],
-            "details": "Create a new service `internal/services/ca_service.go` with methods `InitializeCA`, `IssueCertificate`, and `RevokeCertificate`. These methods will act as a business logic layer on top of the functionality provided in `pkg/pki/ca.go`. `InitializeCA` should be an idempotent operation. `IssueCertificate` will take certificate details from the request body and return a new signed certificate. Create a new `internal/api/handlers/ca_handler.go` to expose this functionality. Register the routes in `internal/api/router.go`: `POST /api/v1/ca/initialize`, `POST /api/v1/certificates/issue`, and `POST /api/v1/certificates/{id}/revoke`.\n<info added on 2025-09-14T23:29:30.423Z>\n**CODEBASE ANALYSIS (Completed):**\nA review of the codebase confirms this feature is already fully implemented and exceeds the original specification.\n- **Service:** `internal/services/ca_service.go` contains the required `InitializeCA`, `IssueCertificate`, and `RevokeCertificate` methods.\n- **Handler:** `internal/api/handlers/ca.go` exposes the functionality via REST endpoints.\n- **Routes:** The routes (`POST /api/v1/ca/initialize`, `POST /api/v1/ca/certificates`, `POST /api/v1/ca/certificates/{id}/revoke`) are correctly registered in `internal/api/server.go`.\n- **Architecture:** The implementation uses a more robust pluggable backend system (e.g., `LocalCABackend`, `VaultCABackend`) rather than the single `pkg/pki/ca.go` file initially proposed. It also includes database persistence for certificate metadata and integrates with existing security middleware.\nThis subtask can be considered complete.\n</info added on 2025-09-14T23:29:30.423Z>",
-            "status": "done",
-            "testStrategy": "Write unit tests for the service layer, mocking the `pkg/pki/ca.go` functionality to ensure the service correctly handles inputs, outputs, and persistence of certificate metadata. Test the API endpoints to ensure proper request parsing and response formatting, especially for certificate data."
-          }
-        ]
-      },
-      {
         "id": 35,
         "title": "Create Dockerfiles for Multi-Architecture Builds",
         "description": "Create and configure Dockerfiles for the controller and agent to support multi-architecture builds (ARM64 and AMD64).",
         "details": "Write a multi-stage Dockerfile for the Go applications to ensure small final image sizes. Use `docker buildx` and QEMU to set up a build pipeline that can cross-compile and build images for both ARM64 (for Raspberry Pi) and AMD64 (for servers/developers).\n<info added on 2025-09-02T04:20:01.624Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:20:01.624Z>",
         "testStrategy": "Build the images for both architectures using `docker buildx build --platform linux/amd64,linux/arm64`. Run the resulting AMD64 image on a local machine and the ARM64 image on a Raspberry Pi to confirm they both start and operate correctly.",
         "priority": "medium",
-        "dependencies": [
-          17,
-          21
-        ],
-        "status": "todo",
+        "dependencies": [],
+        "status": "in-progress",
         "subtasks": []
-      },
-      {
-        "id": 36,
-        "title": "Implement Comprehensive Unit Tests for `internal/services`",
-        "description": "Write thorough unit tests for the core business logic contained within the `internal/services` package. This is a critical package that orchestrates other components.",
-        "details": "Inject mocks for all external dependencies, such as the storage layer and the Kubernetes client. Focus on testing the business logic of each service method, including success paths, edge cases, and error handling.",
-        "testStrategy": "Unit tests with dependency injection and mocking. Interfaces for dependencies like storage and k8s clients should be mocked to test the service logic in complete isolation.",
-        "priority": "high",
-        "dependencies": [
-          2,
-          3,
-          "11",
-          "12",
-          "13",
-          "14",
-          "15",
-          "16",
-          "17",
-          "18",
-          "19",
-          "20",
-          "21",
-          "22",
-          "23",
-          "24",
-          "25",
-          "26",
-          "27",
-          "28",
-          "29",
-          "30",
-          "31",
-          "32",
-          "33",
-          "34",
-          "35"
-        ],
-        "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Create Mock Implementations for Service Dependencies",
-            "description": "Establish the foundational testing structure for the `internal/services` package by creating mock implementations for its core dependencies, specifically `storage.Store` and `pkg/k8s.Client`, using the `testify/mock` library.",
-            "dependencies": [],
-            "details": "In a new `internal/services/mocks_test.go` file, define mock structs for the `storage.Store` and `k8s.Client` interfaces. Implement the necessary methods on these mocks. This will enable dependency injection in the service tests, allowing for precise control over the behavior of external components.",
-            "status": "done",
-            "testStrategy": "This subtask creates the testing infrastructure. The mocks themselves don't require tests, but they are essential for all subsequent unit tests in this package."
-          },
-          {
-            "id": 2,
-            "title": "Write Unit Tests for `DeploymentService` Success Scenarios",
-            "description": "Implement unit tests for the 'happy path' of the `DeploymentService`. These tests will verify the core business logic for creating, retrieving, and deleting deployments when all dependencies function as expected.",
-            "dependencies": [
-              "36.1"
-            ],
-            "details": "Create a `deployment_service_test.go` file. Using the mock dependencies, write test cases for methods like `CreateDeployment`, `GetDeploymentStatus`, etc. For each test, configure the mocks to return successful responses and assert that the service methods return the correct results and no errors.",
-            "status": "done",
-            "testStrategy": "Inject the mock `storage.Store` and `k8s.Client`. For a `CreateDeployment` test, mock the `k8s.Client` to return a successful creation response and the `storage.Store` to confirm the database write, then verify the service's output."
-          },
-          {
-            "id": 3,
-            "title": "Write Unit Tests for `DeploymentService` Error Handling and Edge Cases",
-            "description": "Test the resilience and error-handling capabilities of the `DeploymentService`. This includes verifying its behavior when dependencies like the Kubernetes client or storage layer return errors, or when edge cases like non-existent resources are encountered.",
-            "dependencies": [
-              "36.1"
-            ],
-            "details": "In `deployment_service_test.go`, add test cases where the mock `k8s.Client` and `storage.Store` are configured to return errors (e.g., `context.DeadlineExceeded`, `sql.ErrNoRows`). Assert that the service correctly propagates or handles these errors. Test scenarios should include 'deployment not found' and 'failed to update status in storage'.",
-            "status": "done",
-            "testStrategy": "Configure the mock `k8s.Client` to return an error on a `Delete` call. Assert that the `DeleteDeployment` service method returns a corresponding error and does not attempt to update the storage layer."
-          },
-          {
-            "id": 4,
-            "title": "Write Unit Tests for `PinService` Success Scenarios",
-            "description": "Implement unit tests for the primary success paths of the `PinService`. These tests will focus on verifying the logic for retrieving pin configurations and updating pin states when the storage dependency operates correctly.",
-            "dependencies": [
-              "36.1"
-            ],
-            "details": "Create a `pin_service_test.go` file. Use the mock `storage.Store` to test methods like `GetAllPins`, `GetPinByID`, and `UpdatePinState`. Configure the mock to return valid pin models and verify that the service methods correctly process this data and return the expected results without errors.",
-            "status": "done",
-            "testStrategy": "For an `UpdatePinState` test, mock the `storage.Store`'s `GetPin` method to return a specific pin and its `UpdatePin` method to return success. Call the service method and assert that the `UpdatePin` mock was called with the correct arguments."
-          },
-          {
-            "id": 5,
-            "title": "Write Unit Tests for `PinService` Error Handling and Edge Cases",
-            "description": "Ensure the `PinService` gracefully handles errors from the storage layer and manages invalid requests, such as attempting to access a non-existent pin.",
-            "dependencies": [
-              "36.1"
-            ],
-            "details": "In `pin_service_test.go`, add test cases where the mock `storage.Store` is configured to return errors (e.g., `sql.ErrNoRows` when a pin is not found). Assert that the service methods return appropriate, well-defined errors to the caller. Test input validation, such as passing an invalid pin ID.",
-            "status": "done",
-            "testStrategy": "Configure the mock `storage.Store`'s `GetPin` method to return `sql.ErrNoRows`. Call the `GetPinByID` service method and assert that it returns a specific application-level 'not found' error, not the raw database error."
-          }
-        ]
-      },
-      {
-        "id": 37,
-        "title": "Write Unit Tests for `internal/api/handlers`",
-        "description": "Create unit tests for all HTTP handlers in the `internal/api/handlers` package to ensure they correctly process requests and generate appropriate responses.",
-        "details": "Use the `net/http/httptest` package to create mock HTTP requests and response recorders. Mock the service layer dependencies to test the handler logic, such as request parsing, validation, and response formatting.",
-        "testStrategy": "Unit tests for HTTP handlers using `httptest`. The underlying services will be mocked to focus solely on the handler's responsibility.",
-        "priority": "medium",
-        "dependencies": [
-          36
-        ],
-        "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Create Mocks for Service Layer Dependencies",
-            "description": "Implement mock objects for the service interfaces found in the `internal/services` package (e.g., `DeploymentService`, `PodService`, `K8sService`). Use the `testify/mock` library to generate these mocks. This foundational step is required to test the handlers in isolation.",
-            "dependencies": [],
-            "details": "Create a new package, `internal/services/mocks`, or a local `mocks_test.go` file. Define mock structs that embed `mock.Mock` and implement the service interfaces. For example, for `DeploymentService`, create a `MockDeploymentService` with methods like `GetDeployments` and `CreateDeployment` that can be configured to return specific values or errors for testing.\n<info added on 2025-09-03T22:14:35.537Z>\nMocks have been successfully implemented in `internal/services/mocks_test.go` using the `testify/mock` library.\n\n**Mocks Created:**\n- `MockClusterService`\n- `MockNodeService`\n- `MockGPIOService`\n- `MockDeploymentService`\n\n**Validation:**\n- All existing tests continue to pass.\n- Code passes `go vet` static analysis.\n\nThe mocks provide full coverage for the service methods needed by the API handlers and are ready for use in subsequent handler unit tests.\n</info added on 2025-09-03T22:14:35.537Z>",
-            "status": "done",
-            "testStrategy": "The mocks themselves don't need tests, but their correct usage will be validated in the handler unit tests."
-          },
-          {
-            "id": 2,
-            "title": "Write Unit Tests for Health Check Handler",
-            "description": "Create a test file `internal/api/handlers/health_test.go` to test the `GetHealth` handler. This is the simplest handler and will serve to establish the basic testing pattern using `net/http/httptest` and a test Gin engine.",
-            "dependencies": [],
-            "details": "In `health_test.go`, create a test function. Inside, set up a Gin test router, register the `GetHealth` handler to a route (e.g., `/health`). Create a new `http.Request` using `httptest.NewRequest` and a `httptest.NewRecorder`. Serve the HTTP request and assert that the response status code is `http.StatusOK` and the JSON body is `{\"status\": \"ok\"}`.\n<info added on 2025-09-03T22:16:00.903Z>\nThe implementation was expanded to provide a comprehensive test suite for all health-related endpoints, going beyond the original requirement for a single `/health` check.\n\n**Key Additions & Validations:**\n*   **Multiple Endpoints:** Tests were added for readiness (`/ready`), system information (`/system/info`), and system metrics (`/system/metrics`).\n*   **Database Health:** The readiness test includes scenarios for both healthy and unhealthy database connections.\n*   **Security:** Tests confirm that only the GET method is allowed and that no sensitive information is exposed.\n*   **Concurrency:** The handlers were tested for thread safety with 50 concurrent requests.\n*   **Performance:** Benchmarks were added for the health and readiness endpoints.\n\nAll tests were implemented using `httptest`, a Gin test router, and `testify` for assertions, and are passing successfully.\n</info added on 2025-09-03T22:16:00.903Z>",
-            "status": "done",
-            "testStrategy": "Directly test the handler's output without any mocks, as it should be self-contained."
-          },
-          {
-            "id": 3,
-            "title": "Write Unit Tests for Deployment Handlers",
-            "description": "In `internal/api/handlers/deployment_test.go`, write comprehensive unit tests for all deployment-related handlers, such as `GetDeployments` and `CreateDeployment`. Use the mock `DeploymentService` to simulate various backend scenarios.",
-            "dependencies": [
-              "37.1"
-            ],
-            "details": "Instantiate the `DeploymentHandler` with the `MockDeploymentService`. For `GetDeployments`, test the success case where the mock returns a list of deployments and the error case where it returns an error. For `CreateDeployment`, test valid and invalid JSON input, as well as success and error responses from the mock service. Assert status codes and JSON response bodies for all cases.\n<info added on 2025-09-03T22:17:06.287Z>\nBased on user feedback, it has been confirmed that `DeploymentHandler` does not exist in the `internal/api/handlers` package. This subtask will now focus on writing unit tests for the existing `Cluster` handlers found in `/internal/api/handlers/cluster.go`, as they represent the most appropriate alternative for testing within the API layer.\n</info added on 2025-09-03T22:17:06.287Z>\n<info added on 2025-09-03T22:22:27.208Z>\n<info added on 2025-09-03T22:45:12.113Z>\nImplementation is complete. Since the `DeploymentHandler` does not exist in the codebase, comprehensive unit tests were created for the `Cluster` handlers in a new file: `internal/api/handlers/cluster_test.go`. The tests utilize a `MockClusterService` and an interface-based approach for dependency injection. The suite provides full coverage for all cluster API endpoints (`List`, `Create`, `Get`, `Update`, `Delete`, `ListNodes`, `Status`), validating success paths, invalid JSON and ID parameters, service layer error propagation, and correct HTTP status codes and response bodies. All tests are passing.\n</info added on 2025-09-03T22:45:12.113Z>\n</info added on 2025-09-03T22:22:27.208Z>",
-            "status": "done",
-            "testStrategy": "Use the mock service to control the outcomes of service layer calls, focusing the tests on the handler's logic for request parsing, response formatting, and error handling."
-          },
-          {
-            "id": 4,
-            "title": "Write Unit Tests for Pod Handlers",
-            "description": "Create `internal/api/handlers/pod_test.go` and implement unit tests for pod-related handlers like `GetPods` and `GetPodLogs`. Utilize the mock `PodService` to test different outcomes.",
-            "dependencies": [
-              "37.1"
-            ],
-            "details": "Instantiate the `PodHandler` with the mock `PodService`. Test the `GetPods` handler by simulating successful data retrieval and error conditions from the service. For `GetPodLogs`, ensure the handler correctly extracts path parameters (e.g., namespace, pod name) and passes them to the mock service. Validate the HTTP responses accordingly.\n<info added on 2025-09-16T23:06:53.999Z>\n**Update:** Your investigation correctly identified that a handler for pod operations is missing, despite the existence of a `DeploymentService`. Before writing tests, you must first create this handler.\n\n1.  Create a new file: `internal/api/handlers/deployment_handler.go`.\n2.  Inside this file, define a `DeploymentHandler` struct that contains an instance of the `service.DeploymentService` interface. Follow the existing dependency injection pattern seen in other handlers like `cluster_handler.go`.\n3.  Implement the `GetPods` and `GetPodLogs` methods on the `DeploymentHandler`. These methods should extract necessary parameters (like `namespace`) from the HTTP request and call the corresponding methods on the service.\n4.  Register these new handler methods in the main API router (likely in `cmd/server/main.go`) to expose the endpoints (e.g., `/api/v1/namespaces/{namespace}/pods`).\n5.  After implementing the handler, create `internal/api/handlers/deployment_handler_test.go` and proceed with the unit tests as originally planned, using a mock of the `DeploymentService`.\n</info added on 2025-09-16T23:06:53.999Z>",
-            "status": "done",
-            "testStrategy": "Focus on the handler's ability to correctly parse URL parameters and query strings, and to format responses based on the data or errors returned by the mocked `PodService`."
-          },
-          {
-            "id": 5,
-            "title": "Write Unit Tests for Kubernetes Service Handlers",
-            "description": "In `internal/api/handlers/service_test.go`, write unit tests for handlers that manage Kubernetes Services, such as `GetServices`. Use the mock `K8sService` to simulate interactions with the backend.",
-            "dependencies": [
-              "37.1"
-            ],
-            "details": "Instantiate the `ServiceHandler` with the mock `K8sService`. Write test cases for `GetServices` that cover both successful retrieval of a list of services and scenarios where the service layer returns an error. Verify that the handler returns the correct HTTP status code and a properly formatted JSON response in each case.",
-            "status": "done",
-            "testStrategy": "Mock the `K8sService` to isolate the `ServiceHandler`. Test the handler's logic for processing requests and translating service layer responses (both data and errors) into appropriate HTTP responses."
-          }
-        ]
       },
       {
         "id": 38,
@@ -879,9 +19,7 @@
         "details": "Use `net/http/httptest` to test the middleware chain. Verify that middleware correctly modifies request contexts, handles authentication/authorization, logs requests, and properly passes control to the next handler.",
         "testStrategy": "Unit tests for middleware using `httptest`. Test that each middleware functions correctly in isolation and properly wraps a mock downstream handler.",
         "priority": "medium",
-        "dependencies": [
-          37
-        ],
+        "dependencies": [],
         "status": "todo",
         "subtasks": [
           {
@@ -947,7 +85,6 @@
         "testStrategy": "Unit tests for WebSocket communication logic. Network connections and backend services will be mocked to test the hub and client management in isolation.",
         "priority": "medium",
         "dependencies": [
-          36,
           "38"
         ],
         "status": "todo",
@@ -1145,11 +282,6 @@
         "testStrategy": "CI/CD pipeline configuration. This task validates that all tests are passing and provides visibility into test coverage metrics.",
         "priority": "high",
         "dependencies": [
-          1,
-          2,
-          3,
-          36,
-          37,
           38,
           39,
           40,
@@ -1213,115 +345,13 @@
         ]
       },
       {
-        "id": 43,
-        "title": "Backend: Add Sentry Go Dependencies and Configuration",
-        "description": "Add the `getsentry/sentry-go` and `sentry-gin` packages to the project's `go.mod` file and update the application configuration to support Sentry settings.",
-        "details": "Modify `go.mod` to include the required Sentry packages. In `config/config.go`, add a new `Sentry` struct containing fields for `DSN`, `Environment`, `Release`, and `Debug`. Ensure the DSN can be loaded from a `SENTRY_DSN` environment variable.\n<info added on 2025-09-02T04:20:47.578Z>\nAfter implementing the changes, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:20:47.578Z>",
-        "testStrategy": "Run `go mod tidy` to verify dependencies are added correctly. Verify the application compiles with the new configuration struct. Manually test that setting the `SENTRY_DSN` environment variable populates the config struct correctly on startup.",
-        "priority": "high",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 44,
-        "title": "Backend: Initialize Sentry SDK in `pi-controller` and `pi-agent`",
-        "description": "Initialize the Sentry SDK in the `main()` function of both backend services, `pi-controller` and `pi-agent`.",
-        "details": "In `cmd/pi-controller/main.go` and `cmd/pi-agent/main.go`, call `sentry.Init`. Configure it using the new Sentry settings from the application config. The `Release` should be set dynamically using the application's version (e.g., `app.Version`). The application must not panic or exit if the Sentry DSN is not provided.\n<info added on 2025-09-02T04:20:58.977Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:20:58.977Z>",
-        "testStrategy": "Run both services with and without the `SENTRY_DSN` environment variable set. Verify the application starts without errors in both cases. When the DSN is provided, check application logs for a message indicating Sentry has been initialized.",
-        "priority": "high",
-        "dependencies": [
-          43
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 45,
-        "title": "Backend: Integrate `sentry-gin` Middleware",
-        "description": "Integrate the `sentry-gin` middleware into the Gin router to automatically capture panics and monitor performance.",
-        "details": "In `internal/api/server.go`, add the `sentrygin.New()` middleware to the Gin engine. Configure it to recover from panics and enable performance tracing for all API requests. This will create a transaction for each incoming HTTP request.\n<info added on 2025-09-02T04:21:12.510Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:21:12.510Z>",
-        "testStrategy": "Create a temporary test endpoint that intentionally panics. Call this endpoint and verify that a 500 error is returned and the panic is captured as an issue in the Sentry dashboard. Check the Sentry performance tab to ensure transactions are being created for standard API calls.",
-        "priority": "high",
-        "dependencies": [
-          44
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 46,
-        "title": "Backend: Integrate Logrus with Sentry",
-        "description": "Integrate the existing `logrus` logger with Sentry to automatically capture logged errors.",
-        "details": "Create or use an existing Logrus hook for Sentry. Configure the hook to send events to Sentry for log levels of `Error` and `Fatal`. This will ensure that errors explicitly logged by the application are captured as Sentry events.\n<info added on 2025-09-02T04:21:26.492Z>\nAfter implementing the feature, run `make vet` to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:21:26.492Z>",
-        "testStrategy": "Find a place in the code that uses `log.Error` or add a temporary one. Trigger that code path and verify that a corresponding event appears in the Sentry dashboard with the log message and context.",
-        "priority": "medium",
-        "dependencies": [
-          44
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 47,
-        "title": "Frontend: Add Sentry React Dependencies",
-        "description": "Add the `@sentry/react` and `@sentry/tracing` packages to the web UI's dependencies.",
-        "details": "Navigate to the `web/` directory and use npm or yarn to add `@sentry/react` and `@sentry/tracing` as production dependencies to the `package.json` file.\n<info added on 2025-09-02T04:21:50.284Z>\nAfter adding the new packages, run the linter to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:21:50.284Z>",
-        "testStrategy": "Run `npm install` or `yarn install` in the `web/` directory and ensure it completes successfully. Verify that the packages are listed in `package.json` and `node_modules`.",
-        "priority": "high",
-        "dependencies": [],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 48,
-        "title": "Frontend: Initialize Sentry SDK in React App",
-        "description": "Initialize the Sentry SDK in the main entry point of the React application.",
-        "details": "In `web/src/index.js` (or equivalent entry file), import Sentry and call `Sentry.init`. Configure the `dsn`, `environment`, and `release` using environment variables (e.g., `REACT_APP_SENTRY_DSN`). Ensure the app runs without error if the DSN is not provided.\n<info added on 2025-09-02T04:22:03.795Z>\nAfter implementing the feature, run the linter to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:22:03.795Z>",
-        "testStrategy": "Start the React development server with and without the `REACT_APP_SENTRY_DSN` variable. Verify the application loads correctly in both scenarios. When the DSN is set, check the browser's network tab to confirm that requests are being sent to the Sentry endpoint.",
-        "priority": "high",
-        "dependencies": [
-          47
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 49,
-        "title": "Frontend: Implement Sentry Error Boundary",
-        "description": "Wrap the main React component tree with Sentry's `<ErrorBoundary>` to automatically capture rendering errors.",
-        "details": "In the main application component file (e.g., `App.js` or `index.js`), import the `Sentry.ErrorBoundary`. Wrap the root component of your application with `<Sentry.ErrorBoundary fallback={<p>An error has occurred</p>}>...</Sentry.ErrorBoundary>`.\n<info added on 2025-09-02T04:22:20.738Z>\nAfter implementing the feature, run the linter to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:22:20.738Z>",
-        "testStrategy": "Introduce a temporary error in a child component (e.g., `throw new Error('Test Error')` in a render method). Load the page and verify that the fallback UI is displayed and the error is captured in the Sentry dashboard.",
-        "priority": "high",
-        "dependencies": [
-          48
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
-        "id": 50,
-        "title": "Frontend: Enable Performance Monitoring with BrowserTracing",
-        "description": "Enable automatic performance monitoring for page loads and navigation in the React application.",
-        "details": "In `web/src/index.js` where Sentry is initialized, add the `BrowserTracing` integration to the `integrations` array in the `Sentry.init` call. This will automatically create transactions for page loads and route changes.\n<info added on 2025-09-02T04:22:33.726Z>\nAfter implementing the feature, run the linter to ensure there are no errors and then perform a final build.\n</info added on 2025-09-02T04:22:33.726Z>",
-        "testStrategy": "After deploying the change, navigate between different pages in the web UI. Go to the Sentry dashboard and check the Performance section to verify that transactions for `pageload` and `navigation` are being captured.",
-        "priority": "medium",
-        "dependencies": [
-          48
-        ],
-        "status": "done",
-        "subtasks": []
-      },
-      {
         "id": 51,
         "title": "Documentation: Update .env.example",
         "description": "Add the Sentry DSN environment variable to the example environment file.",
         "details": "Edit the `.env.example` file in the project root and add a new line: `SENTRY_DSN=\"\"`. This will inform other developers of the new configuration option.",
         "testStrategy": "Review the `.env.example` file to confirm the new line has been added correctly.",
         "priority": "low",
-        "dependencies": [
-          43
-        ],
+        "dependencies": [],
         "status": "todo",
         "subtasks": []
       },
@@ -1332,18 +362,71 @@
         "details": "Edit the `getting-started.md` file to include a new section on Sentry. Explain that to enable error tracking, the developer needs to create a `.env` file and set the `SENTRY_DSN` variable with their own DSN from Sentry.io.",
         "testStrategy": "Read the updated `getting-started.md` file and verify that the instructions are clear, accurate, and easy to follow.",
         "priority": "low",
-        "dependencies": [
-          43,
-          47
-        ],
+        "dependencies": [],
         "status": "todo",
+        "subtasks": []
+      },
+      {
+        "id": 53,
+        "title": "Fix Infinite Re-render Loop on Nodes Page",
+        "description": "Debug and resolve the 'Maximum update depth exceeded' error on the Nodes page, which is caused by an infinite re-render loop in a React component.",
+        "details": "The Nodes page is crashing due to a common React issue where a `useEffect` hook's dependencies cause it to run on every render, which in turn updates the state, triggering another render. The primary suspect is likely in `src/pages/Nodes/Nodes.jsx` or a child component responsible for fetching or displaying node data.\n\n1.  **Identify the problematic `useEffect`:** Locate the component responsible for managing the nodes list (likely `src/pages/Nodes/Nodes.jsx`). Examine its `useEffect` hooks.\n2.  **Analyze the Dependency Array:** The issue is almost certainly an unstable dependency (an object, array, or function that is re-created on every render). For example:\n    ```javascript\n    // Bad: `options` is a new object on every render, causing the effect to re-run infinitely\n    const options = { sort: 'name' };\n    useEffect(() => {\n      api.fetchNodes(options).then(setNodes);\n    }, [options]);\n    ```\n3.  **Stabilize Dependencies:** To fix this, stabilize the reference using `useMemo` for objects/arrays or `useCallback` for functions.\n    ```javascript\n    // Good: `options` is memoized and its reference is stable\n    const options = useMemo(() => ({ sort: 'name' }), []);\n    useEffect(() => {\n      api.fetchNodes(options).then(setNodes);\n    }, [options]);\n    ```\n4.  **Check for Missing Dependencies:** Conversely, ensure the dependency array is not missing required values, which can cause stale data, though it's less likely to cause this specific error. The React ESLint plugin for hooks should be checked for warnings.",
+        "testStrategy": "1. Run the application locally using `npm start`.\n2. Open the browser's developer console to monitor for errors.\n3. Navigate to the '/nodes' page.\n4. Verify that the 'Maximum update depth exceeded' error no longer appears in the console.\n5. Confirm that the page loads successfully and the list of nodes is displayed correctly.\n6. Interact with any UI elements on the page (e.g., refresh button, filters) to ensure the fix has not introduced any regressions.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 54,
+        "title": "Fix 404 'Page Not Found' Error on Clusters Page",
+        "description": "The clusters page at the '/clusters' route is currently showing a 'Page Not Found' error. This task involves correcting the frontend routing configuration to ensure the Clusters component is rendered correctly.",
+        "details": "The codebase analysis indicates that a component for the clusters page likely exists at `src/pages/Clusters/Clusters.jsx`, but the route is not defined in the main application router. The fix requires modifying `src/App.jsx`.\n\n1.  **Import the Component:** Add an import statement at the top of `src/App.jsx` to bring in the `Clusters` component:\n    `import Clusters from './pages/Clusters/Clusters';`\n\n2.  **Add the Route:** Inside the `<Routes>` block in `src/App.jsx`, add a new `<Route>` definition for the clusters page. It should be placed before the wildcard `*` route for the `NotFound` component.\n\n    ```jsx\n    // src/App.jsx\n    <Routes>\n      <Route path=\"/\" element={<Dashboard />} />\n      <Route path=\"/nodes\" element={<Nodes />} />\n      {/* Add the new route here */}\n      <Route path=\"/clusters\" element={<Clusters />} />\n      <Route path=\"*\" element={<NotFound />} />\n    </Routes>\n    ```\n\nThis change will map the `/clusters` URL path to the corresponding React component, resolving the 404 error.",
+        "testStrategy": "1. Start the frontend development server using `npm start`.\n2. Open the application in a web browser.\n3. Manually navigate to the `/clusters` URL.\n4. Verify that the 'Page Not Found' message is no longer displayed.\n5. Confirm that the content from the `Clusters.jsx` component (e.g., a heading that says 'Clusters') is rendered on the page.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 55,
+        "title": "Fix HTTPS/WebSocket Connection Issues (426 Upgrade Required)",
+        "description": "Resolve frequent '426 Upgrade Required' errors that cause WebSocket session drops by correctly configuring the reverse proxy to handle WebSocket upgrade requests between the frontend and the Go backend.",
+        "details": "The current setup is experiencing WebSocket connection failures, indicated by HTTP 426 errors. This is almost certainly caused by a reverse proxy (e.g., Nginx, Caddy) that is not correctly handling the protocol upgrade handshake. The proxy is likely stripping the `Connection: \"upgrade\"` and `Upgrade: \"websocket\"` headers from the client's initial request, preventing the Go backend's WebSocket server from accepting the connection.\n\n1.  **Identify and Modify Proxy Configuration:** Locate the configuration file for the reverse proxy service defined in the project's deployment setup (e.g., `docker-compose.yml` might point to an `nginx.conf`).\n2.  **Update Proxy Rules:** Add the necessary directives to the location block that forwards traffic to the backend API to allow WebSocket connections. For an Nginx proxy, the configuration should include:\n    ```nginx\n    location /ws {\n        proxy_pass http://backend-service:8080; # Adjust to your backend service name/port\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection \"upgrade\";\n        proxy_set_header Host $host;\n        proxy_read_timeout 86400s; # Prevent timeouts for long-lived connections\n        proxy_send_timeout 86400s;\n    }\n    ```\n3.  **Review Backend WebSocket Upgrader:** As a secondary check, inspect the `websocket.Upgrader` configuration in `internal/websocket/hub.go`. Ensure the `CheckOrigin` function is correctly configured to allow requests from the frontend's domain, although this typically results in a different error.\n4.  **Verify Frontend Connection URL:** Confirm that the frontend client code is attempting to connect using the secure WebSocket protocol `wss://` and not `ws://`.",
+        "testStrategy": "1.  Start the entire application stack locally, including the reverse proxy, backend, and frontend services.\n2.  Open the application in a web browser and open the Developer Tools to the 'Network' tab, filtering for 'WS' requests.\n3.  Log in to the application to trigger the WebSocket connection.\n4.  Verify that the WebSocket handshake request completes successfully with a `101 Switching Protocols` status code.\n5.  Monitor the connection for an extended period (e.g., 5-10 minutes) while interacting with the application to ensure it remains stable and does not disconnect with a 426 error.\n6.  Confirm that real-time features dependent on the WebSocket are functioning as expected.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 56,
+        "title": "Enhance Web UI with Improved User Experience Features",
+        "description": "Implement several UI/UX improvements including loading states for data fetching, cluster/node management interfaces, a real-time system status indicator, a dark mode theme, and breadcrumb navigation.",
+        "details": "This task involves a comprehensive enhancement of the frontend application to improve usability and provide a more modern user experience. The implementation will be broken down into several key areas:\n\n1.  **Loading States:** Modify the data-fetching logic in `src/pages/Clusters/Clusters.jsx` and `src/pages/Nodes/Nodes.jsx`. While data is being fetched, display a loading indicator (e.g., a spinner or a skeleton screen) instead of a blank or empty page. Create a reusable `<LoadingSpinner />` component for this purpose.\n\n2.  **Cluster & Node Management UI:** On the `Clusters` and `Nodes` pages, add UI elements (e.g., 'Add New' buttons, and 'Edit'/'Delete' icons for each item in the list) to allow for resource management. Clicking these should open modals with forms for creating or editing resources. This will require creating new components for the modals and forms, and integrating them with the existing page components.\n\n3.  **Visual Feedback for System Status:** Create a new component, `<StatusIndicator />`, and place it in a persistent location like the main header or footer. This component will connect to the WebSocket service and display the current connection status (e.g., a green dot for 'Connected', red for 'Disconnected', yellow for 'Reconnecting'). This provides users with immediate feedback on the application's real-time data connection.\n\n4.  **Dark Mode Theme:** Implement a theme-switching capability. Use a React Context provider (`ThemeContext`) to manage the current theme (light/dark) across the application. Refactor existing CSS to use CSS variables for colors, allowing for easy theme switching. Add a toggle switch in the application's main navigation bar to allow users to select their preferred theme. The choice should be persisted in `localStorage`.\n\n5.  **Breadcrumb Navigation:** Develop a `<Breadcrumbs />` component that uses the `useLocation` hook from `react-router-dom` to dynamically generate a navigation trail (e.g., Home > Clusters > My-Cluster). This component should be added to the main application layout in `src/App.jsx` to appear on all relevant pages, providing users with better navigational context.",
+        "testStrategy": "1.  **Loading States:** Navigate to the `/clusters` and `/nodes` pages. Use browser developer tools to throttle the network connection. Verify that a loading indicator is displayed while the data is being fetched and disappears once the content is rendered.\n2.  **Management UI:** On the Clusters and Nodes pages, confirm that the 'Add', 'Edit', and 'Delete' controls are visible. Click the 'Add' button and verify a form modal appears. Test form submission (mocking the API call if necessary).\n3.  **Status Indicator:** Load the application and verify the status indicator shows a 'Connected' state. Stop the backend server and verify the indicator changes to 'Disconnected' or 'Reconnecting'. Restart the server and confirm it returns to 'Connected'.\n4.  **Dark Mode:** Locate the theme toggle switch in the UI. Click it to switch between light and dark modes. Navigate through all pages of the application to ensure all components, text, and backgrounds have correctly adapted to the selected theme. Refresh the page to confirm the theme choice persists.\n5.  **Breadcrumbs:** Navigate from the dashboard to a nested page (e.g., a specific node's detail page). Verify the breadcrumb trail updates correctly at each level of navigation. Click on a link in the breadcrumbs to ensure it navigates back to the correct parent page.",
+        "status": "pending",
+        "dependencies": [
+          53,
+          54,
+          55
+        ],
+        "priority": "low",
         "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-16T23:12:34.794Z",
+      "updated": "2025-09-21T05:07:26.315Z",
       "description": "Tasks for master context"
+    }
+  },
+  "v1_0_archive": {
+    "tasks": [],
+    "metadata": {
+      "created": "2025-09-17T17:00:26.697Z",
+      "updated": "2025-09-17T17:00:26.697Z",
+      "description": "Completed Phase 1 work - Core implementation and testing"
     }
   }
 }

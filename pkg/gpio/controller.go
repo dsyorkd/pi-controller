@@ -46,7 +46,7 @@ func DefaultSecurityConfig() *SecurityConfig {
 		OperationTimeout:   30 * time.Second,
 		EnableAuditLog:     true,
 		RequireUserContext: true,
-		AllowedOperations:  []string{"read", "write", "configure"},
+		AllowedOperations:  []string{"read", "write", "configure", "interrupt", "pwm", "i2c", "spi"},
 	}
 }
 

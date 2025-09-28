@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -8,10 +8,13 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import Layout from './components/layout/Layout';
 import { Dashboard } from './pages/Dashboard';
+import { DashboardDemo } from './pages/DashboardDemo';
 import ClusterDetail from './pages/ClusterDetail';
+import ClustersPage from './pages/ClustersPage';
 import NodeDetail from './pages/NodeDetail';
 import NodesPage from './pages/NodesPage';
 import { UserProfile } from './components/auth/UserProfile';
+import type { User, LoginRequest, RegisterRequest } from './types';
 import './App.css';
 
 function App() {
@@ -25,9 +28,15 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
+          {/* Temporary demo route for testing UI */}
+          <Route path="/demo" element={<DashboardDemo />} />
+
+          {/* Main landing page - new demo dashboard */}
+          <Route path="/" element={<DashboardDemo />} />
+
           {/* Protected routes that require authentication */}
           <Route
-            path="/"
+            path="/admin"
             element={
               <ProtectedRoute>
                 <Layout />
@@ -36,21 +45,22 @@ function App() {
           >
             {/* Dashboard and main application routes */}
             <Route index element={<Dashboard />} />
-            <Route path="/dashboard" element={<Navigate to="/" replace />} />
+            <Route path="dashboard" element={<Navigate to="/admin" replace />} />
 
             {/* Cluster management routes */}
-            <Route path="/clusters/:id" element={<ClusterDetail />} />
+            <Route path="clusters" element={<ClustersPage />} />
+            <Route path="clusters/:id" element={<ClusterDetail />} />
 
             {/* Node management routes */}
-            <Route path="/nodes" element={<NodesPage />} />
-            <Route path="/nodes/:id" element={<NodeDetail />} />
+            <Route path="nodes" element={<NodesPage />} />
+            <Route path="nodes/:id" element={<NodeDetail />} />
 
             {/* User profile route */}
-            <Route path="/profile" element={<UserProfile />} />
+            <Route path="profile" element={<UserProfile />} />
 
             {/* Admin-only routes */}
             <Route
-              path="/admin/*"
+              path="settings/*"
               element={
                 <ProtectedRoute requiredRole="admin">
                   <AdminRoutes />
@@ -137,6 +147,50 @@ const NotFound: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Mock auth context for demo
+interface MockAuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  login: (credentials: LoginRequest) => Promise<void>;
+  register: (userData: RegisterRequest) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+}
+
+const MockAuthContext = createContext<MockAuthContextType | undefined>(undefined);
+
+const DemoWrapper: React.FC = () => {
+  const mockUser: User = {
+    id: '1',
+    username: 'demo-admin',
+    email: 'admin@demo.com',
+    role: 'admin',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const mockAuthValue: MockAuthContextType = {
+    user: mockUser,
+    isAuthenticated: true,
+    isLoading: false,
+    error: null,
+    login: async () => {},
+    register: async () => {},
+    logout: async () => {},
+    clearError: () => {},
+  };
+
+  return (
+    <MockAuthContext.Provider value={mockAuthValue}>
+      <Layout>
+        <Dashboard />
+      </Layout>
+    </MockAuthContext.Provider>
   );
 };
 

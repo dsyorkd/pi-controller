@@ -1,7 +1,16 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
-# Install build dependencies for CGO and hardware access
+# Build arguments
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG DATE=unknown
+
+# Install build dependencies for cross-compilation and hardware access
 RUN apk add --no-cache git make gcc musl-dev linux-headers
 
 # Set working directory
@@ -16,23 +25,56 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build arguments
-ARG VERSION=dev
-ARG COMMIT=unknown
-ARG DATE=unknown
-
-# Build the binary with CGO enabled for hardware access
-RUN CGO_ENABLED=1 GOOS=linux go build \
-    -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
-    -o pi-agent ./cmd/pi-agent
+# Configure cross-compilation and build the binary
+# Hardware access libraries require CGO for GPIO, I2C, etc.
+RUN set -eux; \
+    case "$TARGETARCH" in \
+        amd64) \
+            export CC=gcc; \
+            export CXX=g++; \
+            ;; \
+        arm64) \
+            apk add --no-cache gcc-aarch64-linux-musl; \
+            export CC=aarch64-linux-musl-gcc; \
+            export CXX=aarch64-linux-musl-g++; \
+            ;; \
+        arm) \
+            apk add --no-cache gcc-arm-linux-musleabihf; \
+            export CC=arm-linux-musleabihf-gcc; \
+            export CXX=arm-linux-musleabihf-g++; \
+            ;; \
+        *) \
+            echo "Unsupported architecture: $TARGETARCH"; \
+            exit 1; \
+            ;; \
+    esac; \
+    CGO_ENABLED=1 \
+    GOOS=$TARGETOS \
+    GOARCH=$TARGETARCH \
+    go build \
+        -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE} -linkmode external -extldflags '-static'" \
+        -a -installsuffix cgo \
+        -o pi-agent ./cmd/pi-agent
 
 # Final stage
-FROM alpine:3.22
+FROM --platform=$TARGETPLATFORM alpine:3.22
+
+# Build arguments for final stage
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+# For ARM architectures (Raspberry Pi), we may need additional hardware access libraries
+RUN apk add --no-cache ca-certificates tzdata && \
+    if [ "$TARGETARCH" = "arm64" ] || [ "$TARGETARCH" = "arm" ]; then \
+        apk add --no-cache \
+            i2c-tools \
+            spi-tools; \
+    fi
 
-# Create non-root user
+# Create non-root user with access to hardware groups
+# Note: In Kubernetes DaemonSet, privileged mode will be used for hardware access
 RUN addgroup -S piagent && adduser -S piagent -G piagent
 
 # Set working directory
@@ -40,6 +82,9 @@ WORKDIR /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/pi-agent .
+
+# Ensure binary is executable
+RUN chmod +x /app/pi-agent
 
 # Create data directory
 RUN mkdir -p /app/data && chown -R piagent:piagent /app
@@ -50,6 +95,11 @@ USER piagent
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD /app/pi-agent version || exit 1
+
+# Add labels for multi-arch identification
+LABEL org.opencontainers.image.title="pi-agent"
+LABEL org.opencontainers.image.description="Pi Agent - Hardware access agent for Raspberry Pi clusters"
+LABEL org.opencontainers.image.platform="$TARGETPLATFORM"
 
 # Run the binary
 ENTRYPOINT ["/app/pi-agent"]

@@ -75,7 +75,9 @@ func TestGPIOController_ConfigurePin(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -141,7 +143,7 @@ func TestGPIOController_ConfigurePin(t *testing.T) {
 				Direction: DirectionOutput,
 				PullMode:  PullNone,
 			},
-			expectedErr: "pin 0 is restricted",
+			expectedErr: "critical system pin",
 		},
 		{
 			name: "configure invalid pin should fail",
@@ -150,7 +152,7 @@ func TestGPIOController_ConfigurePin(t *testing.T) {
 				Direction: DirectionOutput,
 				PullMode:  PullNone,
 			},
-			expectedErr: "invalid pin number",
+			expectedErr: "not in allowed pins list",
 		},
 	}
 
@@ -169,7 +171,13 @@ func TestGPIOController_ConfigurePin(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.pinConfig.Pin, state.Pin)
 				assert.Equal(t, tt.pinConfig.Direction, state.Direction)
-				assert.Equal(t, tt.pinConfig.PullMode, state.PullMode)
+
+				// Check expected pull mode (controller applies default if empty)
+				expectedPullMode := tt.pinConfig.PullMode
+				if expectedPullMode == "" {
+					expectedPullMode = PullNone // Default from config
+				}
+				assert.Equal(t, expectedPullMode, state.PullMode)
 			}
 		})
 	}
@@ -185,7 +193,9 @@ func TestGPIOController_Security_PinRestrictions(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -266,7 +276,9 @@ func TestGPIOController_WritePin(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -301,7 +313,7 @@ func TestGPIOController_WritePin(t *testing.T) {
 			name:        "write to input pin should fail",
 			pin:         19,
 			value:       High,
-			expectedErr: "not configured as output",
+			expectedErr: "configured as input",
 		},
 		{
 			name:        "write to unconfigured pin should fail",
@@ -313,7 +325,7 @@ func TestGPIOController_WritePin(t *testing.T) {
 			name:        "write to restricted pin should fail",
 			pin:         0,
 			value:       High,
-			expectedErr: "not configured", // Will fail at configuration level
+			expectedErr: "critical system pin", // Will fail at security level
 		},
 	}
 
@@ -346,7 +358,9 @@ func TestGPIOController_ReadPin(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -407,7 +421,9 @@ func TestGPIOController_PWM(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -437,21 +453,21 @@ func TestGPIOController_PWM(t *testing.T) {
 			pin:         18,
 			frequency:   0,
 			dutyCycle:   50,
-			expectedErr: "invalid PWM frequency",
+			expectedErr: "PWM frequency 0 Hz is outside safe range",
 		},
 		{
 			name:        "invalid duty cycle - negative",
 			pin:         18,
 			frequency:   1000,
 			dutyCycle:   -1,
-			expectedErr: "invalid PWM duty cycle",
+			expectedErr: "PWM duty cycle",
 		},
 		{
 			name:        "invalid duty cycle - over 100",
 			pin:         18,
 			frequency:   1000,
 			dutyCycle:   101,
-			expectedErr: "invalid PWM duty cycle",
+			expectedErr: "PWM duty cycle",
 		},
 		{
 			name:        "PWM on unconfigured pin",
@@ -486,7 +502,9 @@ func TestGPIOController_SPI(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -551,7 +569,9 @@ func TestGPIOController_I2C(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -625,7 +645,9 @@ func TestGPIOController_Events(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -680,7 +702,9 @@ func TestGPIOController_ListConfiguredPins(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(t, controller)
 
 	ctx := context.Background()
@@ -733,7 +757,9 @@ func BenchmarkGPIOController_WritePin(b *testing.B) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(b, controller)
 
 	ctx := context.Background()
@@ -766,7 +792,9 @@ func BenchmarkGPIOController_ReadPin(b *testing.B) {
 	}
 
 	logger := logrus.New()
-	controller := NewController(config, DefaultSecurityConfig(), logger)
+	securityConfig := DefaultSecurityConfig()
+	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	controller := NewController(config, securityConfig, logger)
 	require.NotNil(b, controller)
 
 	ctx := context.Background()

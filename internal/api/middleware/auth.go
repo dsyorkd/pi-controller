@@ -25,6 +25,21 @@ const (
 	UserRoleKey = "user_role"
 	// TokenTypeKey is the context key for token type
 	TokenTypeKey = "token_type"
+	// CSRFTokenKey is the context key for CSRF token
+	CSRFTokenKey = "csrf_token"
+)
+
+// Cookie names for secure session management
+const (
+	AccessTokenCookie  = "access_token"
+	RefreshTokenCookie = "refresh_token"
+	CSRFTokenCookie    = "csrf_token"
+)
+
+// Security headers
+const (
+	CSRFTokenHeader = "X-CSRF-Token"
+	CSRFHeaderName  = "X-Requested-With"
 )
 
 // Role constants for authorization
@@ -61,6 +76,9 @@ type AuthConfig struct {
 	RateLimitPerMinute int           `yaml:"rate_limit_per_minute"`
 	RequireHTTPS       bool          `yaml:"require_https"`
 	EnableAuditLog     bool          `yaml:"enable_audit_log"`
+	CookieDomain       string        `yaml:"cookie_domain"`
+	CookiePath         string        `yaml:"cookie_path"`
+	EnableCSRF         bool          `yaml:"enable_csrf"`
 }
 
 // DefaultAuthConfig returns environment-aware default authentication configuration
@@ -85,6 +103,9 @@ func DefaultAuthConfig() *AuthConfig {
 		RateLimitPerMinute: 100,
 		RequireHTTPS:       requireHTTPS,
 		EnableAuditLog:     true,
+		CookieDomain:       "",
+		CookiePath:         "/",
+		EnableCSRF:         true,
 	}
 }
 
@@ -113,6 +134,11 @@ func NewAuthManager(config *AuthConfig, logger logger.Interface) (*AuthManager, 
 
 	am.logger.Info("Authentication manager initialized successfully")
 	return am, nil
+}
+
+// GetConfig returns the authentication configuration
+func (am *AuthManager) GetConfig() *AuthConfig {
+	return am.config
 }
 
 // loadSecret loads the JWT secret from config or file, generates if missing
@@ -232,7 +258,130 @@ func (am *AuthManager) ValidateToken(tokenString string) (*JWTClaims, error) {
 	return claims, nil
 }
 
-// Auth provides JWT authentication middleware
+// SetSecureCookies sets authentication tokens as httpOnly secure cookies
+func (am *AuthManager) SetSecureCookies(c *gin.Context, accessToken, refreshToken string) error {
+	// Set access token cookie (httpOnly, secure, sameSite)
+	accessCookie := &http.Cookie{
+		Name:     AccessTokenCookie,
+		Value:    accessToken,
+		Path:     am.config.CookiePath,
+		Domain:   am.config.CookieDomain,
+		MaxAge:   int(am.config.AccessTokenExpiry.Seconds()),
+		HttpOnly: true,
+		Secure:   am.config.RequireHTTPS,
+		SameSite: http.SameSiteStrictMode,
+	}
+
+	// Set refresh token cookie (httpOnly, secure, sameSite)
+	refreshCookie := &http.Cookie{
+		Name:     RefreshTokenCookie,
+		Value:    refreshToken,
+		Path:     am.config.CookiePath,
+		Domain:   am.config.CookieDomain,
+		MaxAge:   int(am.config.RefreshTokenExpiry.Seconds()),
+		HttpOnly: true,
+		Secure:   am.config.RequireHTTPS,
+		SameSite: http.SameSiteStrictMode,
+	}
+
+	// Apply cookies to response
+	http.SetCookie(c.Writer, accessCookie)
+	http.SetCookie(c.Writer, refreshCookie)
+
+	// Generate and set CSRF token if enabled
+	if am.config.EnableCSRF {
+		csrfToken, err := am.GenerateCSRFToken()
+		if err != nil {
+			return fmt.Errorf("failed to generate CSRF token: %w", err)
+		}
+
+		csrfCookie := &http.Cookie{
+			Name:     CSRFTokenCookie,
+			Value:    csrfToken,
+			Path:     am.config.CookiePath,
+			Domain:   am.config.CookieDomain,
+			MaxAge:   int(am.config.AccessTokenExpiry.Seconds()),
+			HttpOnly: false, // CSRF token needs to be readable by JS
+			Secure:   am.config.RequireHTTPS,
+			SameSite: http.SameSiteStrictMode,
+		}
+
+		http.SetCookie(c.Writer, csrfCookie)
+		c.Set(CSRFTokenKey, csrfToken)
+	}
+
+	return nil
+}
+
+// ClearSecureCookies removes authentication cookies
+func (am *AuthManager) ClearSecureCookies(c *gin.Context) {
+	cookies := []string{AccessTokenCookie, RefreshTokenCookie, CSRFTokenCookie}
+
+	for _, cookieName := range cookies {
+		cookie := &http.Cookie{
+			Name:     cookieName,
+			Value:    "",
+			Path:     am.config.CookiePath,
+			Domain:   am.config.CookieDomain,
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   am.config.RequireHTTPS,
+			SameSite: http.SameSiteStrictMode,
+		}
+		http.SetCookie(c.Writer, cookie)
+	}
+}
+
+// GetTokenFromCookie extracts JWT token from httpOnly cookie
+func (am *AuthManager) GetTokenFromCookie(c *gin.Context, cookieName string) (string, error) {
+	cookie, err := c.Request.Cookie(cookieName)
+	if err != nil {
+		return "", fmt.Errorf("cookie not found: %w", err)
+	}
+
+	if cookie.Value == "" {
+		return "", errors.New("empty cookie value")
+	}
+
+	return cookie.Value, nil
+}
+
+// GenerateCSRFToken generates a secure CSRF token
+func (am *AuthManager) GenerateCSRFToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+// ValidateCSRFToken validates CSRF token from header against cookie
+func (am *AuthManager) ValidateCSRFToken(c *gin.Context) bool {
+	if !am.config.EnableCSRF {
+		return true // CSRF protection disabled
+	}
+
+	// Get CSRF token from header
+	headerToken := c.GetHeader(CSRFTokenHeader)
+	if headerToken == "" {
+		// Also check X-Requested-With header for AJAX requests
+		if c.GetHeader(CSRFHeaderName) == "XMLHttpRequest" {
+			return true
+		}
+		return false
+	}
+
+	// Get CSRF token from cookie
+	cookieToken, err := c.Request.Cookie(CSRFTokenCookie)
+	if err != nil || cookieToken.Value == "" {
+		return false
+	}
+
+	// Perform constant-time comparison
+	return SecureCompare(headerToken, cookieToken.Value)
+}
+
+// Auth provides JWT authentication middleware with support for both cookies and headers
 func (am *AuthManager) Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check HTTPS requirement
@@ -257,31 +406,43 @@ func (am *AuthManager) Auth() gin.HandlerFunc {
 			return
 		}
 
-		// Extract authorization header
-		authHeader := c.GetHeader(AuthorizationHeader)
-		if authHeader == "" {
-			am.auditLog(c, "auth_failure", "Missing authorization header", "")
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error":   "Unauthorized",
-				"message": "Authorization header is required",
-			})
-			c.Abort()
-			return
+		// Extract token from cookie first, then fallback to authorization header
+		var tokenString string
+		var tokenSource string
+
+		// Try to get token from httpOnly cookie first (more secure)
+		if cookieToken, err := am.GetTokenFromCookie(c, AccessTokenCookie); err == nil && cookieToken != "" {
+			tokenString = cookieToken
+			tokenSource = "cookie"
+		} else {
+			// Fallback to authorization header for API clients
+			authHeader := c.GetHeader(AuthorizationHeader)
+			if authHeader == "" {
+				am.auditLog(c, "auth_failure", "Missing authorization header and cookie", "")
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error":   "Unauthorized",
+					"message": "Authentication required",
+				})
+				c.Abort()
+				return
+			}
+
+			// Validate Bearer token format
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				am.auditLog(c, "auth_failure", "Invalid authorization header format", "")
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error":   "Unauthorized",
+					"message": "Invalid authorization header format. Use: Bearer <token>",
+				})
+				c.Abort()
+				return
+			}
+
+			// Extract token
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+			tokenSource = "header"
 		}
 
-		// Validate Bearer token format
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			am.auditLog(c, "auth_failure", "Invalid authorization header format", "")
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error":   "Unauthorized",
-				"message": "Invalid authorization header format. Use: Bearer <token>",
-			})
-			c.Abort()
-			return
-		}
-
-		// Extract token
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == "" {
 			am.auditLog(c, "auth_failure", "Empty token", "")
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -304,14 +465,38 @@ func (am *AuthManager) Auth() gin.HandlerFunc {
 			return
 		}
 
+		// For cookie-based auth, validate CSRF token for state-changing operations
+		if tokenSource == "cookie" && am.isStateChangingRequest(c.Request.Method) {
+			if !am.ValidateCSRFToken(c) {
+				am.auditLog(c, "csrf_failure", "CSRF token validation failed", claims.UserID)
+				c.JSON(http.StatusForbidden, gin.H{
+					"error":   "Forbidden",
+					"message": "CSRF token validation failed",
+				})
+				c.Abort()
+				return
+			}
+		}
+
 		// Set context values
 		c.Set(UserIDKey, claims.UserID)
 		c.Set(UserRoleKey, claims.Role)
 		c.Set(TokenTypeKey, claims.TokenType)
 
-		am.auditLog(c, "auth_success", "Authentication successful", claims.UserID)
+		am.auditLog(c, "auth_success", fmt.Sprintf("Authentication successful via %s", tokenSource), claims.UserID)
 		c.Next()
 	}
+}
+
+// isStateChangingRequest determines if the HTTP method can modify state
+func (am *AuthManager) isStateChangingRequest(method string) bool {
+	stateChangingMethods := []string{"POST", "PUT", "PATCH", "DELETE"}
+	for _, m := range stateChangingMethods {
+		if method == m {
+			return true
+		}
+	}
+	return false
 }
 
 // RequireRole creates a middleware that requires specific role

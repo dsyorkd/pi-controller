@@ -45,7 +45,7 @@ export const useNodes = () => {
       setLoading(false);
       setRefetching(false);
     }
-  }, [refetching, setLoading, setError, setNodes]);
+  }, [refetching]);
 
   const refetch = useCallback(() => {
     setRefetching(true);
@@ -168,10 +168,11 @@ export const useNodes = () => {
   );
 
   useEffect(() => {
-    if (nodes.length === 0 && !isLoading && !error) {
+    // Only fetch on initial mount if we have no nodes and no loading/error state
+    if (nodes.length === 0 && !isLoading && !error && !refetching) {
       fetchNodes();
     }
-  }, [nodes.length, isLoading, error, fetchNodes]);
+  }, []); // Empty dependency array for initial fetch only
 
   return {
     nodes,

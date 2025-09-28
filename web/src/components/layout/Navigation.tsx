@@ -17,7 +17,7 @@ const Navigation: React.FC = () => {
   const baseNavItems = [
     {
       name: 'Dashboard',
-      path: '/',
+      path: '/admin',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -32,7 +32,7 @@ const Navigation: React.FC = () => {
     },
     {
       name: 'Clusters',
-      path: '/clusters',
+      path: '/admin/clusters',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -46,7 +46,7 @@ const Navigation: React.FC = () => {
     },
     {
       name: 'Nodes',
-      path: '/nodes',
+      path: '/admin/nodes',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

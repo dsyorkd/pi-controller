@@ -50,11 +50,10 @@ type RegisterRequest struct {
 
 // LoginResponse represents the login response payload
 type LoginResponse struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
 	TokenType    string    `json:"token_type"`
 	ExpiresIn    int       `json:"expires_in"`
 	User         *UserInfo `json:"user"`
+	CSRFToken    string    `json:"csrf_token,omitempty"`
 }
 
 // UserInfo represents safe user information for API responses
@@ -185,19 +184,37 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		CreatedAt: user.CreatedAt,
 	}
 
+	// Set secure httpOnly cookies for tokens
+	if err := h.authManager.SetSecureCookies(c, accessToken, refreshToken); err != nil {
+		h.logger.WithError(err).Error("Failed to set secure cookies")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": "Failed to establish secure session",
+		})
+		return
+	}
+
 	h.logger.WithFields(map[string]interface{}{
 		"user_id":  user.ID,
 		"username": user.Username,
 		"role":     user.Role,
 	}).Info("User logged in successfully")
 
-	c.JSON(http.StatusOK, LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		TokenType:    "Bearer",
-		ExpiresIn:    15 * 60, // 15 minutes
-		User:         userInfo,
-	})
+	// Create response
+	response := LoginResponse{
+		TokenType: "Bearer",
+		ExpiresIn: 15 * 60, // 15 minutes
+		User:      userInfo,
+	}
+
+	// Include CSRF token in response if enabled
+	if csrfToken, exists := c.Get(middleware.CSRFTokenKey); exists {
+		if token, ok := csrfToken.(string); ok {
+			response.CSRFToken = token
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // Register creates a new user account
@@ -301,19 +318,36 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-// RefreshToken generates new access token from refresh token
+// RefreshToken generates new access token from refresh token (supports both cookie and request body)
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	var req RefreshTokenRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var refreshToken string
+
+	// Try to get refresh token from httpOnly cookie first
+	if cookieToken, err := h.authManager.GetTokenFromCookie(c, middleware.RefreshTokenCookie); err == nil && cookieToken != "" {
+		refreshToken = cookieToken
+	} else {
+		// Fallback to request body for API clients
+		var req RefreshTokenRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Bad Request",
+				"message": "Invalid request format",
+			})
+			return
+		}
+		refreshToken = req.RefreshToken
+	}
+
+	if refreshToken == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Bad Request",
-			"message": "Invalid request format",
+			"message": "Refresh token is required",
 		})
 		return
 	}
 
 	// Validate refresh token
-	claims, err := h.authManager.ValidateToken(req.RefreshToken)
+	claims, err := h.authManager.ValidateToken(refreshToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error":   "Unauthorized",
@@ -342,11 +376,41 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"access_token": accessToken,
-		"token_type":   "Bearer",
-		"expires_in":   15 * 60, // 15 minutes
-	})
+	// Generate new refresh token for rotation
+	newRefreshToken, err := h.authManager.GenerateToken(claims.UserID, claims.Role, middleware.TokenTypeRefresh)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to generate new refresh token")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": "Failed to generate refresh token",
+		})
+		return
+	}
+
+	// Set new secure cookies
+	if err := h.authManager.SetSecureCookies(c, accessToken, newRefreshToken); err != nil {
+		h.logger.WithError(err).Error("Failed to set secure cookies during refresh")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": "Failed to refresh session",
+		})
+		return
+	}
+
+	// Create response
+	response := gin.H{
+		"token_type": "Bearer",
+		"expires_in": 15 * 60, // 15 minutes
+	}
+
+	// Include CSRF token in response if enabled
+	if csrfToken, exists := c.Get(middleware.CSRFTokenKey); exists {
+		if token, ok := csrfToken.(string); ok {
+			response["csrf_token"] = token
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // GetProfile returns the current user's profile information
@@ -401,11 +465,49 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, userInfo)
 }
 
-// Logout invalidates the current session (placeholder for token blacklisting)
+// Logout invalidates the current session and clears secure cookies
 func (h *AuthHandler) Logout(c *gin.Context) {
+	// Get user ID for logging
+	userID := middleware.GetUserID(c)
+
+	// Clear secure cookies
+	h.authManager.ClearSecureCookies(c)
+
 	// In a real implementation, we'd want to add the token to a blacklist
-	// For now, we just return success - the client should discard the token
+	// For now, we clear cookies and return success
+
+	h.logger.WithField("user_id", userID).Info("User logged out successfully")
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Logged out successfully",
+	})
+}
+
+// GetCSRFToken returns the current CSRF token for authenticated users
+func (h *AuthHandler) GetCSRFToken(c *gin.Context) {
+	// Generate new CSRF token
+	csrfToken, err := h.authManager.GenerateCSRFToken()
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to generate CSRF token")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Internal Server Error",
+			"message": "Failed to generate CSRF token",
+		})
+		return
+	}
+
+	// Set CSRF token cookie
+	c.SetCookie(
+		middleware.CSRFTokenCookie,
+		csrfToken,
+		int(h.authManager.GetConfig().AccessTokenExpiry.Seconds()),
+		h.authManager.GetConfig().CookiePath,
+		h.authManager.GetConfig().CookieDomain,
+		h.authManager.GetConfig().RequireHTTPS,
+		false, // Not httpOnly - needs to be readable by JS
+	)
+
+	c.JSON(http.StatusOK, gin.H{
+		"csrf_token": csrfToken,
 	})
 }

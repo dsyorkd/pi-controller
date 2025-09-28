@@ -1,3 +1,4 @@
+
 # Pi-Controller System Architecture
 
 ## Executive Summary
@@ -1004,3 +1005,842 @@ Key architectural strengths:
 - **Comprehensive security model** protects infrastructure and hardware
 
 The modular design allows for incremental development and testing, while the detailed specifications enable multiple development teams to work in parallel on different components.
+
+## 11. Controller & Web Interface Architecture Details
+
+### 11.1 Single Binary Architecture
+
+The pi-controller binary is designed as a monolithic application that embeds all necessary components:
+
+```go
+type ControllerServer struct {
+    // Core services
+    discoveryService  *discovery.Service
+    provisionerEngine *provisioner.Engine
+    clusterManager    *cluster.Manager
+    gpioManager       *gpio.Manager
+    
+    // Communication layers
+    httpServer        *http.Server
+    grpcServer        *grpc.Server
+    websocketHub      *websocket.Hub
+    mcpServer         *mcp.Server
+    
+    // Data layer
+    database          *storage.Database
+    configManager     *config.Manager
+    
+    // Frontend assets (optional)
+    webUIHandler      *WebUIHandler
+    webUIEnabled      bool
+}
+```
+
+#### Binary Structure & Deployment Modes
+```
+pi-controller (single binary ~35MB)
+├── Core Application Logic (Go)
+├── SQLite Database Engine
+├── gRPC Protocol Buffers
+├── TLS Certificates (self-signed defaults)
+├── Configuration Templates
+└── Optional Embedded Minimal Web UI (~5MB)
+    ├── Basic cluster overview
+    ├── Node status display
+    └── Emergency management interface
+
+Deployment Modes:
+├── 1. Standalone Mode (on Pi nodes)
+│   ├── Full control plane functionality
+│   ├── Local database storage
+│   └── Direct hardware access
+├── 2. Container Mode (Docker/K8s)
+│   ├── Stateless control plane
+│   ├── External database connection
+│   └── Network-based hardware control
+└── 3. Remote Control Host Mode
+    ├── Management workstation deployment
+    ├── Remote cluster provisioning
+    └── Central multi-cluster management
+```
+
+### 11.2 Web Interface Architecture
+
+The web interface is maintained as a separate repository (`kubes-aura`) and can be deployed in multiple ways:
+
+#### Deployment Options
+
+1. **CRD-Based Kubernetes Deployment (Recommended)**
+   - Deployed as a Custom Resource after cluster formation
+   - Automatically pulled and deployed when cluster is ready
+   - Scales with cluster and provides full functionality
+
+2. **Embedded Minimal UI (Fallback)**
+   - Lightweight interface embedded in binary
+   - Basic cluster status and emergency operations
+   - Used when full UI is unavailable
+
+3. **External Deployment**
+   - Standalone deployment on separate infrastructure
+   - Can manage multiple clusters remotely
+   - Corporate/enterprise deployment pattern
+
+#### CRD-Based Web UI Deployment
+```yaml
+apiVersion: ui.pi-controller.io/v1
+kind: WebInterface
+metadata:
+  name: kubes-aura-ui
+  namespace: pi-controller-system
+spec:
+  version: "latest"
+  repository: "ghcr.io/dsyorkd/kubes-aura"
+  replicas: 2
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:  
+      cpu: "100m"
+      memory: "128Mi"
+  ingress:
+    enabled: true
+    hostname: "pi-controller.local"
+    tls: true
+  features:
+    - clusterManagement
+    - gpioControl
+    - monitoring
+    - nodeProvisioning
+```
+
+#### Frontend Technology Stack (Separate Repository)
+```typescript
+// kubes-aura Repository Architecture
+interface WebUIArchitecture {
+  framework: "React 18 + TypeScript";
+  stateManagement: "Zustand + React Query";
+  routing: "React Router v6";
+  uiComponents: "Tailwind CSS + Headless UI";
+  realTimeUpdates: "WebSocket + EventSource";
+  authentication: "JWT + HTTP-only cookies";
+  buildTool: "Vite";
+  bundleSize: "~8MB (full featured)";
+  containerImage: "~50MB Alpine-based";
+  repository: "https://github.com/dsyorkd/kubes-aura";
+}
+```
+
+#### Frontend-Backend Communication Patterns
+```typescript
+// API Client Architecture
+class ApiClient {
+  private baseURL: string;
+  private authToken: string;
+  private wsConnection: WebSocket;
+  
+  // REST API calls
+  async getClusters(): Promise<Cluster[]> {
+    return this.get('/api/v1/clusters');
+  }
+  
+  // Real-time updates via WebSocket
+  subscribeToClusterEvents(clusterId: string, callback: EventCallback) {
+    this.wsConnection.send({
+      type: 'subscribe',
+      channel: `cluster.${clusterId}.events`
+    });
+  }
+  
+  // Server-Sent Events for long-running operations
+  streamProvisioningStatus(nodeId: string): EventSource {
+    return new EventSource(`/api/v1/nodes/${nodeId}/provision/stream`);
+  }
+}
+```
+
+#### Web UI Component Structure (kubes-aura Repository)
+```
+kubes-aura/
+├── src/
+│   ├── components/           # Reusable UI components
+│   │   ├── common/          # Generic components (Button, Modal, etc.)
+│   │   ├── cluster/         # Cluster-specific components
+│   │   ├── gpio/            # GPIO control components
+│   │   └── monitoring/      # System monitoring components
+│   ├── pages/               # Route-level components
+│   │   ├── Dashboard.tsx    # Main overview page
+│   │   ├── Clusters.tsx     # Cluster management
+│   │   ├── Nodes.tsx        # Node management
+│   │   ├── GPIO.tsx         # GPIO resources
+│   │   └── Settings.tsx     # System configuration
+│   ├── hooks/               # Custom React hooks
+│   │   ├── useWebSocket.ts  # WebSocket connection hook
+│   │   ├── useAuth.ts       # Authentication hook
+│   │   └── useGPIO.ts       # GPIO state management hook
+│   ├── services/            # API service layer
+│   │   ├── api.ts           # REST API client
+│   │   ├── websocket.ts     # WebSocket client
+│   │   └── auth.ts          # Authentication service
+│   ├── store/               # Global state management
+│   │   ├── authStore.ts     # User authentication state
+│   │   ├── clusterStore.ts  # Cluster state
+│   │   └── gpioStore.ts     # GPIO resource state
+│   └── types/               # TypeScript type definitions
+│       ├── api.ts           # API response types
+│       ├── cluster.ts       # Cluster-related types
+│       └── gpio.ts          # GPIO resource types
+├── Dockerfile               # Container build configuration
+├── k8s/                     # Kubernetes deployment manifests
+│   ├── deployment.yaml      # Web UI deployment
+│   ├── service.yaml         # Service configuration
+│   └── ingress.yaml         # Ingress configuration
+└── README.md                # Project documentation
+```
+
+### 11.3 HTTP Server & Route Architecture
+
+#### Server Initialization & Route Setup
+```go
+func (s *ControllerServer) setupHTTPServer() *http.Server {
+    router := mux.NewRouter()
+    
+    // API routes with versioning
+    apiV1 := router.PathPrefix("/api/v1").Subrouter()
+    apiV1.Use(s.authMiddleware, s.corsMiddleware, s.loggingMiddleware)
+    
+    // Cluster management endpoints
+    apiV1.HandleFunc("/clusters", s.handleClusters).Methods("GET", "POST")
+    apiV1.HandleFunc("/clusters/{id}", s.handleCluster).Methods("GET", "PUT", "DELETE")
+    apiV1.HandleFunc("/clusters/{id}/nodes", s.handleClusterNodes).Methods("GET", "POST")
+    
+    // Node management endpoints
+    apiV1.HandleFunc("/nodes", s.handleNodes).Methods("GET")
+    apiV1.HandleFunc("/nodes/{id}", s.handleNode).Methods("GET", "PUT")
+    apiV1.HandleFunc("/nodes/{id}/provision", s.handleNodeProvision).Methods("POST")
+    apiV1.HandleFunc("/nodes/{id}/provision/stream", s.handleProvisionStream).Methods("GET")
+    
+    // GPIO endpoints
+    apiV1.HandleFunc("/gpio", s.handleGPIOResources).Methods("GET", "POST")
+    apiV1.HandleFunc("/gpio/{id}", s.handleGPIOResource).Methods("GET", "PUT", "DELETE")
+    
+    // WebSocket endpoint for real-time updates
+    router.HandleFunc("/ws", s.handleWebSocket)
+    
+    // Health check endpoint (unauthenticated)
+    router.HandleFunc("/health", s.handleHealth).Methods("GET")
+    
+    // Static file serving (embedded web UI)
+    router.PathPrefix("/").Handler(s.webUIHandler())
+    
+    return &http.Server{
+        Addr:         fmt.Sprintf(":%d", s.config.HTTPPort),
+        Handler:      router,
+        TLSConfig:    s.tlsConfig,
+        ReadTimeout:  30 * time.Second,
+        WriteTimeout: 30 * time.Second,
+        IdleTimeout:  120 * time.Second,
+    }
+}
+```
+
+#### Static Asset Serving
+```go
+//go:embed web/dist/*
+var webUIAssets embed.FS
+
+func (s *ControllerServer) webUIHandler() http.Handler {
+    // Serve embedded React app
+    webUI, _ := fs.Sub(webUIAssets, "web/dist")
+    fileServer := http.FileServer(http.FS(webUI))
+    
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Handle client-side routing (SPA)
+        if !strings.Contains(r.URL.Path, ".") && r.URL.Path != "/" {
+            r.URL.Path = "/"
+        }
+        
+        // Security headers
+        w.Header().Set("X-Content-Type-Options", "nosniff")
+        w.Header().Set("X-Frame-Options", "DENY")
+        w.Header().Set("X-XSS-Protection", "1; mode=block")
+        
+        fileServer.ServeHTTP(w, r)
+    })
+}
+```
+
+### 11.4 Authentication & Session Management
+
+#### JWT-based Authentication Flow
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant WebUI
+    participant ControllerAPI
+    participant Database
+    
+    Browser->>WebUI: Load application
+    WebUI->>Browser: React app with login form
+    
+    Browser->>ControllerAPI: POST /api/v1/auth/login
+    ControllerAPI->>Database: Validate credentials
+    Database-->>ControllerAPI: User valid
+    ControllerAPI->>ControllerAPI: Generate JWT
+    ControllerAPI-->>Browser: Set HTTP-only cookie + JWT
+    
+    Browser->>ControllerAPI: API calls with cookie
+    ControllerAPI->>ControllerAPI: Validate JWT
+    ControllerAPI-->>Browser: API response
+    
+    Browser->>WebUI: WebSocket connection
+    WebUI->>ControllerAPI: WS upgrade with cookie
+    ControllerAPI->>ControllerAPI: Validate JWT
+    ControllerAPI-->>WebUI: WebSocket established
+```
+
+#### Authentication Implementation
+```go
+type AuthManager struct {
+    jwtSecret     []byte
+    tokenExpiry   time.Duration
+    refreshExpiry time.Duration
+    userStore     UserStore
+}
+
+func (am *AuthManager) GenerateTokens(userID string) (TokenPair, error) {
+    accessClaims := jwt.MapClaims{
+        "sub": userID,
+        "exp": time.Now().Add(am.tokenExpiry).Unix(),
+        "iat": time.Now().Unix(),
+        "type": "access",
+    }
+    
+    refreshClaims := jwt.MapClaims{
+        "sub": userID,
+        "exp": time.Now().Add(am.refreshExpiry).Unix(),
+        "iat": time.Now().Unix(),
+        "type": "refresh",
+    }
+    
+    accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+    refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+    
+    accessString, _ := accessToken.SignedString(am.jwtSecret)
+    refreshString, _ := refreshToken.SignedString(am.jwtSecret)
+    
+    return TokenPair{
+        AccessToken:  accessString,
+        RefreshToken: refreshString,
+    }, nil
+}
+```
+
+## 12. Deployment Architecture & Binary Usage
+
+### 12.1 Deployment Mode Overview
+
+The pi-controller binary supports three distinct deployment modes, each optimized for different use cases:
+
+#### Mode 1: Standalone Pi Deployment
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Raspberry Pi Node                   │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐│
+│  │              pi-controller binary                   ││
+│  │ ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ ││
+│  │ │ Control     │ │ SQLite      │ │ Embedded        │ ││
+│  │ │ Plane       │ │ Database    │ │ Minimal UI      │ ││
+│  │ │ Services    │ │             │ │                 │ ││
+│  │ └─────────────┘ └─────────────┘ └─────────────────┘ ││
+│  └─────────────────────────────────────────────────────┘│
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐│
+│  │                 K3s Cluster                         ││
+│  │ ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ ││
+│  │ │ Full Web UI │ │ GPIO        │ │ Node Agent      │ ││
+│  │ │ (CRD)       │ │ Controllers │ │ DaemonSet       │ ││
+│  │ └─────────────┘ └─────────────┘ └─────────────────┘ ││
+│  └─────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Mode 2: Container Deployment
+```
+┌─────────────────────────────────────────────────────────┐
+│              Docker/Kubernetes Host                     │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐│
+│  │         pi-controller container                     ││
+│  │ ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ ││
+│  │ │ Control     │ │ External DB │ │ Config          │ ││
+│  │ │ Plane       │ │ Connection  │ │ Volume          │ ││
+│  │ │ Services    │ │             │ │ Mount           │ ││
+│  │ └─────────────┘ └─────────────┘ └─────────────────┘ ││
+│  └─────────────────────────────────────────────────────┘│
+├─────────────────────────────────────────────────────────┤
+│  External PostgreSQL Database                          │
+│  Network Access to Target Pi Clusters                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Mode 3: Remote Control Host
+```
+┌─────────────────────────────────────────────────────────┐
+│                Management Workstation                  │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐│
+│  │              pi-controller binary                   ││
+│  │ ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ ││
+│  │ │ Multi-      │ │ Local       │ │ Full Web UI     │ ││
+│  │ │ Cluster     │ │ Database    │ │ (Embedded)      │ ││
+│  │ │ Manager     │ │             │ │                 │ ││
+│  │ └─────────────┘ └─────────────┘ └─────────────────┘ ││
+│  └─────────────────────────────────────────────────────┘│
+├─────────────────────────────────────────────────────────┤
+│             Network Connections to:                     │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐│
+│  │ Pi Cluster  │ │ Pi Cluster  │ │ Pi Cluster          ││
+│  │ Site A      │ │ Site B      │ │ Site C              ││
+│  │             │ │             │ │                     ││
+│  └─────────────┘ └─────────────┘ └─────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+### 12.2 Binary Usage Patterns
+
+#### Command-Line Interface Design
+```bash
+# Primary binary: pi-controller
+pi-controller [GLOBAL-OPTIONS] COMMAND [COMMAND-OPTIONS]
+
+# Global options apply to all commands
+Global Options:
+  --config PATH        Configuration file path (default: /etc/pi-controller/config.yaml)
+  --data-dir PATH      Data directory path (default: /var/lib/pi-controller)
+  --log-level LEVEL    Logging level: debug, info, warn, error (default: info)
+  --log-format FORMAT  Log format: json, text (default: text)
+
+# Primary Commands:
+pi-controller server                    # Run control plane server (default)
+pi-controller agent                     # Run node agent only
+pi-controller cluster                   # Cluster management commands
+pi-controller node                      # Node management commands
+pi-controller gpio                      # GPIO resource commands
+pi-controller config                    # Configuration management
+pi-controller cert                      # Certificate management
+pi-controller backup                    # Backup/restore operations
+pi-controller version                   # Version information
+```
+
+#### Server Command (Primary Usage)
+```bash
+# Server command - runs the full control plane
+pi-controller server [OPTIONS]
+
+Server Options:
+  --bind-address IP        HTTP server bind address (default: 0.0.0.0)
+  --http-port PORT         HTTP/HTTPS port (default: 8080)
+  --grpc-port PORT         gRPC port (default: 9090)
+  --cluster-init           Initialize new cluster (first node only)
+  --join-token TOKEN       Join existing cluster with token
+  --server-url URL         Existing cluster server URL for joining
+  --node-role ROLE         Node role: server, agent (default: server)
+  --deployment-mode MODE   Deployment mode: standalone, container, remote (default: standalone)
+  --web-ui-enabled         Enable embedded web UI (default: true)
+  --web-ui-mode MODE       Web UI mode: embedded, external, crd (default: crd)
+  --web-ui-path PATH       Custom web UI static files path
+  --tls-cert PATH          TLS certificate file path
+  --tls-key PATH           TLS private key file path
+  --ca-cert PATH           CA certificate file path
+  --auto-cert              Enable automatic TLS certificate generation
+  --storage-backend TYPE   Storage backend: sqlite, postgres (default: sqlite)
+  --sqlite-path PATH       SQLite database file path
+  --postgres-url URL       PostgreSQL connection URL
+  --remote-clusters FILE   Multi-cluster configuration file (remote mode)
+```
+
+#### Deployment Mode Examples
+
+**Standalone Mode (On Pi):**
+```bash
+# Run directly on Raspberry Pi with local storage
+pi-controller server \
+  --deployment-mode=standalone \
+  --cluster-init \
+  --web-ui-mode=crd \
+  --storage-backend=sqlite
+```
+
+**Container Mode:**
+```bash
+# Run in Docker container with external database
+docker run -d \
+  --name pi-controller \
+  -p 8080:8080 -p 9090:9090 \
+  -e POSTGRES_URL="postgres://user:pass@db:5432/picontroller" \
+  pi-controller/controller:latest \
+  server --deployment-mode=container --storage-backend=postgres
+```
+
+**Remote Control Host Mode:**
+```bash
+# Run on management workstation for multiple clusters
+pi-controller server \
+  --deployment-mode=remote \
+  --web-ui-mode=embedded \
+  --remote-clusters=/etc/pi-controller/clusters.yaml \
+  --bind-address=0.0.0.0
+```
+
+### 12.2 Installation & Bootstrap Process
+
+#### Single-Node Quickstart
+```bash
+# 1. Download and install binary
+curl -sfL https://get.pi-controller.io/install.sh | sh -s - --channel stable
+
+# 2. Initialize first cluster node
+sudo pi-controller server --cluster-init --node-role=server
+
+# Process:
+# - Generates self-signed CA and certificates
+# - Creates SQLite database
+# - Initializes K3s server with embedded etcd
+# - Starts web UI on port 8080
+# - Generates join tokens for additional nodes
+```
+
+#### Multi-Node Cluster Formation
+```bash
+# On first node (control plane)
+pi-master-1$ sudo pi-controller server --cluster-init --bind-address=192.168.1.10
+
+# Output includes join information:
+# Cluster initialized successfully!
+# Web UI: https://192.168.1.10:8080
+# Join token: K10abcdef1234567890abcdef1234567890::server:1234567890abcdef
+# Join command for additional servers: 
+#   pi-controller server --server-url=https://192.168.1.10:8080 --join-token=K10abcdef...
+# Join command for agents:
+#   pi-controller agent --server-url=https://192.168.1.10:8080 --join-token=K10abcdef...
+
+# On additional control plane nodes
+pi-master-2$ sudo pi-controller server \
+  --server-url=https://192.168.1.10:8080 \
+  --join-token=K10abcdef1234567890abcdef1234567890::server:1234567890abcdef \
+  --bind-address=192.168.1.11
+
+# On worker nodes  
+pi-worker-1$ sudo pi-controller agent \
+  --server-url=https://192.168.1.10:8080 \
+  --join-token=K10abcdef1234567890abcdef1234567890::agent:0987654321fedcba
+```
+
+### 12.3 Configuration Management
+
+#### Configuration File Structure
+```yaml
+# /etc/pi-controller/config.yaml
+apiVersion: v1
+kind: Config
+metadata:
+  name: pi-controller-config
+
+# Server configuration
+server:
+  bindAddress: "0.0.0.0"
+  httpPort: 8080
+  grpcPort: 9090
+  tlsEnabled: true
+  autoTLS: true
+  deploymentMode: "standalone"  # standalone, container, remote
+  
+# Web UI configuration
+webUI:
+  mode: "crd"  # embedded, external, crd
+  enabled: true
+  title: "Pi Controller"
+  theme: "dark"
+  customCSS: ""
+  crdDeployment:
+    repository: "ghcr.io/dsyorkd/kubes-aura"
+    version: "latest"
+    replicas: 2
+  
+# Database configuration  
+database:
+  type: "sqlite"
+  sqlite:
+    path: "/var/lib/pi-controller/data.db"
+    maxConnections: 10
+    enableWAL: true
+  postgres:
+    url: ""
+    maxConnections: 25
+    
+# Security configuration
+security:
+  authentication:
+    method: "local"  # local, oidc, ldap
+    sessionTimeout: "24h"
+    refreshTimeout: "168h"
+  authorization:
+    rbacEnabled: true
+    defaultRole: "viewer"
+  tls:
+    minVersion: "1.3"
+    cipherSuites:
+      - "TLS_AES_256_GCM_SHA384"
+      - "TLS_AES_128_GCM_SHA256"
+      
+# Cluster configuration
+cluster:
+  name: "pi-cluster"
+  k3sVersion: "v1.25.9+k3s1"
+  cniPlugin: "flannel"
+  serviceCIDR: "10.43.0.0/16"
+  clusterCIDR: "10.42.0.0/16"
+  
+# Node agent configuration
+agent:
+  metricsInterval: "30s"
+  healthCheckInterval: "10s"
+  gpioEnabled: true
+  gpioPermissions: "644"
+  
+# Logging configuration
+logging:
+  level: "info"
+  format: "json"
+  output: "/var/log/pi-controller/controller.log"
+  maxSize: "100MB"
+  maxBackups: 5
+  maxAge: 30
+```
+
+#### Runtime Configuration Management
+```go
+type ConfigManager struct {
+    configPath   string
+    config       *Config
+    watchers     []ConfigWatcher
+    mutex        sync.RWMutex
+    reloadSignal chan os.Signal
+}
+
+func (cm *ConfigManager) WatchForChanges() {
+    fsnotify.Watch(cm.configPath, func(event fsnotify.Event) {
+        if event.Op&fsnotify.Write == fsnotify.Write {
+            cm.ReloadConfig()
+        }
+    })
+    
+    // Also watch for SIGHUP signal
+    signal.Notify(cm.reloadSignal, syscall.SIGHUP)
+    go func() {
+        for range cm.reloadSignal {
+            cm.ReloadConfig()
+        }
+    }()
+}
+
+func (cm *ConfigManager) ReloadConfig() error {
+    newConfig, err := LoadConfig(cm.configPath)
+    if err != nil {
+        return fmt.Errorf("failed to reload config: %w", err)
+    }
+    
+    cm.mutex.Lock()
+    oldConfig := cm.config
+    cm.config = newConfig
+    cm.mutex.Unlock()
+    
+    // Notify all watchers of config change
+    for _, watcher := range cm.watchers {
+        watcher.OnConfigChange(oldConfig, newConfig)
+    }
+    
+    return nil
+}
+```
+
+### 12.4 Service Management & Lifecycle
+
+#### Systemd Service Configuration
+```ini
+# /etc/systemd/system/pi-controller.service
+[Unit]
+Description=Pi Controller Cluster Management
+Documentation=https://docs.pi-controller.io
+Wants=network-online.target
+After=network-online.target
+AssertFileIsExecutable=/usr/local/bin/pi-controller
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/pi-controller server
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+User=pi-controller
+Group=pi-controller
+UMask=0027
+
+# Directories
+WorkingDirectory=/var/lib/pi-controller
+StateDirectory=pi-controller
+ConfigurationDirectory=pi-controller
+LogsDirectory=pi-controller
+
+# Environment
+Environment="PI_CONTROLLER_CONFIG=/etc/pi-controller/config.yaml"
+Environment="PI_CONTROLLER_DATA_DIR=/var/lib/pi-controller"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Graceful Shutdown Handling
+```go
+func (s *ControllerServer) Start() error {
+    // Setup signal handling for graceful shutdown
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+    
+    // Start all services
+    g, ctx := errgroup.WithContext(context.Background())
+    
+    // Start HTTP server
+    g.Go(func() error {
+        return s.httpServer.ListenAndServeTLS("", "")
+    })
+    
+    // Start gRPC server
+    g.Go(func() error {
+        lis, _ := net.Listen("tcp", fmt.Sprintf(":%d", s.config.GRPCPort))
+        return s.grpcServer.Serve(lis)
+    })
+    
+    // Start background services
+    g.Go(func() error {
+        return s.discoveryService.Start(ctx)
+    })
+    
+    // Wait for shutdown signal
+    go func() {
+        sig := <-sigChan
+        log.Printf("Received signal %v, initiating graceful shutdown", sig)
+        
+        if sig == syscall.SIGHUP {
+            // Reload configuration
+            s.configManager.ReloadConfig()
+            return
+        }
+        
+        // Graceful shutdown
+        shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+        
+        // Shutdown HTTP server
+        s.httpServer.Shutdown(shutdownCtx)
+        
+        // Shutdown gRPC server
+        s.grpcServer.GracefulStop()
+        
+        // Stop background services
+        s.discoveryService.Stop()
+        
+        // Close database connections
+        s.database.Close()
+    }()
+    
+    // Notify systemd that we're ready
+    daemon.SdNotify(false, daemon.SdNotifyReady)
+    
+    return g.Wait()
+}
+```
+
+### 12.5 Network Architecture & Port Usage
+
+#### Port Allocation Strategy
+```
+Port Ranges:
+├── 8080-8089: HTTP/HTTPS Web UI and API
+│   ├── 8080: Primary HTTPS (Web UI + REST API)
+│   ├── 8081: Prometheus metrics endpoint
+│   └── 8082: Health check endpoint (HTTP only)
+├── 9090-9099: gRPC Communication
+│   ├── 9090: Control plane gRPC (node agents)
+│   ├── 9091: Inter-control-plane gRPC
+│   └── 9092: MCP server gRPC
+├── 6443: Kubernetes API server (K3s)
+├── 10250: Kubelet API
+├── 2379-2380: etcd (embedded in K3s)
+└── 5353: mDNS discovery (UDP)
+```
+
+#### Network Communication Matrix
+```
+┌─────────────────┬─────────────────┬─────────────────┬─────────────────┐
+│                 │ Control Plane   │ Worker Nodes    │ External Users  │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ Control Plane   │ gRPC 9091       │ gRPC 9090       │ HTTPS 8080      │
+│                 │ etcd 2379-2380  │ K8s API 6443    │ mDNS 5353       │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ Worker Nodes    │ gRPC 9090       │ Kubelet 10250   │ None            │
+│                 │ K8s API 6443    │ NodePort Range  │                 │
+├─────────────────┼─────────────────┼─────────────────┼─────────────────┤
+│ External Users  │ HTTPS 8080      │ None            │ None            │
+│                 │ SSH 22 (setup)  │                 │                 │
+└─────────────────┴─────────────────┴─────────────────┴─────────────────┘
+```
+
+#### Load Balancing & High Availability
+```yaml
+# HAProxy configuration for multi-master setup
+global:
+  daemon
+  maxconn 4096
+
+defaults:
+  mode http
+  timeout connect 5000ms
+  timeout client 50000ms  
+  timeout server 50000ms
+
+# Pi-Controller API Load Balancer
+frontend pi_controller_frontend
+  bind *:8080 ssl crt /etc/ssl/certs/pi-controller.pem
+  redirect scheme https if !{ ssl_fc }
+  default_backend pi_controller_backend
+
+backend pi_controller_backend
+  balance roundrobin
+  option httpchk GET /health
+  server pi-master-1 192.168.1.10:8080 check ssl verify none
+  server pi-master-2 192.168.1.11:8080 check ssl verify none  
+  server pi-master-3 192.168.1.12:8080 check ssl verify none
+
+# Kubernetes API Load Balancer  
+frontend k8s_api_frontend
+  bind *:6443
+  mode tcp
+  default_backend k8s_api_backend
+
+backend k8s_api_backend
+  mode tcp
+  balance roundrobin
+  server pi-master-1 192.168.1.10:6443 check
+  server pi-master-2 192.168.1.11:6443 check
+  server pi-master-3 192.168.1.12:6443 check
+```
+
+This detailed expansion clarifies the assumptions around controller/web interface architecture, deployment patterns, and binary usage. The architecture now provides specific implementation details for how users interact with the system, how the binary operates, and how the various components communicate.

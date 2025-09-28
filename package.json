@@ -1,0 +1,29 @@
+{
+  "name": "pi-controller",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dsyorkd/pi-controller.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dsyorkd/pi-controller/issues"
+  },
+  "homepage": "https://github.com/dsyorkd/pi-controller#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.5.2"
+  },
+  "dependencies": {
+    "playwright": "^1.55.1"
+  }
+}

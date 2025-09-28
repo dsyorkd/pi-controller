@@ -16,47 +16,46 @@ concurrency:
 
 env:
   GO_VERSION: "1.25"  # Use Go 1.25 for consistency
+  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v2.0"
 
 jobs:
-  # Dependency vulnerability scanning
+  # Dependency vulnerability scanning using optimized CI image
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    container:
+      image: ${{ env.CI_IMAGE }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Cache Go modules
+        uses: actions/cache@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-      - name: Generate protobuf code first
-        run: make proto
-
-      - name: Install dependencies after protobuf generation
-        run: make deps
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
 
       - name: Run Govulncheck
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+        run: govulncheck ./...
 
       - name: Run Additional Vulnerability Scan with OSV-Scanner
-        run: |
-          go install github.com/google/osv-scanner/cmd/osv-scanner@latest
-          osv-scanner --lockfile=go.mod .
+        run: osv-scanner --lockfile=go.mod .
 
       - name: Generate SBOM (Software Bill of Materials)
         run: |
-          go install github.com/anchore/syft/cmd/syft@latest
           syft . -o spdx-json=sbom.json
           syft . -o table=sbom.txt
           echo "Generated SBOM files"
@@ -70,42 +69,34 @@ jobs:
             sbom.txt
           retention-days: 30
 
-  # Static code analysis with multiple tools
+  # Static code analysis with multiple tools using optimized CI image
   static-analysis:
     name: Static Code Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    container:
+      image: ${{ env.CI_IMAGE }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 6
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Cache Go modules
+        uses: actions/cache@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-      - name: Generate protobuf code first
-        run: make proto
-
-      - name: Install dependencies after protobuf generation
-        run: make deps
-
-      - name: Install security analysis tools
+      - name: Generate protobuf code and install dependencies
         run: |
-          # Install gosec for security scanning
-          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-          
-          # Install staticcheck for advanced static analysis
-          go install honnef.co/go/tools/cmd/staticcheck@latest
-          
-          # Install golangci-lint with security linters
-          make install-lint
+          make proto
+          make deps
 
       - name: Run gosec security scanner
         run: |
@@ -294,42 +285,43 @@ jobs:
             .secrets.baseline
           retention-days: 30
 
-  # License compliance check
+  # License compliance check using optimized CI image
   license-check:
     name: License Compliance
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    container:
+      image: ${{ env.CI_IMAGE }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make protobuf-compiler
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - name: Cache Go modules
+        uses: actions/cache@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-      - name: Generate protobuf code first
-        run: make proto
-
-      - name: Install dependencies after protobuf generation
-        run: make deps
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
 
       - name: Check licenses
         run: |
-          # Install go-licenses tool if not available
-          go install github.com/google/go-licenses@latest
           echo "Checking licenses for pi-controller..."
           go-licenses report ./cmd/pi-controller --template licenses.tpl > controller-licenses.txt || true
-          
-          echo "Checking licenses for pi-agent..."  
+
+          echo "Checking licenses for pi-agent..."
           go-licenses report ./cmd/pi-agent --template licenses.tpl > agent-licenses.txt || true
-          
+
           echo "Generating license summary..."
           go-licenses csv ./... > licenses-summary.csv
 

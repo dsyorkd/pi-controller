@@ -45,7 +45,7 @@ export const useClusters = () => {
       setLoading(false);
       setRefetching(false);
     }
-  }, [refetching, setLoading, setError, setClusters]);
+  }, [refetching]);
 
   const refetch = useCallback(() => {
     setRefetching(true);
@@ -113,10 +113,11 @@ export const useClusters = () => {
   );
 
   useEffect(() => {
-    if (clusters.length === 0 && !isLoading && !error) {
+    // Only fetch on initial mount if we have no clusters and no loading/error state
+    if (clusters.length === 0 && !isLoading && !error && !refetching) {
       fetchClusters();
     }
-  }, [clusters.length, isLoading, error, fetchClusters]);
+  }, []); // Empty dependency array for initial fetch only
 
   return {
     clusters,

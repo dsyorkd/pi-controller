@@ -115,6 +115,44 @@ func (m *MockK8sClient) DeletePod(ctx context.Context, namespace, name string) e
 	return args.Error(0)
 }
 
+// Service operations
+func (m *MockK8sClient) CreateService(ctx context.Context, namespace string, service *corev1.Service) (*corev1.Service, error) {
+	args := m.Called(ctx, namespace, service)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*corev1.Service), args.Error(1)
+}
+
+func (m *MockK8sClient) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
+	args := m.Called(ctx, namespace, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*corev1.Service), args.Error(1)
+}
+
+func (m *MockK8sClient) ListServices(ctx context.Context, namespace string) ([]corev1.Service, error) {
+	args := m.Called(ctx, namespace)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]corev1.Service), args.Error(1)
+}
+
+func (m *MockK8sClient) UpdateService(ctx context.Context, namespace string, service *corev1.Service) (*corev1.Service, error) {
+	args := m.Called(ctx, namespace, service)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*corev1.Service), args.Error(1)
+}
+
+func (m *MockK8sClient) DeleteService(ctx context.Context, namespace, name string) error {
+	args := m.Called(ctx, namespace, name)
+	return args.Error(0)
+}
+
 // MockClusterService is a mock implementation of the ClusterService
 type MockClusterService struct {
 	mock.Mock
