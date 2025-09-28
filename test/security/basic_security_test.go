@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,17 @@ import (
 )
 
 func TestBasicSecurity(t *testing.T) {
+	// Set environment to development for testing (disables HTTPS requirement)
+	originalEnv := os.Getenv("PI_CONTROLLER_ENVIRONMENT")
+	defer func() {
+		if originalEnv == "" {
+			os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
+		} else {
+			os.Setenv("PI_CONTROLLER_ENVIRONMENT", originalEnv)
+		}
+	}()
+	os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
+
 	// Create test database
 	dbConfig := &storage.Config{
 		Path:            ":memory:",

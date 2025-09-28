@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -36,13 +37,13 @@ type SecurityTestSuite struct {
 
 // SetupSuite sets up the test suite
 func (suite *SecurityTestSuite) SetupSuite() {
-	_, cleanup := testutils.SetupTestDBFile(suite.T())
+	// Set environment to development for testing (disables HTTPS requirement)
+	os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
+
+	db, cleanup := testutils.SetupTestDBFile(suite.T())
 	appLogger := logger.Default()
 
-	var err error
-	suite.db, err = storage.NewForTest(appLogger)
-	require.NoError(suite.T(), err)
-
+	suite.db = storage.NewForTestWithDB(db, appLogger)
 	suite.cleanup = cleanup
 
 	logrusLogger := logrus.New()

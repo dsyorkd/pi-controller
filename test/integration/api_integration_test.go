@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
@@ -37,6 +38,9 @@ type APIIntegrationTestSuite struct {
 
 // SetupSuite sets up the test suite
 func (suite *APIIntegrationTestSuite) SetupSuite() {
+	// Set environment to development for testing (disables HTTPS requirement)
+	os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
+
 	db, cleanup := testutils.SetupTestDBFile(suite.T())
 	suite.db = storage.NewForTestWithDB(db, logger.Default())
 	suite.cleanup = cleanup

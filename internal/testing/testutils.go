@@ -54,6 +54,10 @@ func SetupTestDBFile(t *testing.T) (*gorm.DB, func()) {
 		&models.Node{},
 		&models.GPIODevice{},
 		&models.GPIOReading{},
+		&models.User{},
+		&models.Certificate{},
+		&models.CertificateRequest{},
+		&models.CAInfo{},
 	)
 	require.NoError(t, err)
 
