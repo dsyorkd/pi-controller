@@ -27,9 +27,9 @@ func NewServiceHandler(service *services.K8sService, logger logger.Interface) *S
 
 // CreateServiceRequest represents the request to create a service
 type CreateServiceRequest struct {
-	ClusterID uint             `json:"cluster_id" binding:"required"`
-	Namespace string           `json:"namespace,omitempty"`
-	Service   *corev1.Service  `json:"service" binding:"required"`
+	ClusterID uint            `json:"cluster_id" binding:"required"`
+	Namespace string          `json:"namespace,omitempty"`
+	Service   *corev1.Service `json:"service" binding:"required"`
 }
 
 // GetServicesResponse represents the response for listing services

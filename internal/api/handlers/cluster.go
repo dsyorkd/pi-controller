@@ -75,9 +75,9 @@ func (h *ClusterHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":  clusters,
-		"total": total,
-		"limit": limit,
+		"data":   clusters,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	})
 }
@@ -237,10 +237,10 @@ func (h *ClusterHandler) Status(c *gin.Context) {
 
 // ProvisionClusterHTTPRequest represents HTTP request for cluster provisioning
 type ProvisionClusterHTTPRequest struct {
-	MasterNodeID  uint                      `json:"master_node_id" binding:"required"`
-	WorkerNodeIDs []uint                    `json:"worker_node_ids,omitempty"`
-	K3sConfig     services.K3sConfig        `json:"k3s_config,omitempty"`
-	SSHConfig     ClusterSSHConfig          `json:"ssh_config" binding:"required"`
+	MasterNodeID  uint               `json:"master_node_id" binding:"required"`
+	WorkerNodeIDs []uint             `json:"worker_node_ids,omitempty"`
+	K3sConfig     services.K3sConfig `json:"k3s_config,omitempty"`
+	SSHConfig     ClusterSSHConfig   `json:"ssh_config" binding:"required"`
 }
 
 // DeprovisionClusterHTTPRequest represents HTTP request for cluster deprovisioning
@@ -413,8 +413,8 @@ func (h *ClusterHandler) ScaleCluster(c *gin.Context) {
 	}
 
 	h.logger.WithFields(map[string]interface{}{
-		"cluster_id":  id,
-		"node_count":  req.NodeCount,
+		"cluster_id": id,
+		"node_count": req.NodeCount,
 	}).Info("Received cluster scaling request")
 
 	// This is an async operation, return 202 Accepted

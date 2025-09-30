@@ -16,8 +16,8 @@ import (
 
 // ClusterService is the service for managing clusters
 type ClusterService struct {
-	store              *storage.Database
-	log                logger.Interface
+	store               *storage.Database
+	log                 logger.Interface
 	provisioningService *ProvisioningService
 	nodeService         *NodeService
 }
@@ -405,7 +405,7 @@ func (s *ClusterService) GetClusterStatus(ctx context.Context, clusterID uint) (
 // ScaleCluster scales the cluster to the specified number of nodes
 func (s *ClusterService) ScaleCluster(ctx context.Context, clusterID uint, req ClusterScaleRequest) error {
 	s.log.WithFields(map[string]interface{}{
-		"cluster_id": clusterID,
+		"cluster_id":   clusterID,
 		"target_nodes": req.NodeCount,
 	}).Info("Starting cluster scaling")
 
@@ -443,9 +443,9 @@ func (s *ClusterService) scaleDown(ctx context.Context, clusterID uint, currentN
 	nodesToRemove := currentCount - targetCount
 
 	s.log.WithFields(map[string]interface{}{
-		"cluster_id": clusterID,
-		"current_nodes": currentCount,
-		"target_nodes": targetCount,
+		"cluster_id":      clusterID,
+		"current_nodes":   currentCount,
+		"target_nodes":    targetCount,
 		"nodes_to_remove": nodesToRemove,
 	}).Info("Scaling down cluster")
 
@@ -473,8 +473,8 @@ func (s *ClusterService) scaleDown(ctx context.Context, clusterID uint, currentN
 	for _, node := range nodesToDeprovision {
 		s.log.WithFields(map[string]interface{}{
 			"cluster_id": clusterID,
-			"node_id": node.ID,
-			"node_name": node.Name,
+			"node_id":    node.ID,
+			"node_name":  node.Name,
 		}).Info("Removing node from cluster")
 
 		if s.provisioningService != nil {
@@ -504,10 +504,10 @@ func (s *ClusterService) scaleUp(ctx context.Context, clusterID uint, currentNod
 	nodesToAdd := targetCount - currentCount
 
 	s.log.WithFields(map[string]interface{}{
-		"cluster_id": clusterID,
+		"cluster_id":    clusterID,
 		"current_nodes": currentCount,
-		"target_nodes": targetCount,
-		"nodes_to_add": nodesToAdd,
+		"target_nodes":  targetCount,
+		"nodes_to_add":  nodesToAdd,
 	}).Info("Scaling up cluster")
 
 	// For scale up, we need to find available nodes that are not part of any cluster
@@ -562,8 +562,8 @@ func (s *ClusterService) scaleUp(ctx context.Context, clusterID uint, currentNod
 
 		s.log.WithFields(map[string]interface{}{
 			"cluster_id": clusterID,
-			"node_id": node.ID,
-			"node_name": node.Name,
+			"node_id":    node.ID,
+			"node_name":  node.Name,
 		}).Info("Adding node to cluster")
 
 		// Assign node to cluster first
