@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dsyorkd/pi-controller/internal/api/middleware"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/provisioner"
 	"github.com/dsyorkd/pi-controller/internal/services"
@@ -16,6 +17,34 @@ import (
 type ClusterHandler struct {
 	service *services.ClusterService
 	logger  logger.Interface
+}
+
+// hasPermission checks if user role has permission for cluster write operations
+func (h *ClusterHandler) hasPermission(userRole, requiredRole string) bool {
+	// Admin can access everything
+	if userRole == middleware.RoleAdmin {
+		return true
+	}
+
+	// Operator can access operator and viewer endpoints
+	if userRole == middleware.RoleOperator && (requiredRole == middleware.RoleOperator || requiredRole == middleware.RoleViewer) {
+		return true
+	}
+
+	// Viewer can only access viewer endpoints
+	if userRole == middleware.RoleViewer && requiredRole == middleware.RoleViewer {
+		return true
+	}
+
+	return false
+}
+
+// writeError writes an error response to the client
+func (h *ClusterHandler) writeError(w *gin.Context, status int, message string) {
+	w.JSON(status, gin.H{
+		"error":   http.StatusText(status),
+		"message": message,
+	})
 }
 
 // NewClusterHandler creates a new cluster handler
@@ -55,6 +84,13 @@ func (h *ClusterHandler) List(c *gin.Context) {
 
 // Create creates a new cluster
 func (h *ClusterHandler) Create(c *gin.Context) {
+	// Check permissions for cluster write operations
+	userRole := middleware.GetUserRole(c)
+	if !h.hasPermission(userRole, middleware.RoleOperator) {
+		h.writeError(c, http.StatusForbidden, "insufficient permissions")
+		return
+	}
+
 	var req services.CreateClusterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -66,6 +102,8 @@ func (h *ClusterHandler) Create(c *gin.Context) {
 
 	cluster, err := h.service.Create(req)
 	if err != nil {
+		logger := h.logger.WithField("handler", "ClusterHandler").WithField("method", "Create")
+		logger.WithError(err).Error("failed to create cluster")
 		h.handleServiceError(c, err, "Failed to create cluster")
 		return
 	}
