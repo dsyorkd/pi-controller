@@ -421,7 +421,7 @@ func (am *AuthManager) Auth() gin.HandlerFunc {
 				am.auditLog(c, "auth_failure", "Missing authorization header and cookie", "")
 				c.JSON(http.StatusUnauthorized, gin.H{
 					"error":   "Unauthorized",
-					"message": "Authentication required",
+					"message": "Authorization header is required",
 				})
 				c.Abort()
 				return

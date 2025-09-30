@@ -193,7 +193,6 @@ func (h *NodeHandler) ListGPIO(c *gin.Context) {
 	})
 }
 
-
 // handleServiceError handles service layer errors and maps them to appropriate HTTP responses
 func (h *NodeHandler) handleServiceError(c *gin.Context, err error, message string) {
 	h.logger.WithError(err).Error(message)

@@ -174,15 +174,15 @@ func checkSQLInjection(fieldName, value string) error {
 func containsSQLKeywordPattern(upperValue, keyword string) bool {
 	// Look for keyword with SQL operators or at string boundaries
 	suspiciousPatterns := []string{
-		" " + keyword + " ",    // Keyword with spaces (common in SQL)
-		"(" + keyword + " ",    // After parenthesis
-		" " + keyword + "(",    // Before parenthesis
-		";" + keyword,          // After semicolon
-		keyword + ";",          // Before semicolon
-		"\t" + keyword,         // After tab
-		keyword + "\t",         // Before tab
-		"\n" + keyword,         // After newline
-		keyword + "\n",         // Before newline
+		" " + keyword + " ", // Keyword with spaces (common in SQL)
+		"(" + keyword + " ", // After parenthesis
+		" " + keyword + "(", // Before parenthesis
+		";" + keyword,       // After semicolon
+		keyword + ";",       // Before semicolon
+		"\t" + keyword,      // After tab
+		keyword + "\t",      // Before tab
+		"\n" + keyword,      // After newline
+		keyword + "\n",      // Before newline
 	}
 
 	for _, pattern := range suspiciousPatterns {

@@ -26,7 +26,6 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-
 // APIIntegrationTestSuite defines the test suite for API integration tests
 type APIIntegrationTestSuite struct {
 	suite.Suite

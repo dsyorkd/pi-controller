@@ -482,29 +482,29 @@ type CompressionConfig struct {
 
 // SecurityConfig contains security header settings
 type SecurityConfig struct {
-	HSTSEnabled         bool   `yaml:"hsts_enabled"`
-	HSTSMaxAge          string `yaml:"hsts_max_age"`
-	FrameDeny           bool   `yaml:"frame_deny"`
-	ContentTypeNoSniff  bool   `yaml:"content_type_nosniff"`
-	XSSProtection       bool   `yaml:"xss_protection"`
-	CSPEnabled          bool   `yaml:"csp_enabled"`
-	CSPDirectives       string `yaml:"csp_directives"`
+	HSTSEnabled        bool   `yaml:"hsts_enabled"`
+	HSTSMaxAge         string `yaml:"hsts_max_age"`
+	FrameDeny          bool   `yaml:"frame_deny"`
+	ContentTypeNoSniff bool   `yaml:"content_type_nosniff"`
+	XSSProtection      bool   `yaml:"xss_protection"`
+	CSPEnabled         bool   `yaml:"csp_enabled"`
+	CSPDirectives      string `yaml:"csp_directives"`
 }
 
 // RateLimitConfig contains rate limiting settings
 type RateLimitConfig struct {
-	Enabled             bool `yaml:"enabled"`
-	RequestsPerMinute   int  `yaml:"requests_per_minute"`
-	BurstSize           int  `yaml:"burst_size"`
+	Enabled           bool `yaml:"enabled"`
+	RequestsPerMinute int  `yaml:"requests_per_minute"`
+	BurstSize         int  `yaml:"burst_size"`
 }
 
 // ObservabilityConfig contains observability settings
 type ObservabilityConfig struct {
-	AccessLog         bool   `yaml:"access_log"`
-	AccessLogFormat   string `yaml:"access_log_format"`
-	MetricsEnabled    bool   `yaml:"metrics_enabled"`
-	MetricsPath       string `yaml:"metrics_path"`
-	TracingEnabled    bool   `yaml:"tracing_enabled"`
+	AccessLog       bool   `yaml:"access_log"`
+	AccessLogFormat string `yaml:"access_log_format"`
+	MetricsEnabled  bool   `yaml:"metrics_enabled"`
+	MetricsPath     string `yaml:"metrics_path"`
+	TracingEnabled  bool   `yaml:"tracing_enabled"`
 }
 
 // ResourcesConfig contains resource limit settings

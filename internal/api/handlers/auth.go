@@ -50,10 +50,10 @@ type RegisterRequest struct {
 
 // LoginResponse represents the login response payload
 type LoginResponse struct {
-	TokenType    string    `json:"token_type"`
-	ExpiresIn    int       `json:"expires_in"`
-	User         *UserInfo `json:"user"`
-	CSRFToken    string    `json:"csrf_token,omitempty"`
+	TokenType string    `json:"token_type"`
+	ExpiresIn int       `json:"expires_in"`
+	User      *UserInfo `json:"user"`
+	CSRFToken string    `json:"csrf_token,omitempty"`
 }
 
 // UserInfo represents safe user information for API responses
