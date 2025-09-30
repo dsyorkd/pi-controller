@@ -9,7 +9,7 @@
         "testStrategy": "Build the images for both architectures using `docker buildx build --platform linux/amd64,linux/arm64`. Run the resulting AMD64 image on a local machine and the ARM64 image on a Raspberry Pi to confirm they both start and operate correctly.",
         "priority": "medium",
         "dependencies": [],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -372,7 +372,7 @@
         "description": "Debug and resolve the 'Maximum update depth exceeded' error on the Nodes page, which is caused by an infinite re-render loop in a React component.",
         "details": "The Nodes page is crashing due to a common React issue where a `useEffect` hook's dependencies cause it to run on every render, which in turn updates the state, triggering another render. The primary suspect is likely in `src/pages/Nodes/Nodes.jsx` or a child component responsible for fetching or displaying node data.\n\n1.  **Identify the problematic `useEffect`:** Locate the component responsible for managing the nodes list (likely `src/pages/Nodes/Nodes.jsx`). Examine its `useEffect` hooks.\n2.  **Analyze the Dependency Array:** The issue is almost certainly an unstable dependency (an object, array, or function that is re-created on every render). For example:\n    ```javascript\n    // Bad: `options` is a new object on every render, causing the effect to re-run infinitely\n    const options = { sort: 'name' };\n    useEffect(() => {\n      api.fetchNodes(options).then(setNodes);\n    }, [options]);\n    ```\n3.  **Stabilize Dependencies:** To fix this, stabilize the reference using `useMemo` for objects/arrays or `useCallback` for functions.\n    ```javascript\n    // Good: `options` is memoized and its reference is stable\n    const options = useMemo(() => ({ sort: 'name' }), []);\n    useEffect(() => {\n      api.fetchNodes(options).then(setNodes);\n    }, [options]);\n    ```\n4.  **Check for Missing Dependencies:** Conversely, ensure the dependency array is not missing required values, which can cause stale data, though it's less likely to cause this specific error. The React ESLint plugin for hooks should be checked for warnings.",
         "testStrategy": "1. Run the application locally using `npm start`.\n2. Open the browser's developer console to monitor for errors.\n3. Navigate to the '/nodes' page.\n4. Verify that the 'Maximum update depth exceeded' error no longer appears in the console.\n5. Confirm that the page loads successfully and the list of nodes is displayed correctly.\n6. Interact with any UI elements on the page (e.g., refresh button, filters) to ensure the fix has not introduced any regressions.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": []
@@ -383,41 +383,299 @@
         "description": "The clusters page at the '/clusters' route is currently showing a 'Page Not Found' error. This task involves correcting the frontend routing configuration to ensure the Clusters component is rendered correctly.",
         "details": "The codebase analysis indicates that a component for the clusters page likely exists at `src/pages/Clusters/Clusters.jsx`, but the route is not defined in the main application router. The fix requires modifying `src/App.jsx`.\n\n1.  **Import the Component:** Add an import statement at the top of `src/App.jsx` to bring in the `Clusters` component:\n    `import Clusters from './pages/Clusters/Clusters';`\n\n2.  **Add the Route:** Inside the `<Routes>` block in `src/App.jsx`, add a new `<Route>` definition for the clusters page. It should be placed before the wildcard `*` route for the `NotFound` component.\n\n    ```jsx\n    // src/App.jsx\n    <Routes>\n      <Route path=\"/\" element={<Dashboard />} />\n      <Route path=\"/nodes\" element={<Nodes />} />\n      {/* Add the new route here */}\n      <Route path=\"/clusters\" element={<Clusters />} />\n      <Route path=\"*\" element={<NotFound />} />\n    </Routes>\n    ```\n\nThis change will map the `/clusters` URL path to the corresponding React component, resolving the 404 error.",
         "testStrategy": "1. Start the frontend development server using `npm start`.\n2. Open the application in a web browser.\n3. Manually navigate to the `/clusters` URL.\n4. Verify that the 'Page Not Found' message is no longer displayed.\n5. Confirm that the content from the `Clusters.jsx` component (e.g., a heading that says 'Clusters') is rendered on the page.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 55,
-        "title": "Fix HTTPS/WebSocket Connection Issues (426 Upgrade Required)",
-        "description": "Resolve frequent '426 Upgrade Required' errors that cause WebSocket session drops by correctly configuring the reverse proxy to handle WebSocket upgrade requests between the frontend and the Go backend.",
-        "details": "The current setup is experiencing WebSocket connection failures, indicated by HTTP 426 errors. This is almost certainly caused by a reverse proxy (e.g., Nginx, Caddy) that is not correctly handling the protocol upgrade handshake. The proxy is likely stripping the `Connection: \"upgrade\"` and `Upgrade: \"websocket\"` headers from the client's initial request, preventing the Go backend's WebSocket server from accepting the connection.\n\n1.  **Identify and Modify Proxy Configuration:** Locate the configuration file for the reverse proxy service defined in the project's deployment setup (e.g., `docker-compose.yml` might point to an `nginx.conf`).\n2.  **Update Proxy Rules:** Add the necessary directives to the location block that forwards traffic to the backend API to allow WebSocket connections. For an Nginx proxy, the configuration should include:\n    ```nginx\n    location /ws {\n        proxy_pass http://backend-service:8080; # Adjust to your backend service name/port\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection \"upgrade\";\n        proxy_set_header Host $host;\n        proxy_read_timeout 86400s; # Prevent timeouts for long-lived connections\n        proxy_send_timeout 86400s;\n    }\n    ```\n3.  **Review Backend WebSocket Upgrader:** As a secondary check, inspect the `websocket.Upgrader` configuration in `internal/websocket/hub.go`. Ensure the `CheckOrigin` function is correctly configured to allow requests from the frontend's domain, although this typically results in a different error.\n4.  **Verify Frontend Connection URL:** Confirm that the frontend client code is attempting to connect using the secure WebSocket protocol `wss://` and not `ws://`.",
-        "testStrategy": "1.  Start the entire application stack locally, including the reverse proxy, backend, and frontend services.\n2.  Open the application in a web browser and open the Developer Tools to the 'Network' tab, filtering for 'WS' requests.\n3.  Log in to the application to trigger the WebSocket connection.\n4.  Verify that the WebSocket handshake request completes successfully with a `101 Switching Protocols` status code.\n5.  Monitor the connection for an extended period (e.g., 5-10 minutes) while interacting with the application to ensure it remains stable and does not disconnect with a 426 error.\n6.  Confirm that real-time features dependent on the WebSocket are functioning as expected.",
+        "id": 57,
+        "title": "Fix Database Schema Initialization in Integration Tests",
+        "description": "Resolve 'no such table' errors in integration and security tests by ensuring the database schema is correctly initialized in the test setup helpers.",
+        "details": "Codebase analysis indicates that integration tests are failing because the test utility for creating a database does not apply the required schema. The helper function `NewTestDB` in `pkg/testutil/testutil.go` correctly creates an in-memory SQLite database but omits the step to initialize tables like 'nodes' and 'clusters'.\n\n1.  **Locate the Test Helper:** Open the file `pkg/testutil/testutil.go`.\n2.  **Identify the Issue:** The `NewTestDB` function successfully establishes a database connection but never calls the schema initialization method.\n3.  **Implement the Fix:** Modify the `NewTestDB` function to call the `db.Init()` method after creating the database connection. This will execute the `CREATE TABLE` statements found in `internal/database/schema.go`.\n\n```go\n// In pkg/testutil/testutil.go\n\nimport (\n    \"testing\"\n    \"pi-controller/internal/database\"\n)\n\nfunc NewTestDB(t *testing.T) *database.DB {\n    db, err := database.New(\"file::memory:?cache=shared\")\n    if err != nil {\n        t.Fatalf(\"failed to create test database: %v\", err)\n    }\n\n    // FIX: Add this call to initialize the schema\n    if err := db.Init(); err != nil {\n        db.Close() // Close the connection on init failure\n        t.Fatalf(\"failed to initialize test database schema: %v\", err)\n    }\n\n    t.Cleanup(func() {\n        db.Close()\n    })\n\n    return db\n}\n```\nThis single change in the shared test utility should resolve the database errors across the entire integration test suite.",
+        "testStrategy": "1. Before applying the fix, run the integration test suite (e.g., using a command like `go test ./...` or a specific `make` target for integration tests) and confirm that tests fail with \"no such table\" errors.\n2. Apply the code change to `pkg/testutil/testutil.go` as detailed above.\n3. Re-run the entire integration test suite.\n4. Verify that all tests now pass and that the logs are free of any database schema-related errors.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 58,
+        "title": "Mock Pi Agent for GPIO Integration Tests to Prevent Timeouts",
+        "description": "Refactor GPIO workflow integration tests to use a mock Pi Agent server instead of connecting to a hardcoded IP address. This will resolve network connection failures and test timeouts, making the test suite faster and more reliable.",
+        "details": "Codebase analysis shows that integration tests, particularly those in the GPIO workflow, are failing due to timeouts. These tests attempt to establish a real network connection to a hardcoded agent address (192.168.1.100:9091), which is unavailable in the CI/CD environment, leading to a 60-second timeout. The correct approach is to replace this external dependency with a local mock server for fast and deterministic testing.\n\n1.  **Create a Mock Pi Agent Server:** In the `pkg/testutil/` directory, create a new helper function, `NewMockPiAgentServer()`. This function will use Go's standard `net/http/httptest` package to create an in-process HTTP server that mimics the real Pi Agent's API. It should handle expected routes like `/gpio/set` and return predictable JSON responses.\n\n    ```go\n    // In pkg/testutil/testutil.go\n    import (\n        \"net/http\"\n        \"net/http/httptest\"\n    )\n\n    func NewMockPiAgentServer() *httptest.Server {\n        mux := http.NewServeMux()\n        mux.HandleFunc(\"/gpio/set\", func(w http.ResponseWriter, r *http.Request) {\n            w.WriteHeader(http.StatusOK)\n            w.Write([]byte(`{\"status\":\"success\", \"pin\": 17, \"state\": 1}`))\n        })\n        // Add other handlers as needed\n        return httptest.NewServer(mux)\n    }\n    ```\n\n2.  **Refactor Pi Agent Client for Testability:** The existing Pi Agent client likely uses a hardcoded URL. Modify its constructor or relevant functions to accept a base URL as a parameter. This allows injecting the mock server's URL during tests.\n\n3.  **Update GPIO Integration Tests:** Modify the relevant GPIO integration test files (e.g., `internal/workflow/gpio_workflow_test.go`).\n    - In the test setup function (e.g., `TestMain` or a per-test setup), start the mock server: `mockAgent := testutil.NewMockPiAgentServer()`.\n    - Ensure the server is closed after the test runs: `defer mockAgent.Close()`.\n    - Instantiate the Pi Agent client using the mock server's dynamic URL: `client := piagent.NewClient(mockAgent.URL)`.\n    - Run the test assertions against this client, which now communicates with the fast, in-memory mock server.",
+        "testStrategy": "1.  Before implementing the changes, run the integration test suite using a command like `go test -v ./...` or a specific `make` target. Observe and confirm that the GPIO-related tests fail with a timeout error after approximately 60 seconds.\n2.  Apply the changes as described in the implementation details: create the mock server in `pkg/testutil/testutil.go` and refactor the integration tests to use it.\n3.  Re-run the same test command.\n4.  Verify that the previously failing GPIO tests now pass quickly and consistently.\n5.  Examine the test logs to ensure there are no log messages indicating connection attempts to `192.168.1.100:9091`.",
+        "status": "done",
+        "dependencies": [
+          57
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 59,
+        "title": "Isolate Database State in Integration Tests to Prevent Data Conflicts",
+        "description": "Refactor integration test setup to ensure each test runs against a clean, isolated database, resolving 'UNIQUE constraint failed' errors by preventing state leakage between test cases.",
+        "details": "Codebase analysis reveals that integration tests are sharing a database instance without proper cleanup, causing data from one test to interfere with subsequent tests. This task will introduce a robust cleanup mechanism in the test utility helpers to ensure test isolation.\n\n1.  **Modify the Test Database Helper:** Open `pkg/testutil/testutil.go`. The current `NewTestDB` function returns only a database connection. Modify its signature to also return a cleanup function.\n    *   **Old Signature:** `func NewTestDB(t *testing.T) *db.DB`\n    *   **New Signature:** `func NewTestDB(t *testing.T) (*db.DB, func())`\n\n2.  **Implement the Cleanup Logic:** Inside the modified `NewTestDB` function, define the returned cleanup function. This function will be responsible for deleting all data from the tables to reset the state. It should execute `DELETE FROM` statements for all relevant tables (e.g., `clusters`, `nodes`).\n    ```go\n    // Example cleanup function implementation\n    cleanup := func() {\n        _, err := db.Exec(\"DELETE FROM clusters\")\n        if err != nil {\n            t.Fatalf(\"failed to clean up clusters table: %v\", err)\n        }\n        _, err = db.Exec(\"DELETE FROM nodes\")\n        if err != nil {\n            t.Fatalf(\"failed to clean up nodes table: %v\", err)\n        }\n        // ... add DELETE statements for other tables ...\n        db.Close()\n    }\n    return db, cleanup\n    ```\n\n3.  **Refactor Integration Tests:** Update all integration tests that use `NewTestDB` to adopt the new pattern. Use a `defer` statement to guarantee the cleanup function is called at the end of each test, even if the test panics.\n    ```go\n    // Example of updated test structure\n    func TestClusterCreation(t *testing.T) {\n        db, cleanup := testutil.NewTestDB(t)\n        defer cleanup()\n\n        // ... rest of the test logic ...\n    }\n    ```\nThis approach ensures that every test starts with a clean slate, preventing data conflicts and making the test suite more reliable and deterministic.",
+        "testStrategy": "1.  Before making any changes, run the integration test suite (e.g., `go test -v ./...`) and verify that multiple tests fail with the `UNIQUE constraint failed: clusters.id` error.\n2.  Apply the changes to `pkg/testutil/testutil.go` to make `NewTestDB` return a cleanup function.\n3.  Select one of the failing test files and refactor all its test cases to use the `defer cleanup()` pattern.\n4.  Run the tests within that specific file and confirm that they now pass consistently.\n5.  Proceed to refactor all remaining integration tests that interact with the database.\n6.  Run the entire test suite again and confirm that all tests pass and the 'UNIQUE constraint failed' errors are completely resolved.",
+        "status": "done",
+        "dependencies": [
+          57
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 60,
+        "title": "Implement Missing Field Validation and Method Not Allowed Error Handling in API",
+        "description": "Correct API behavior for invalid requests by implementing proper validation for required fields and ensuring endpoints return a 405 Method Not Allowed error for unsupported HTTP methods. This will fix failing integration tests.",
+        "details": "Codebase analysis reveals that API handlers, likely within a `pkg/api/` directory, are not validating incoming request bodies for required fields, leading to unexpected server errors instead of clear client errors. Additionally, the HTTP router is not correctly configured to reject unsupported methods.\n\n1.  **Standardize JSON Error Responses:** Create a reusable error response utility. In a new or existing utility package (e.g., `pkg/httputil/`), define a standard error struct and a helper function.\n    ```go\n    // In pkg/httputil/json.go\n    type APIError struct {\n        Error string `json:\"error\"`\n    }\n\n    func RespondWithError(w http.ResponseWriter, code int, message string) {\n        w.Header().Set(\"Content-Type\", \"application/json; charset=utf-8\")\n        w.WriteHeader(code)\n        json.NewEncoder(w).Encode(APIError{Error: message})\n    }\n    ```\n\n2.  **Implement Request Body Validation:** Refactor the API handlers for creating resources (e.g., `CreateClusterHandler`, `CreateNodeHandler`). After decoding the request body, add explicit checks for required fields. If validation fails, use the new helper to return a `400 Bad Request`.\n    ```go\n    // Example in a handler like CreateClusterHandler\n    var req CreateClusterRequest\n    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {\n        httputil.RespondWithError(w, http.StatusBadRequest, \"Invalid request payload\")\n        return\n    }\n\n    if req.Name == \"\" {\n        httputil.RespondWithError(w, http.StatusBadRequest, \"Field 'name' is required\")\n        return\n    }\n    // ... rest of the handler logic\n    ```\n\n3.  **Fix Method Not Allowed Handling:** Investigate the router setup in the main application entry point (e.g., `cmd/server/main.go`). Ensure the router's default `MethodNotAllowedHandler` is enabled or configured. If a custom catch-all route is overriding it, remove it or adjust it to correctly delegate method handling.\n\n4.  **Update Integration Tests:** Modify the relevant integration test files (e.g., `pkg/api/handlers_integration_test.go`). Add specific test cases that intentionally send invalid data to verify the new error handling.\n    *   Add a test case that sends a POST request with a missing `name` field and asserts a `400 Bad Request` status and the correct JSON error message.\n    *   Add a test case that sends a GET request to a POST-only endpoint (like `/api/clusters`) and asserts a `405 Method Not Allowed` status.",
+        "testStrategy": "1.  Run the integration test suite before making changes to confirm the existing failures. Note the incorrect status codes (e.g., 200 OK or 500 Internal Server Error) being returned for invalid requests.\n2.  **Validation Test:** Create a new test function, `TestCreateCluster_MissingName`, in the relevant integration test file. This test should perform a POST to the cluster creation endpoint with a JSON body lacking the `name` field (e.g., `{}`). Assert that the HTTP response code is `http.StatusBadRequest` (400). Further, decode the JSON response body and assert that the `error` field equals `\"Field 'name' is required\"`.\n3.  **Method Not Allowed Test:** Create a new test function, `TestCreateCluster_MethodNotAllowed`. This test should perform a GET request to the same cluster creation endpoint. Assert that the HTTP response code is `http.StatusMethodNotAllowed` (405).\n4.  **Regression Test:** Re-run the entire integration test suite, including the tests for successful resource creation, to ensure that the changes have not broken existing valid functionality.",
+        "status": "review",
+        "dependencies": [
+          57,
+          58,
+          59
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 61,
+        "title": "Implement GPIO Pin Safelisting and Correct Rate Limiting",
+        "description": "Fix security vulnerabilities by creating a safelist of user-configurable GPIO pins to prevent access to critical system pins and by correctly implementing and applying API rate limiting to GPIO endpoints.",
+        "details": "Codebase analysis indicates security tests are failing due to two issues: unrestricted access to all GPIO pins and an ineffective API rate limiter. This task will introduce a pin safelist and reconfigure the rate-limiting middleware.\n\n1.  **Implement GPIO Pin Safelisting:**\n    *   In a configuration file (e.g., `config/agent.yaml`) or via environment variables, define a list of GPIO pins that are safe for remote control. Example: `SAFE_GPIO_PINS=17,27,22`.\n    *   In the `internal/gpio` package, create a new function `IsPinSafe(pin int) bool` that checks if a given pin number is present in the configured safelist.\n    *   In the API handler responsible for GPIO operations (likely in `pkg/api/gpio_handler.go`), call `IsPinSafe` for every incoming request. \n    *   If the requested pin is not in the safelist, the handler must immediately return an `HTTP 403 Forbidden` error with a descriptive JSON message like `{\"error\": \"Access to this GPIO pin is restricted\"}`.\n\n2.  **Correct Rate Limiting Middleware:**\n    *   Locate the rate-limiting middleware, likely in `pkg/middleware/ratelimit.go`. The current configuration is too permissive.\n    *   Adjust the limiter to a more conservative value suitable for hardware interaction, such as 10 requests per second with a burst allowance of 20. This prevents rapid toggling that could cause system instability or damage hardware.\n    *   In the main application setup (`cmd/agent/main.go`), ensure this middleware is specifically and correctly applied to the router group handling GPIO endpoints (e.g., `/api/v1/gpio/...`). If it's currently applied globally with a loose configuration, create a stricter, separate middleware instance just for these sensitive routes.",
+        "testStrategy": "1.  **Confirm Existing Failures:** Run the security test suite before making changes and verify that tests for restricted pin access and rate limiting fail as expected.\n2.  **Pin Safety Tests:**\n    *   Create a new integration test case that attempts to set the state of a non-safelisted pin (e.g., a pin used for I2C like GPIO3). Assert that the API returns an `HTTP 403 Forbidden` status code.\n    *   Create another test case that attempts to set the state of a pin that is on the safelist. Assert that the API returns an `HTTP 200 OK` status.\n3.  **Rate Limiting Tests:**\n    *   Write a new integration test that sends a burst of requests (e.g., 30 requests in a tight loop) to a valid, safelisted GPIO endpoint.\n    *   Assert that the first ~20 requests receive an `HTTP 200 OK` response and that subsequent requests receive an `HTTP 429 Too Many Requests` response.\n4.  **Final Verification:** After implementation, re-run the entire security and integration test suites to confirm that the original failures are resolved and no new regressions have been introduced.",
+        "status": "review",
+        "dependencies": [
+          57,
+          58,
+          59
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 62,
+        "title": "Fix 404 Error in Cluster Creation API Endpoint",
+        "description": "Correct the cluster creation API endpoint which is incorrectly returning a 404 Not Found error in integration tests. This task involves properly registering the API route and implementing the handler to return a 201 Created status on success.",
+        "details": "Codebase analysis of related tasks (e.g., #60) suggests that while handlers for other resources exist, the cluster creation endpoint is either not registered in the API router or its handler is not implemented. The integration tests are correctly attempting to call a `POST` endpoint, but the router responds with 404 because no handler is mapped to the route.\n\n1.  **Locate API Router Configuration:** Open the primary API router setup file, likely located at `pkg/api/router.go` or within `cmd/controller/main.go`.\n\n2.  **Register the Cluster Creation Route:** Add a new route for creating clusters. Ensure it handles the `POST` method for a path like `/api/v1/clusters`. The route should be mapped to a new handler function.\n    ```go\n    // In pkg/api/router.go inside the router setup function\n    r.Post(\"/api/v1/clusters\", api.CreateClusterHandler)\n    ```\n\n3.  **Implement the `CreateClusterHandler`:** In a file such as `pkg/api/cluster_handler.go`, create the `CreateClusterHandler` function. This function must perform the following actions:\n    *   Decode the incoming JSON request body into a cluster model struct.\n    *   Perform validation on the decoded struct. Leverage the validation patterns established in Task #60 to ensure required fields like `name` are present. Return a `400 Bad Request` with a standardized error message if validation fails.\n    *   If validation passes, interact with the database layer to persist the new cluster record.\n    *   Upon successful insertion into the database, respond with a `201 Created` status code and serialize the newly created cluster object (including its new ID) back to the client as JSON.\n    *   Use the standardized JSON error response utility from Task #60 (e.g., in `pkg/httputil`) for all error conditions.",
+        "testStrategy": "1.  **Confirm Existing Failure:** Run the integration test suite using `go test -v ./...` and verify that the test for cluster creation (e.g., `TestCreateCluster_Success`) fails with an HTTP 404 status code.\n\n2.  **Implement the Fix:** Apply the changes described in the implementation details to register the route and create the handler.\n\n3.  **Verify Success Case:** Re-run the `TestCreateCluster_Success` test. It should now pass, asserting a `201 Created` status code. The test should also parse the JSON response and confirm the returned cluster object contains the correct name and a non-zero ID.\n\n4.  **Add Validation Test Case:** Following the pattern from Task #60, add a new test case, `TestCreateCluster_MissingName`, in the same test file. This test should send a `POST` request with a JSON body missing the `name` field and assert that the server responds with a `400 Bad Request` status code and a descriptive error message.\n\n5.  **Verify Database State:** In the success test case, after receiving the 201 response, use the test database connection (provided by the test setup from Task #57 and #59) to query the `clusters` table directly and confirm that the new record was successfully inserted.",
+        "status": "done",
+        "dependencies": [
+          57,
+          59,
+          60
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 63,
+        "title": "Implement Per-Test Database Cleanup to Resolve UNIQUE Constraint Failures",
+        "description": "Refactor the integration test database helper to provide an automatic cleanup mechanism for each test case, ensuring a clean database state and resolving persistent 'UNIQUE constraint failed' errors.",
+        "details": "Based on the analysis of Task #59, the root cause of 'UNIQUE constraint failed: clusters.id' errors is state leakage between integration tests. This task will implement the solution proposed in Task #59 by modifying the test database helper to return a cleanup function that is registered to run after each test.\n\n1.  **Modify `NewTestDB` Signature in `pkg/testutil/testutil.go`**:\n    *   Change the function signature to accept the test's `*testing.T` object and return both a database connection and a cleanup function.\n    *   **Before:** `func NewTestDB() (*gorm.DB, error)`\n    *   **After:** `func NewTestDB(t *testing.T) *gorm.DB` (The cleanup will be handled internally using `t.Cleanup`)\n\n2.  **Implement Cleanup Logic inside `NewTestDB`**:\n    *   The function should create a temporary, file-based SQLite database with a unique name for each test run (e.g., using the test name or a random string).\n    *   Use the `t.Cleanup()` function, available since Go 1.14, to register a deferred function that will execute automatically when the test completes.\n    *   This cleanup function should close the database connection and, crucially, delete the temporary database file from the filesystem (e.g., using `os.Remove(dbPath)`).\n\n    **Example Implementation in `pkg/testutil/testutil.go`:**\n    ```go\n    import (\n        \"fmt\"\n        \"os\"\n        \"testing\"\n        \"gorm.io/driver/sqlite\"\n        \"gorm.io/gorm\"\n        // ... other imports\n    )\n\n    func NewTestDB(t *testing.T) *gorm.DB {\n        // Create a unique temp file for the DB\n        f, err := os.CreateTemp(\"\", fmt.Sprintf(\"testdb_%s_*.db\", t.Name()))\n        if err != nil {\n            t.Fatalf(\"failed to create temp file for test db: %v\", err)\n        }\n        dbPath := f.Name()\n        f.Close() // Close the file handle immediately\n\n        // Connect to the new database file\n        db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})\n        if err != nil {\n            t.Fatalf(\"failed to connect to test database: %v\", err)\n        }\n\n        // Register the cleanup function to run when the test finishes\n        t.Cleanup(func() {\n            sqlDB, err := db.DB()\n            if err == nil {\n                sqlDB.Close()\n            }\n            os.Remove(dbPath) // Delete the database file\n        })\n\n        // Run migrations\n        // err = db.AutoMigrate(&models.Cluster{}, ...)\n        // if err != nil { ... }\n\n        return db\n    }\n    ```\n\n3.  **Refactor All Integration Tests**:\n    *   Search the codebase for all usages of the old `NewTestDB()`.\n    *   Update each test to call the new `NewTestDB(t)` and remove any manual cleanup logic that may exist.\n    *   The call will now look like: `db := testutil.NewTestDB(t)`.",
+        "testStrategy": "1.  **Verify Existing Failure**: Before making any changes, run the full integration test suite with `go test -v ./...`. Confirm that multiple tests fail with the 'UNIQUE constraint failed: clusters.id' error.\n2.  **Implement Helper Changes**: Apply the changes to `pkg/testutil/testutil.go` as described in the details.\n3.  **Incremental Refactoring**: Select a single test file that is currently failing (e.g., a test file for the cluster API). Update all tests within that file to use the new `NewTestDB(t)` helper.\n4.  **Verify Incremental Fix**: Run the tests for only the modified file. Confirm that all tests within it now pass and that running it multiple times does not re-introduce the error.\n5.  **Complete Refactoring**: Update all remaining integration tests across the codebase that use the database helper.\n6.  **Final Verification**: Run the entire test suite (`go test -v ./...`) again. Confirm that all tests pass and the UNIQUE constraint errors are completely eliminated.",
+        "status": "done",
+        "dependencies": [
+          57,
+          59
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 64,
+        "title": "Correct HTTP Router Configuration for 405 and 400 Error Responses",
+        "description": "Refactor the API's HTTP router to correctly return 405 Method Not Allowed for unsupported request methods and ensure handlers implement request body validation to return 400 Bad Request for invalid payloads, fixing integration test failures.",
+        "details": "Codebase analysis indicates that integration tests are failing with 404 Not Found errors for scenarios that should produce 405 Method Not Allowed or 400 Bad Request. This is caused by a misconfigured HTTP router and a lack of input validation in API handlers.\n\n1. **Configure Router for 405 Method Not Allowed:**\n   - Open the router setup file, likely `pkg/api/router.go`.\n   - The current router (e.g., `chi`, `gorilla/mux`) is not configured to differentiate between a non-existent route and an unsupported method on an existing route.\n   - Add the appropriate middleware to handle this. If using `chi`, this can be accomplished by adding `middleware.MethodNotAllowed` to the middleware stack: `r.Use(middleware.MethodNotAllowed)`.\n\n2. **Implement Request Body Validation for 400 Bad Request:**\n   - This follows the pattern outlined in Task #60. Introduce a validation library like `go-playground/validator` to the project dependencies.\n   - In a utility package like `pkg/httputil`, create a helper function to decode and validate JSON request bodies. This function should accept a request, a destination struct pointer, and return a formatted error if validation fails.\n   - Update the API model structs (e.g., `ClusterCreateRequest` in `pkg/models/cluster.go`) with validation tags. For example: `Name string `json:\"name\" validate:\"required\"``. \n\n3. **Refactor API Handlers:**\n   - Modify the API handlers, starting with the cluster creation handler (`createClusterHandler`), to use the new validation helper.\n   - The handler should first call the validation helper. If an error is returned, the handler should immediately respond with a 400 Bad Request status and a JSON body detailing the validation errors.",
+        "testStrategy": "1. **Verify Existing Failure:** Run the integration test suite using `go test -v ./...` and confirm that tests for invalid methods and missing fields fail with a 404 Not Found status code.\n\n2. **Test for 405 Method Not Allowed:**\n   - Create a new test case that sends an unsupported method (e.g., `PUT`) to an existing endpoint like `/api/v1/clusters`.\n   - Assert that the HTTP response status code is exactly `405 Method Not Allowed`.\n\n3. **Test for 400 Bad Request:**\n   - Create a new test case that sends a `POST` request to `/api/v1/clusters` with a required field missing from the JSON payload (e.g., `{}`).\n   - Assert that the HTTP response status code is `400 Bad Request`.\n   - Assert that the response body is a JSON object containing a descriptive error message about the missing field.\n\n4. **Regression Test:**\n   - Re-run the existing success-path tests (e.g., creating a cluster with a valid payload) to ensure they still pass with a 201 Created status.",
+        "status": "done",
+        "dependencies": [
+          57,
+          60,
+          62
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 65,
+        "title": "Document Missing Features and Intentional Test Failures",
+        "description": "Create a new markdown file to document missing features highlighted by failing tests, including the need for proper 405 Method Not Allowed handling and intentional security test failures.",
+        "details": "Create a new documentation file at `docs/technical_debt.md` to provide clarity for developers on the current state of the test suite and known architectural gaps.\n\n1.  **HTTP 405 Method Not Allowed:** Document that, as addressed in Task #64, the API router previously returned incorrect 404 errors for unsupported methods on existing routes. Explain that the work in Task #60 is to create a robust middleware solution for this. This section should serve as an architectural note on API compliance.\n\n2.  **Intentional Security Test Failures:** Add a prominent section explaining that certain security tests are expected to fail until their corresponding features are implemented. This is critical to prevent developers from 'fixing' the tests without addressing the underlying vulnerability. Specifically reference the failing tests related to Task #61 (GPIO Pin Safelisting and API Rate Limiting). State clearly that authentication and authorization features are not yet implemented, and any related tests will fail by design.\n\n3.  **Other Feature-Gaps:** Create a section to list other known test failures that are due to missing features rather than bugs. This can include incomplete request body validation (related to Task #60) and other items discovered during development that are not yet prioritized for implementation.",
+        "testStrategy": "1. Review the newly created `docs/technical_debt.md` file. 2. Verify that the documentation accurately describes the status of features and test failures as detailed in Tasks #60, #61, and #64. 3. Ensure the explanations are clear and provide sufficient context for a new developer to understand why certain tests are failing and what features are pending.",
         "status": "pending",
+        "dependencies": [
+          60,
+          61
+        ],
+        "priority": "low",
+        "subtasks": []
+      },
+      {
+        "id": 66,
+        "title": "Fix Integration Test NodeWorkflow",
+        "description": "Resolve persistent 404 Not Found errors in the node API integration tests for GET, PUT, and DELETE operations. This task involves correcting the API route registration or data persistence logic to ensure a node's full lifecycle can be tested successfully.",
+        "details": "Codebase analysis of related tasks (#62, #64) indicates a pattern of router misconfiguration or incomplete handler implementation. The NodeWorkflow integration test fails because after a node is successfully created (returning a 201 Created), subsequent requests to retrieve, update, or delete that same node fail with a 404 Not Found. This strongly suggests that the routes for these specific operations are not correctly registered in the API router.\n\n1.  **Examine API Router Configuration:** Open `pkg/api/router.go`. Locate the section where API routes are defined. Based on the fix for clusters in Task #62, there should be a routing group for nodes, likely using `r.Route(\"/api/v1/nodes\", ...)`. Verify that handlers for `GET /{nodeID}`, `PUT /{nodeID}`, and `DELETE /{nodeID}` are registered. It is highly probable they are missing.\n\n2.  **Register Missing Node Routes:** Add the necessary route definitions to the router, mapping the HTTP methods and path patterns to the corresponding handler functions (e.g., `h.GetNode`, `h.UpdateNode`, `h.DeleteNode`). Ensure the path parameter (e.g., `{nodeID}`) is consistent with what the handlers expect.\n\n3.  **Verify Handler Implementation:** Open the node handler file, likely `pkg/api/handlers/node_handler.go`. Confirm that the `CreateNode` handler is correctly persisting the new node to the database via the store layer. Then, check that the `GetNode`, `UpdateNode`, and `DeleteNode` handlers correctly extract the `nodeID` from the URL path parameter and use it in their database queries.\n\n4.  **Confirm Data Persistence:** As a secondary check, ensure the `nodeStore` implementation (e.g., in `pkg/store/node_store.go`) has correctly implemented the `FindByID`, `Update`, and `Delete` methods and that they are being called by the handlers.",
+        "testStrategy": "1.  **Reproduce the Failure:** Before making any changes, run the integration test suite, specifically targeting the node workflow test (e.g., `go test -v -run TestNodeWorkflow ./...`). Confirm that the test fails with 404 Not Found errors on the GET, PUT, and DELETE steps after the initial POST succeeds.\n\n2.  **Apply the Fix:** Implement the changes described in the details, primarily by adding the missing routes to `pkg/api/router.go`.\n\n3.  **Verify the Fix:** Re-run the `TestNodeWorkflow` integration test. The test should now pass, with all HTTP requests in the workflow returning the expected status codes (e.g., POST -> 201, GET -> 200, PUT -> 200, DELETE -> 204).\n\n4.  **Run Full Test Suite:** Execute the entire integration test suite (`go test -v ./...`) to ensure that the routing changes have not caused any regressions in other API endpoints.",
+        "status": "cancelled",
+        "dependencies": [
+          57,
+          62,
+          63,
+          64
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Reproduce and Analyze NodeWorkflow Test Failure",
+            "description": "Run the `TestNodeWorkflow` integration test located in the `test/integration/` directory. Confirm that the test fails with 404 Not Found errors for GET, PUT, and DELETE requests made to `/api/v1/nodes/{nodeID}` after a successful POST. This will establish a clear baseline for the fix.",
+            "dependencies": [],
+            "details": "Use the command `go test -v -run TestNodeWorkflow ./...` to execute the specific test. Observe the test output and logs to verify the HTTP status codes for each step of the node lifecycle.",
+            "status": "done",
+            "testStrategy": "The execution of this subtask is the test itself. The goal is to have a reproducible failure before implementing any changes."
+          },
+          {
+            "id": 2,
+            "title": "Register GET /{nodeID} Route in API Router",
+            "description": "In `pkg/api/router.go`, locate the `r.Route(\"/api/v1/nodes\", ...)` block. Add the route definition to handle retrieving a single node by its ID. The new line should map the GET method with a path parameter to the `h.GetNode` handler.",
+            "dependencies": [
+              "66.1"
+            ],
+            "details": "Based on the existing pattern for clusters and the `chi` router syntax, add the line `r.Get(\"/{nodeID}\", h.GetNode)` inside the nodes routing group. The `nodeID` parameter name must match what the handler expects.",
+            "status": "pending",
+            "testStrategy": "After adding the route, re-run the `TestNodeWorkflow` test. The GET step should now pass with a 200 OK status, while the PUT and DELETE steps should still fail with 404."
+          },
+          {
+            "id": 3,
+            "title": "Register PUT /{nodeID} Route in API Router",
+            "description": "In `pkg/api/router.go`, within the same `/api/v1/nodes` routing group, add the route definition for updating a single node. This involves mapping the PUT method with the `/{nodeID}` path to the `h.UpdateNode` handler.",
+            "dependencies": [
+              "66.2"
+            ],
+            "details": "Add the line `r.Put(\"/{nodeID}\", h.UpdateNode)` immediately after the `GET /{nodeID}` route definition within the nodes routing group in `pkg/api/router.go`.",
+            "status": "pending",
+            "testStrategy": "Re-run the `TestNodeWorkflow` test. The GET and PUT steps should now pass successfully. The DELETE step will likely still fail with a 404."
+          },
+          {
+            "id": 4,
+            "title": "Register DELETE /{nodeID} Route in API Router",
+            "description": "In `pkg/api/router.go`, complete the node lifecycle routes by adding the definition for deleting a single node. This requires mapping the DELETE method with the `/{nodeID}` path to the `h.DeleteNode` handler.",
+            "dependencies": [
+              "66.3"
+            ],
+            "details": "Add the line `r.Delete(\"/{nodeID}\", h.DeleteNode)` within the nodes routing group in `pkg/api/router.go`, completing the set of required routes for the integration test.",
+            "status": "pending",
+            "testStrategy": "At this point, running the `TestNodeWorkflow` test should result in all steps passing, as all required API routes are now registered."
+          },
+          {
+            "id": 5,
+            "title": "Verify Handler Logic and Confirm Full Test Pass",
+            "description": "Review the `GetNode`, `UpdateNode`, and `DeleteNode` functions in `pkg/api/handlers/node_handler.go`. Confirm they correctly extract the `nodeID` from the request's URL path using `chi.URLParam(r, \"nodeID\")`. After this final verification, run the entire integration test suite to ensure the fix is complete and has not introduced regressions.",
+            "dependencies": [
+              "66.4"
+            ],
+            "details": "The key is to ensure the path parameter name used in `router.go` (e.g., `\"{nodeID}\"`) exactly matches the key used in the `chi.URLParam` call within the handlers. Once confirmed, run `go test -v ./...` to execute all tests.",
+            "status": "pending",
+            "testStrategy": "The final test is to run the full integration test suite. A successful run with no failures confirms that the `NodeWorkflow` is fixed and no other tests were broken by the changes."
+          }
+        ]
+      },
+      {
+        "id": 67,
+        "title": "Secure DELETE Operations with Authentication Middleware",
+        "description": "Implement and apply an authentication middleware to all DELETE API endpoints to prevent unauthorized resource deletion. This will fix the failing security integration test by ensuring unauthenticated requests are rejected with a 401 Unauthorized status.",
+        "details": "Codebase analysis shows that a security integration test is failing because DELETE endpoints are not protected. The test expects a 401 Unauthorized or 404 Not Found but receives a 204 No Content, indicating the operation succeeded without authentication.\n\n1. **Identify or Create Authentication Middleware:** Examine the `internal/api/middleware` package, which is the designated location for such handlers (as seen in Task #38). If a suitable authentication middleware does not exist, create one. This middleware should inspect the request for authentication credentials (e.g., a token in the `Authorization` header). If credentials are not present or are invalid, it must write an `http.StatusUnauthorized` response and immediately halt further request processing.\n\n2. **Apply Middleware to DELETE Routes:** Open the main router configuration file, identified in Task #64 as likely being `pkg/api/router.go`. Locate the route definitions for all DELETE operations.\n\n3. **Use Router Groups for Protection:** To ensure consistent application, use the router's group functionality to apply the authentication middleware to all routes that use the DELETE method. For example, if using the `chi` router, the implementation might look like this:\n   ```go\n   // In pkg/api/router.go\n   r.Group(func(r chi.Router) {\n       r.Use(middleware.RequireAuth) // Apply the auth middleware\n       r.Delete(\"/nodes/{nodeID}\", nodeHandler.Delete)\n       r.Delete(\"/clusters/{clusterID}\", clusterHandler.Delete)\n       // ... other DELETE routes\n   })\n   ```\nThis approach is cleaner than applying the middleware to each route individually and ensures future DELETE endpoints are protected by default if added to this group.",
+        "testStrategy": "1. **Reproduce the Failure:** Before making any changes, run the specific security integration test that targets unauthenticated DELETE operations. Confirm that it fails because the API returns a 204 status code instead of the expected 401 or 404.\n\n2. **Verify Unauthorized Access is Blocked:** After applying the middleware, re-run the same security test. It should now pass, with the API correctly returning a 401 Unauthorized status code.\n\n3. **Verify Authorized Access Succeeds:** Create a new integration test case for a DELETE endpoint. This test must first perform authentication to obtain valid credentials, then include those credentials in the DELETE request. Verify that the request succeeds with a 204 No Content status and that the corresponding resource is confirmed to be deleted from the test database.\n\n4. **Regression Test:** Run the full integration test suite (e.g., `go test -v ./...`) to ensure that applying this middleware has not negatively impacted other endpoints or tests, particularly the node workflow tests from Task #66.",
+        "status": "review",
+        "dependencies": [
+          66
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 68,
+        "title": "Implement Strict Rate Limiting on GPIO Endpoints",
+        "description": "Implement and apply a strict, configurable rate-limiting middleware specifically to all GPIO API endpoints to mitigate potential Denial of Service (DoS) attacks and fix failing security tests.",
+        "details": "The current security test suite indicates that GPIO endpoints lack effective rate limiting, creating a vulnerability for Denial of Service attacks through rapid requests. This task involves creating or configuring a dedicated rate-limiting middleware for these sensitive endpoints.\n\n1.  **Analyze and Configure Rate Limiting Middleware:**\n    *   Locate the existing middleware package at `internal/api/middleware`. It is likely a generic rate limiter is already present but not correctly applied.\n    *   Utilize a standard library like `golang.org/x/time/rate` to implement the limiter logic. Create a new middleware instance specifically for GPIO operations.\n    *   The middleware must be configurable via environment variables to allow for different settings in development vs. production (e.g., `GPIO_RATE_LIMIT_RPS=5`, `GPIO_RATE_LIMIT_BURST=10`).\n\n2.  **Apply Middleware to GPIO Routes:**\n    *   In the API router configuration file (identified as `pkg/api/router.go` in Task #64), identify the route group for GPIO endpoints (e.g., `/api/v1/gpio`).\n    *   Apply the newly configured GPIO-specific rate-limiting middleware exclusively to this route group. This ensures that only GPIO operations are subject to this strict limit, leaving other API endpoints unaffected.\n    *   The middleware must return an `HTTP 429 Too Many Requests` status code with an appropriate error message once the defined rate is exceeded.",
+        "testStrategy": "1.  **Reproduce Failure:** Run the existing security test suite and confirm that the test case for GPIO rate limiting fails as expected before any changes are made.\n2.  **Create Specific Integration Test:**\n    *   Develop a new integration test that targets a specific GPIO endpoint (e.g., `POST /api/v1/gpio/{pin}/state`).\n    *   The test should send requests in a tight loop, exceeding the configured burst and rate limit (e.g., send 15 requests if the burst limit is 10).\n3.  **Verify Rate Limiting Logic:**\n    *   Assert that the first N requests (where N is the burst limit) receive a `200 OK` or similar success status.\n    *   Assert that all subsequent requests within the rate window receive an `HTTP 429 Too Many Requests` status code.\n4.  **Confirm No Regressions:** After implementation, run the entire integration and security test suites to ensure that the new middleware has not negatively impacted other API endpoints or introduced new issues.",
+        "status": "review",
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 56,
-        "title": "Enhance Web UI with Improved User Experience Features",
-        "description": "Implement several UI/UX improvements including loading states for data fetching, cluster/node management interfaces, a real-time system status indicator, a dark mode theme, and breadcrumb navigation.",
-        "details": "This task involves a comprehensive enhancement of the frontend application to improve usability and provide a more modern user experience. The implementation will be broken down into several key areas:\n\n1.  **Loading States:** Modify the data-fetching logic in `src/pages/Clusters/Clusters.jsx` and `src/pages/Nodes/Nodes.jsx`. While data is being fetched, display a loading indicator (e.g., a spinner or a skeleton screen) instead of a blank or empty page. Create a reusable `<LoadingSpinner />` component for this purpose.\n\n2.  **Cluster & Node Management UI:** On the `Clusters` and `Nodes` pages, add UI elements (e.g., 'Add New' buttons, and 'Edit'/'Delete' icons for each item in the list) to allow for resource management. Clicking these should open modals with forms for creating or editing resources. This will require creating new components for the modals and forms, and integrating them with the existing page components.\n\n3.  **Visual Feedback for System Status:** Create a new component, `<StatusIndicator />`, and place it in a persistent location like the main header or footer. This component will connect to the WebSocket service and display the current connection status (e.g., a green dot for 'Connected', red for 'Disconnected', yellow for 'Reconnecting'). This provides users with immediate feedback on the application's real-time data connection.\n\n4.  **Dark Mode Theme:** Implement a theme-switching capability. Use a React Context provider (`ThemeContext`) to manage the current theme (light/dark) across the application. Refactor existing CSS to use CSS variables for colors, allowing for easy theme switching. Add a toggle switch in the application's main navigation bar to allow users to select their preferred theme. The choice should be persisted in `localStorage`.\n\n5.  **Breadcrumb Navigation:** Develop a `<Breadcrumbs />` component that uses the `useLocation` hook from `react-router-dom` to dynamically generate a navigation trail (e.g., Home > Clusters > My-Cluster). This component should be added to the main application layout in `src/App.jsx` to appear on all relevant pages, providing users with better navigational context.",
-        "testStrategy": "1.  **Loading States:** Navigate to the `/clusters` and `/nodes` pages. Use browser developer tools to throttle the network connection. Verify that a loading indicator is displayed while the data is being fetched and disappears once the content is rendered.\n2.  **Management UI:** On the Clusters and Nodes pages, confirm that the 'Add', 'Edit', and 'Delete' controls are visible. Click the 'Add' button and verify a form modal appears. Test form submission (mocking the API call if necessary).\n3.  **Status Indicator:** Load the application and verify the status indicator shows a 'Connected' state. Stop the backend server and verify the indicator changes to 'Disconnected' or 'Reconnecting'. Restart the server and confirm it returns to 'Connected'.\n4.  **Dark Mode:** Locate the theme toggle switch in the UI. Click it to switch between light and dark modes. Navigate through all pages of the application to ensure all components, text, and backgrounds have correctly adapted to the selected theme. Refresh the page to confirm the theme choice persists.\n5.  **Breadcrumbs:** Navigate from the dashboard to a nested page (e.g., a specific node's detail page). Verify the breadcrumb trail updates correctly at each level of navigation. Click on a link in the breadcrumbs to ensure it navigates back to the correct parent page.",
-        "status": "pending",
-        "dependencies": [
-          53,
-          54,
-          55
-        ],
-        "priority": "low",
-        "subtasks": []
+        "id": 69,
+        "title": "Fix Integration Test for Unsupported HTTP Method Error Handling",
+        "description": "Resolve the failing integration test that checks for 405 Method Not Allowed responses. The current API router configuration is not correctly handling requests with unsupported HTTP methods on existing endpoints.",
+        "details": "Codebase analysis indicates that Task #64 was intended to solve this, but the corresponding integration test is still failing. This suggests the implementation was either incomplete or has been impacted by subsequent changes. The primary goal is to ensure that when a request is made to a valid API route with an unsupported HTTP method (e.g., a PUT request to a GET-only endpoint), the server responds with a 405 status code, not a 404.\n\n1. **Locate the Failing Test:** Identify the specific integration test case responsible for verifying the 405 Method Not Allowed behavior. This test will serve as the primary means of reproducing and validating the fix.\n2. **Examine Router Configuration:** Open the main router setup file, which is likely `pkg/api/router.go`. The project uses a Go-based router like `chi` or `gorilla/mux`.\n3. **Correct Router Handler:**\n   - If using the `chi` router, ensure that the `middleware.MethodNotAllowed` handler is correctly configured in the global middleware stack. It should be placed before any custom 404 handlers to function correctly.\n   - If using `gorilla/mux`, verify that the `Router.MethodNotAllowedHandler` property is assigned a custom handler that writes a 405 status code.\n4. **Investigate Middleware Order:** A common cause for this issue is another middleware (e.g., a generic not-found handler) intercepting the request before the router's built-in method validation can execute. Analyze the order in which middleware is applied in `pkg/api/router.go` and adjust if necessary.",
+        "testStrategy": "1. **Reproduce the Failure:** Run the specific integration test suite and confirm that the test for unsupported methods fails, likely receiving a 404 Not Found instead of the expected 405 Method Not Allowed.\n2. **Implement the Fix:** Apply the necessary corrections to the router configuration in `pkg/api/router.go`.\n3. **Verify the Fix:** Re-run the specific failing test and confirm that it now passes, asserting that a 405 status code is returned.\n4. **Conduct Regression Testing:** Run the full integration test suite (e.g., `go test -v ./...`) to ensure the change has not introduced any side effects. Specifically, verify that requests to genuinely non-existent routes still correctly return a 404 Not Found.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate and Isolate the Failing 405 MethodNotAllowed Test Case",
+            "description": "Identify the specific test function within `integration/api_test.go` that asserts a `405 Method Not Allowed` status code for an invalid HTTP method on a valid route. Isolate this test to confirm the failure.",
+            "dependencies": [],
+            "details": "Based on codebase analysis, the relevant test is likely named `TestAPIRoot/Method_Not_Allowed` or similar within `integration/api_test.go`. Use a command like `go test -v -run TestAPIRoot/Method_Not_Allowed ./integration` to run only this test. Confirm that it fails because it receives a 404 status code instead of the expected 405.",
+            "status": "done",
+            "testStrategy": "Run the specific test case using `go test -v -run ...` and observe the failure output, confirming the incorrect status code."
+          },
+          {
+            "id": 2,
+            "title": "Analyze Middleware Configuration in `pkg/api/router.go`",
+            "description": "Examine the `NewRouter` function in `pkg/api/router.go`. Document the current middleware stack and confirm that the `chi/middleware.MethodNotAllowed` handler is missing.",
+            "dependencies": [
+              "69.1"
+            ],
+            "details": "The file `pkg/api/router.go` initializes the `chi` router. The sequence of `r.Use(...)` calls defines the middleware chain. The analysis confirms that `middleware.MethodNotAllowed` is not present, which is the root cause of the router falling back to a 404 response for this scenario.",
+            "status": "done",
+            "testStrategy": "Visually inspect the `NewRouter` function in `pkg/api/router.go` and list the currently applied middleware. Confirm the absence of `middleware.MethodNotAllowed`."
+          },
+          {
+            "id": 3,
+            "title": "Add `MethodNotAllowed` Middleware to the Chi Router",
+            "description": "In `pkg/api/router.go`, add the `middleware.MethodNotAllowed` handler to the `chi` router's middleware stack.",
+            "dependencies": [
+              "69.2"
+            ],
+            "details": "Add the line `r.Use(middleware.MethodNotAllowed)` to the middleware chain within the `NewRouter` function in `pkg/api/router.go`. This middleware should be placed after general-purpose middleware like logging and recovery, but before any custom `NotFound` handlers to ensure it correctly intercepts requests with unsupported methods for existing routes.",
+            "status": "done",
+            "testStrategy": "After adding the line of code, compile the project to ensure there are no build errors."
+          },
+          {
+            "id": 4,
+            "title": "Verify the Fix by Rerunning the Specific Test",
+            "description": "After adding the middleware, rerun the specific integration test case identified in the first subtask to confirm that it now passes.",
+            "dependencies": [
+              "69.3"
+            ],
+            "details": "Execute the same `go test -v -run TestAPIRoot/Method_Not_Allowed ./integration` command from subtask 1. The test should now receive the expected `http.StatusMethodNotAllowed` (405) status code and pass successfully.",
+            "status": "done",
+            "testStrategy": "Run the targeted test and verify that its output now indicates a PASS status."
+          },
+          {
+            "id": 5,
+            "title": "Run Full Integration Test Suite to Ensure No Regressions",
+            "description": "Execute the entire integration test suite to ensure that adding the `MethodNotAllowed` middleware has not introduced any unintended side effects or broken other parts of the API's routing or error handling.",
+            "dependencies": [
+              "69.4"
+            ],
+            "details": "Run the full test suite using the project's standard command, such as `make test-integration` or `go test -v ./...`. All tests, including the newly fixed one, must pass to confirm the solution is robust and does not cause regressions.",
+            "status": "done",
+            "testStrategy": "Execute the complete test suite and ensure all tests pass without any new failures."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-09-01T23:14:24.287Z",
-      "updated": "2025-09-21T05:07:26.315Z",
+      "updated": "2025-09-29T22:03:54.291Z",
       "description": "Tasks for master context"
     }
   },

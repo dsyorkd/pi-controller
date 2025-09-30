@@ -46,11 +46,10 @@ func (h *ClusterHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"clusters": clusters,
-		"count":    len(clusters),
-		"total":    total,
-		"limit":    limit,
-		"offset":   offset,
+		"data":  clusters,
+		"total": total,
+		"limit": limit,
+		"offset": offset,
 	})
 }
 
@@ -72,7 +71,9 @@ func (h *ClusterHandler) Create(c *gin.Context) {
 	}
 
 	h.logger.WithField("cluster_id", cluster.ID).Info("Created new cluster")
-	c.JSON(http.StatusCreated, cluster)
+	c.JSON(http.StatusCreated, gin.H{
+		"data": cluster,
+	})
 }
 
 // Get returns a specific cluster by ID
@@ -92,7 +93,9 @@ func (h *ClusterHandler) Get(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, cluster)
+	c.JSON(http.StatusOK, gin.H{
+		"data": cluster,
+	})
 }
 
 // Update updates a cluster
@@ -122,7 +125,9 @@ func (h *ClusterHandler) Update(c *gin.Context) {
 	}
 
 	h.logger.WithField("cluster_id", cluster.ID).Info("Updated cluster")
-	c.JSON(http.StatusOK, cluster)
+	c.JSON(http.StatusOK, gin.H{
+		"data": cluster,
+	})
 }
 
 // Delete deletes a cluster
@@ -447,7 +452,7 @@ func (h *ClusterHandler) handleServiceError(c *gin.Context, err error, message s
 		return
 	}
 
-	if services.IsValidationFailed(err) {
+	if services.IsValidationFailed(err) || services.IsInvalidInput(err) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Validation Failed",
 			"message": err.Error(),

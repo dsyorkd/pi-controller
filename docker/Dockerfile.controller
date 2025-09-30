@@ -25,41 +25,16 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Configure cross-compilation and build the binary
-# SQLite requires CGO, so we need proper cross-compilation setup
-RUN set -eux; \
-    case "$TARGETARCH" in \
-        amd64) \
-            export CC=gcc; \
-            export CXX=g++; \
-            ;; \
-        arm64) \
-            apk add --no-cache gcc-aarch64-linux-musl; \
-            export CC=aarch64-linux-musl-gcc; \
-            export CXX=aarch64-linux-musl-g++; \
-            ;; \
-        arm) \
-            apk add --no-cache gcc-arm-linux-musleabihf; \
-            export CC=arm-linux-musleabihf-gcc; \
-            export CXX=arm-linux-musleabihf-g++; \
-            ;; \
-        *) \
-            echo "Unsupported architecture: $TARGETARCH"; \
-            exit 1; \
-            ;; \
-    esac; \
-    CGO_ENABLED=1 \
+# Build the binary (no CGO needed since using bbolt instead of SQLite)
+RUN CGO_ENABLED=0 \
     GOOS=$TARGETOS \
     GOARCH=$TARGETARCH \
-    CGO_CFLAGS="-DSQLITE_MAX_MMAP_SIZE=0" \
-    CGO_LDFLAGS="-lsqlite3" \
     go build \
-        -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE} -linkmode external -extldflags '-static'" \
-        -a -installsuffix cgo \
+        -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
         -o pi-controller ./cmd/pi-controller
 
 # Final stage
-FROM --platform=$TARGETPLATFORM alpine:3.22
+FROM alpine:3.22
 
 # Build arguments for final stage
 ARG TARGETPLATFORM

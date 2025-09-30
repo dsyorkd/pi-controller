@@ -11,6 +11,7 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/provisioner"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/validation"
 )
 
 // ClusterService is the service for managing clusters
@@ -47,9 +48,21 @@ func (s *ClusterService) Create(req CreateClusterRequest) (*models.Cluster, erro
 		return nil, errors.Wrapf(ErrInvalidInput, "name is required")
 	}
 
+	// Validate cluster name for malicious input
+	if err := validation.ValidateResourceName("name", req.Name, 255); err != nil {
+		return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+	}
+
+	// Validate description if provided
+	if req.Description != "" {
+		if err := validation.ValidateDescription("description", req.Description, 1000); err != nil {
+			return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+		}
+	}
+
 	// Check for duplicate name
 	existing, err := s.GetByName(req.Name)
-	if err != nil && err.Error() != "not found" {
+	if err != nil && !IsNotFound(err) {
 		return nil, err
 	}
 	if existing != nil {
@@ -86,9 +99,19 @@ func (s *ClusterService) Update(id uint, req UpdateClusterRequest) (*models.Clus
 	}
 
 	if req.Name != nil {
+		// Validate cluster name for malicious input
+		if err := validation.ValidateResourceName("name", *req.Name, 255); err != nil {
+			return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+		}
 		cluster.Name = *req.Name
 	}
 	if req.Description != nil {
+		// Validate description if provided
+		if *req.Description != "" {
+			if err := validation.ValidateDescription("description", *req.Description, 1000); err != nil {
+				return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+			}
+		}
 		cluster.Description = *req.Description
 	}
 	if req.Status != nil {
@@ -140,6 +163,9 @@ func (s *ClusterService) GetByID(id uint) (*models.Cluster, error) {
 	var cluster models.Cluster
 	err := s.store.DB().First(&cluster, id).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 	return &cluster, nil

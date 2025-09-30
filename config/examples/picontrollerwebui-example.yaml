@@ -1,0 +1,318 @@
+---
+# Example 1: Basic WebUI Deployment
+apiVersion: picontroller.io/v1
+kind: PiControllerWebUI
+metadata:
+  name: pi-controller-webui-basic
+  namespace: pi-controller-system
+  labels:
+    app.kubernetes.io/name: pi-controller-webui
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 2
+
+  image:
+    repository: "pi-controller/webui"
+    tag: "v1.0.0"
+    pullPolicy: "IfNotPresent"
+
+  backendServices:
+    api:
+      name: pi-controller-api
+      namespace: pi-controller-system
+      port: 8080
+      path: /api
+
+    grpc:
+      name: pi-controller-grpc
+      namespace: pi-controller-system
+      port: 9090
+      webEnabled: false
+
+    websocket:
+      name: pi-controller-websocket
+      namespace: pi-controller-system
+      port: 8081
+      path: /socket.io
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    hosts:
+      - host: "pi-controller.example.com"
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: pi-controller-webui-tls
+        hosts:
+          - "pi-controller.example.com"
+
+  auth:
+    enabled: true
+    sessionSecretRef:
+      name: pi-controller-webui-secrets
+      key: session-secret
+    jwtSecretRef:
+      name: pi-controller-webui-secrets
+      key: jwt-secret
+    sessionTimeout: "24h"
+
+  features:
+    gpioControl: true
+    clusterManagement: true
+    certificateManagement: true
+    realTimeMetrics: true
+    nodeDiscovery: true
+    advancedNetworking: false
+    experimental: false
+
+  branding:
+    title: "Pi Controller"
+    primaryColor: "#10b981"
+    theme: "dark"
+
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+---
+# Example 2: Production WebUI with HPA
+apiVersion: picontroller.io/v1
+kind: PiControllerWebUI
+metadata:
+  name: pi-controller-webui-production
+  namespace: pi-controller-system
+  labels:
+    app.kubernetes.io/name: pi-controller-webui
+    app.kubernetes.io/component: frontend
+    environment: production
+spec:
+  replicas: 3
+
+  image:
+    repository: "ghcr.io/myorg/pi-controller-webui"
+    tag: "v1.2.0"
+    pullPolicy: "IfNotPresent"
+    pullSecrets:
+      - "ghcr-credentials"
+
+  backendServices:
+    api:
+      name: pi-controller-api
+      namespace: pi-controller-system
+      port: 8080
+      path: /api
+
+    grpc:
+      name: pi-controller-grpc
+      namespace: pi-controller-system
+      port: 9090
+      webEnabled: true
+
+    websocket:
+      name: pi-controller-websocket
+      namespace: pi-controller-system
+      port: 8081
+      path: /socket.io
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+    hosts:
+      - host: "pi-controller.prod.example.com"
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: pi-controller-webui-prod-tls
+        hosts:
+          - "pi-controller.prod.example.com"
+
+  auth:
+    enabled: true
+    sessionSecretRef:
+      name: pi-controller-webui-secrets-prod
+      key: session-secret
+    jwtSecretRef:
+      name: pi-controller-webui-secrets-prod
+      key: jwt-secret
+    sessionTimeout: "12h"
+
+  features:
+    gpioControl: true
+    clusterManagement: true
+    certificateManagement: true
+    realTimeMetrics: true
+    nodeDiscovery: true
+    advancedNetworking: true
+    experimental: false
+
+  branding:
+    title: "Pi Controller - Production"
+    logoURL: "https://cdn.example.com/logo.png"
+    faviconURL: "https://cdn.example.com/favicon.ico"
+    primaryColor: "#10b981"
+    theme: "auto"
+
+  runtimeConfig:
+    enabled: true
+    configMapRef:
+      name: pi-controller-webui-runtime-config
+
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 75
+
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/metrics"
+
+  podLabels:
+    environment: production
+    tier: frontend
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - pi-controller-webui
+            topologyKey: kubernetes.io/hostname
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+  livenessProbe:
+    httpGet:
+      path: /health/live
+      port: 3000
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+---
+# Example 3: Development WebUI
+apiVersion: picontroller.io/v1
+kind: PiControllerWebUI
+metadata:
+  name: pi-controller-webui-dev
+  namespace: pi-controller-dev
+  labels:
+    app.kubernetes.io/name: pi-controller-webui
+    app.kubernetes.io/component: frontend
+    environment: development
+spec:
+  replicas: 1
+
+  image:
+    repository: "pi-controller/webui"
+    tag: "dev"
+    pullPolicy: "Always"
+
+  backendServices:
+    api:
+      name: pi-controller-api-dev
+      namespace: pi-controller-dev
+      port: 8080
+      path: /api
+
+    grpc:
+      name: pi-controller-grpc-dev
+      namespace: pi-controller-dev
+      port: 9090
+      webEnabled: false
+
+    websocket:
+      name: pi-controller-websocket-dev
+      namespace: pi-controller-dev
+      port: 8081
+      path: /socket.io
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    hosts:
+      - host: "pi-controller.dev.local"
+        paths:
+          - path: /
+            pathType: Prefix
+
+  auth:
+    enabled: false
+
+  features:
+    gpioControl: true
+    clusterManagement: true
+    certificateManagement: true
+    realTimeMetrics: true
+    nodeDiscovery: true
+    advancedNetworking: true
+    experimental: true
+
+  branding:
+    title: "Pi Controller - DEV"
+    primaryColor: "#ef4444"
+    theme: "light"
+
+  resources:
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+  autoscaling:
+    enabled: false

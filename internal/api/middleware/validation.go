@@ -110,13 +110,18 @@ func (v *Validator) ValidateName(name string, resourceType string) error {
 		return fmt.Errorf("%s name exceeds maximum length of %d characters", resourceType, v.config.MaxNameLength)
 	}
 
-	if !safeNamePattern.MatchString(name) {
+	// Check for XSS patterns first (these will fail the pattern match anyway, but need specific message)
+	if v.config.EnableXSSCheck && v.containsXSS(name) {
 		return fmt.Errorf("%s name contains invalid characters. Only alphanumeric, dots, hyphens and underscores allowed", resourceType)
 	}
 
-	// Check for SQL injection patterns
+	// Check for SQL injection patterns (more specific error)
 	if v.config.EnableSQLCheck && v.containsSQLInjection(name) {
 		return fmt.Errorf("%s name contains potentially malicious content", resourceType)
+	}
+
+	if !safeNamePattern.MatchString(name) {
+		return fmt.Errorf("%s name contains invalid characters. Only alphanumeric, dots, hyphens and underscores allowed", resourceType)
 	}
 
 	return nil
@@ -217,6 +222,18 @@ func (v *Validator) validateHeaders(c *gin.Context) error {
 
 // validateQueryParams validates query parameters
 func (v *Validator) validateQueryParams(c *gin.Context) error {
+	// First check the raw query string for malicious content
+	// This catches injection attempts that break URL parsing
+	rawQuery := c.Request.URL.RawQuery
+	if rawQuery != "" {
+		if v.config.EnableSQLCheck && v.containsSQLInjection(rawQuery) {
+			return fmt.Errorf("query parameters contain potentially malicious content")
+		}
+		if v.config.EnableXSSCheck && v.containsXSS(rawQuery) {
+			return fmt.Errorf("query parameters contain potentially malicious content")
+		}
+	}
+
 	// Validate common query parameters
 	if limitStr := c.Query("limit"); limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)

@@ -1,0 +1,492 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: picontrollerwebuis.picontroller.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+spec:
+  group: picontroller.io
+  names:
+    kind: PiControllerWebUI
+    listKind: PiControllerWebUIList
+    plural: picontrollerwebuis
+    singular: picontrollerwebui
+    shortNames:
+      - pcwebui
+      - webui
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Status
+      type: string
+      description: The phase of the WebUI deployment
+      jsonPath: .status.phase
+    - name: Replicas
+      type: integer
+      description: Number of desired replicas
+      jsonPath: .spec.replicas
+    - name: Available
+      type: integer
+      description: Number of available replicas
+      jsonPath: .status.availableReplicas
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        type: object
+        description: PiControllerWebUI is the Schema for the web UI deployment
+        properties:
+          apiVersion:
+            type: string
+            description: 'APIVersion defines the versioned schema of this representation'
+          kind:
+            type: string
+            description: 'Kind is a string value representing the REST resource'
+          metadata:
+            type: object
+          spec:
+            type: object
+            description: PiControllerWebUISpec defines the desired state
+            properties:
+              replicas:
+                type: integer
+                description: Number of desired pod replicas
+                minimum: 1
+                maximum: 100
+                default: 2
+
+              image:
+                type: object
+                description: Container image configuration
+                properties:
+                  repository:
+                    type: string
+                    description: Image repository
+                    default: "pi-controller/webui"
+                  tag:
+                    type: string
+                    description: Image tag
+                    default: "latest"
+                  pullPolicy:
+                    type: string
+                    description: Image pull policy
+                    enum: ["Always", "IfNotPresent", "Never"]
+                    default: "IfNotPresent"
+                  pullSecrets:
+                    type: array
+                    description: Image pull secrets
+                    items:
+                      type: string
+
+              backendServices:
+                type: object
+                description: Backend service references
+                properties:
+                  api:
+                    type: object
+                    description: REST API service
+                    properties:
+                      name:
+                        type: string
+                        description: Service name
+                      namespace:
+                        type: string
+                        description: Service namespace
+                      port:
+                        type: integer
+                        description: Service port
+                      path:
+                        type: string
+                        description: URL path prefix
+                    required: ["name", "port"]
+
+                  grpc:
+                    type: object
+                    description: gRPC service
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                      port:
+                        type: integer
+                      webEnabled:
+                        type: boolean
+                        description: Enable gRPC-web
+                    required: ["name", "port"]
+
+                  websocket:
+                    type: object
+                    description: WebSocket service
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                      port:
+                        type: integer
+                      path:
+                        type: string
+                    required: ["name", "port"]
+                required: ["api", "grpc", "websocket"]
+
+              ingress:
+                type: object
+                description: Ingress configuration
+                properties:
+                  enabled:
+                    type: boolean
+                    default: true
+                  className:
+                    type: string
+                    default: "nginx"
+                  annotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  hosts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        host:
+                          type: string
+                        paths:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              path:
+                                type: string
+                              pathType:
+                                type: string
+                                enum: ["Exact", "Prefix"]
+                  tls:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        secretName:
+                          type: string
+                        hosts:
+                          type: array
+                          items:
+                            type: string
+
+              auth:
+                type: object
+                description: Authentication configuration
+                properties:
+                  enabled:
+                    type: boolean
+                    default: true
+                  sessionSecretRef:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      key:
+                        type: string
+                    required: ["name", "key"]
+                  jwtSecretRef:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      key:
+                        type: string
+                    required: ["name", "key"]
+                  sessionTimeout:
+                    type: string
+                    default: "24h"
+
+              features:
+                type: object
+                description: Feature flags
+                properties:
+                  gpioControl:
+                    type: boolean
+                    default: true
+                  clusterManagement:
+                    type: boolean
+                    default: true
+                  certificateManagement:
+                    type: boolean
+                    default: true
+                  realTimeMetrics:
+                    type: boolean
+                    default: true
+                  nodeDiscovery:
+                    type: boolean
+                    default: true
+                  advancedNetworking:
+                    type: boolean
+                    default: false
+                  experimental:
+                    type: boolean
+                    default: false
+
+              branding:
+                type: object
+                description: UI customization
+                properties:
+                  title:
+                    type: string
+                    default: "Pi Controller"
+                  logoURL:
+                    type: string
+                  faviconURL:
+                    type: string
+                  primaryColor:
+                    type: string
+                    default: "#10b981"
+                    pattern: "^#[0-9a-fA-F]{6}$"
+                  theme:
+                    type: string
+                    enum: ["dark", "light", "auto"]
+                    default: "dark"
+
+              runtimeConfig:
+                type: object
+                description: Runtime config injection
+                properties:
+                  enabled:
+                    type: boolean
+                    default: true
+                  configMapRef:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                    required: ["name"]
+
+              resources:
+                type: object
+                description: Resource constraints
+                properties:
+                  limits:
+                    type: object
+                    properties:
+                      cpu:
+                        type: string
+                        default: "500m"
+                      memory:
+                        type: string
+                        default: "512Mi"
+                  requests:
+                    type: object
+                    properties:
+                      cpu:
+                        type: string
+                        default: "100m"
+                      memory:
+                        type: string
+                        default: "128Mi"
+
+              autoscaling:
+                type: object
+                description: Horizontal Pod Autoscaling
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                  minReplicas:
+                    type: integer
+                    minimum: 1
+                    default: 2
+                  maxReplicas:
+                    type: integer
+                    minimum: 1
+                    default: 10
+                  targetCPUUtilizationPercentage:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                    default: 80
+                  targetMemoryUtilizationPercentage:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                    default: 80
+
+              podAnnotations:
+                type: object
+                additionalProperties:
+                  type: string
+
+              podLabels:
+                type: object
+                additionalProperties:
+                  type: string
+
+              nodeSelector:
+                type: object
+                additionalProperties:
+                  type: string
+
+              tolerations:
+                type: array
+                items:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+
+              affinity:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+
+              securityContext:
+                type: object
+                description: Pod security context
+                properties:
+                  runAsNonRoot:
+                    type: boolean
+                    default: true
+                  runAsUser:
+                    type: integer
+                    default: 1000
+                  fsGroup:
+                    type: integer
+                    default: 1000
+
+              service:
+                type: object
+                description: Service configuration
+                properties:
+                  type:
+                    type: string
+                    enum: ["ClusterIP", "NodePort", "LoadBalancer"]
+                    default: "ClusterIP"
+                  port:
+                    type: integer
+                    default: 80
+                  targetPort:
+                    type: integer
+                    default: 3000
+                  annotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+
+              livenessProbe:
+                type: object
+                description: Liveness probe configuration
+                properties:
+                  httpGet:
+                    type: object
+                    properties:
+                      path:
+                        type: string
+                        default: "/health/live"
+                      port:
+                        type: integer
+                        default: 3000
+                  initialDelaySeconds:
+                    type: integer
+                    default: 10
+                  periodSeconds:
+                    type: integer
+                    default: 10
+                  timeoutSeconds:
+                    type: integer
+                    default: 3
+                  failureThreshold:
+                    type: integer
+                    default: 3
+
+              readinessProbe:
+                type: object
+                description: Readiness probe configuration
+                properties:
+                  httpGet:
+                    type: object
+                    properties:
+                      path:
+                        type: string
+                        default: "/health/ready"
+                      port:
+                        type: integer
+                        default: 3000
+                  initialDelaySeconds:
+                    type: integer
+                    default: 5
+                  periodSeconds:
+                    type: integer
+                    default: 5
+                  timeoutSeconds:
+                    type: integer
+                    default: 2
+                  failureThreshold:
+                    type: integer
+                    default: 3
+
+            required:
+              - backendServices
+
+          status:
+            type: object
+            description: PiControllerWebUIStatus defines the observed state
+            properties:
+              phase:
+                type: string
+                description: Current lifecycle phase
+                enum:
+                  - Pending
+                  - Configuring
+                  - Ready
+                  - Failed
+                  - Degraded
+
+              replicas:
+                type: integer
+                description: Total number of replicas
+
+              availableReplicas:
+                type: integer
+                description: Number of available replicas
+
+              unavailableReplicas:
+                type: integer
+                description: Number of unavailable replicas
+
+              observedGeneration:
+                type: integer
+                description: Most recent generation observed
+
+              conditions:
+                type: array
+                description: Current conditions
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      description: Condition type
+                    status:
+                      type: string
+                      enum: ["True", "False", "Unknown"]
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                  required: ["type", "status"]
+
+              endpoints:
+                type: array
+                description: Exposed endpoints
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    url:
+                      type: string
+                  required: ["name", "url"]

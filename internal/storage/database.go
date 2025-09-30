@@ -315,7 +315,7 @@ func (g *gormSlogAdapter) Trace(ctx context.Context, begin time.Time, fc func() 
 	}
 }
 
-// NewForTest creates a new database connection for testing without running migrations
+// NewForTest creates a new database connection for testing with migrations
 func NewForTest(logger applogger.Interface) (*Database, error) {
 	config := &Config{
 		Path:            ":memory:",
@@ -341,6 +341,11 @@ func NewForTest(logger applogger.Interface) (*Database, error) {
 	database := &Database{
 		db:     db,
 		logger: logger,
+	}
+
+	// Run migrations for test database
+	if err := database.migrate(); err != nil {
+		return nil, errors.Wrapf(err, "failed to migrate test database")
 	}
 
 	return database, nil

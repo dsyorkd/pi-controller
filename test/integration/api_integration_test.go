@@ -17,6 +17,7 @@ import (
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -24,6 +25,7 @@ import (
 func init() {
 	gin.SetMode(gin.TestMode)
 }
+
 
 // APIIntegrationTestSuite defines the test suite for API integration tests
 type APIIntegrationTestSuite struct {
@@ -34,6 +36,7 @@ type APIIntegrationTestSuite struct {
 	clusterService *services.ClusterService
 	nodeService    *services.NodeService
 	gpioService    *services.GPIOService
+	mockManager    *MockPiAgentClientManager
 }
 
 // SetupSuite sets up the test suite
@@ -47,10 +50,13 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 
 	testLogger := logger.Default()
 
+	// Initialize mock manager for GPIO testing
+	suite.mockManager = NewMockPiAgentClientManager()
+
 	// Initialize services
 	suite.clusterService = services.NewClusterService(suite.db, testLogger)
 	suite.nodeService = services.NewNodeService(suite.db, testLogger)
-	suite.gpioService = services.NewGPIOService(suite.db, testLogger)
+	suite.gpioService = services.NewGPIOServiceWithManager(suite.db, testLogger, suite.mockManager)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(suite.db)
@@ -60,6 +66,11 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 
 	// Setup router
 	suite.router = gin.New()
+
+	// Add NoMethod handler to return 405 for unsupported methods
+	suite.router.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+	})
 
 	// Health endpoints
 	suite.router.GET("/health", healthHandler.Health)
@@ -78,6 +89,10 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 			clusters.GET("/:id", clusterHandler.Get)
 			clusters.PUT("/:id", clusterHandler.Update)
 			clusters.DELETE("/:id", clusterHandler.Delete)
+			// Handle unsupported methods explicitly
+			clusters.PATCH("/:id", func(c *gin.Context) {
+				c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+			})
 		}
 
 		// Node routes
@@ -103,6 +118,19 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 			gpio.GET("/:id/readings", gpioHandler.GetReadings)
 		}
 	}
+}
+
+// SetupTest runs before each test to ensure clean database state
+func (suite *APIIntegrationTestSuite) SetupTest() {
+	// Clear all tables to ensure clean state for each test
+	suite.db.DB().Exec("DELETE FROM gpio_readings")
+	suite.db.DB().Exec("DELETE FROM gpio_devices")
+	suite.db.DB().Exec("DELETE FROM nodes")
+	suite.db.DB().Exec("DELETE FROM clusters")
+	suite.db.DB().Exec("DELETE FROM certificate_requests")
+	suite.db.DB().Exec("DELETE FROM certificates")
+	suite.db.DB().Exec("DELETE FROM ca_info")
+	suite.db.DB().Exec("DELETE FROM users")
 }
 
 // TearDownSuite cleans up after the test suite
@@ -361,6 +389,13 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_GPIOWorkflow() {
 
 	node := testutils.CreateTestNode(suite.T(), cluster.ID)
 	require.NoError(suite.T(), suite.db.DB().Create(node).Error)
+
+	// Setup mock expectations for GPIO operations
+	suite.mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(suite.mockManager.mockClient, nil)
+	suite.mockManager.mockClient.On("IsConnected").Return(true)
+	suite.mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(nil)
+	suite.mockManager.mockClient.On("WriteGPIOPin", mock.Anything, 18, 1).Return(nil)
+	suite.mockManager.mockClient.On("ReadGPIOPin", mock.Anything, 18).Return(1, nil)
 
 	// 1. Create a GPIO device
 	createReq := services.CreateGPIODeviceRequest{

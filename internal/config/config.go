@@ -51,6 +51,9 @@ type Config struct {
 
 	// Sentry configuration
 	Sentry SentryConfig `yaml:"sentry"`
+
+	// Web UI configuration
+	WebUI WebUIConfig `yaml:"webui"`
 }
 
 // AppConfig contains general application settings
@@ -340,6 +343,186 @@ type SentryConfig struct {
 	AttachStacktrace bool `yaml:"attach_stacktrace"`
 }
 
+// WebUIConfig contains web UI server settings
+type WebUIConfig struct {
+	// Server settings
+	Enabled   bool   `yaml:"enabled"`
+	Host      string `yaml:"host"`
+	Port      int    `yaml:"port"`
+	StaticDir string `yaml:"static_dir"`
+	IndexFile string `yaml:"index_file"`
+	SPAMode   bool   `yaml:"spa_mode"`
+
+	// Backend connection
+	Backend BackendConfig `yaml:"backend"`
+
+	// Runtime config injection
+	RuntimeConfig RuntimeConfigSettings `yaml:"runtime_config"`
+
+	// Authentication
+	Auth WebAuthConfig `yaml:"auth"`
+
+	// CORS configuration
+	CORS CORSConfig `yaml:"cors"`
+
+	// Feature flags
+	Features FeatureFlags `yaml:"features"`
+
+	// UI branding
+	Branding BrandingConfig `yaml:"branding"`
+
+	// Performance & caching
+	Cache CacheConfig `yaml:"cache"`
+
+	// Compression
+	Compression CompressionConfig `yaml:"compression"`
+
+	// Security headers
+	Security SecurityConfig `yaml:"security"`
+
+	// Rate limiting
+	RateLimit RateLimitConfig `yaml:"rate_limit"`
+
+	// Observability
+	Observability ObservabilityConfig `yaml:"observability"`
+
+	// Resource limits (for K8s)
+	Resources ResourcesConfig `yaml:"resources"`
+
+	// Health checks
+	Health HealthConfig `yaml:"health"`
+}
+
+// BackendConfig contains backend service URLs
+type BackendConfig struct {
+	API       BackendServiceConfig `yaml:"api"`
+	GRPC      BackendServiceConfig `yaml:"grpc"`
+	WebSocket BackendServiceConfig `yaml:"websocket"`
+	TLS       TLSConfig            `yaml:"tls"`
+}
+
+// BackendServiceConfig contains configuration for a backend service
+type BackendServiceConfig struct {
+	URL         string `yaml:"url"`
+	InternalURL string `yaml:"internal_url"`
+	Prefix      string `yaml:"prefix"`
+	Path        string `yaml:"path"`
+	WebEnabled  bool   `yaml:"web_enabled"`
+}
+
+// TLSConfig contains TLS settings
+type TLSConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
+	CAFile   string `yaml:"ca_file"`
+}
+
+// RuntimeConfigSettings controls runtime config injection
+type RuntimeConfigSettings struct {
+	Enabled bool   `yaml:"enabled"`
+	Path    string `yaml:"path"`
+}
+
+// WebAuthConfig contains web UI authentication settings
+type WebAuthConfig struct {
+	Enabled          bool   `yaml:"enabled"`
+	SessionSecretEnv string `yaml:"session_secret_env"`
+	JWTSecretEnv     string `yaml:"jwt_secret_env"`
+	SessionTimeout   string `yaml:"session_timeout"`
+	CookieSecure     bool   `yaml:"cookie_secure"`
+	CookieSameSite   string `yaml:"cookie_same_site"`
+}
+
+// CORSConfig contains CORS settings
+type CORSConfig struct {
+	Enabled        bool     `yaml:"enabled"`
+	AllowedOrigins []string `yaml:"allowed_origins"`
+	AllowedMethods []string `yaml:"allowed_methods"`
+	AllowedHeaders []string `yaml:"allowed_headers"`
+	ExposedHeaders []string `yaml:"exposed_headers"`
+	Credentials    bool     `yaml:"credentials"`
+	MaxAge         string   `yaml:"max_age"`
+}
+
+// FeatureFlags contains UI feature toggles
+type FeatureFlags struct {
+	GPIOControl           bool `yaml:"gpio_control"`
+	ClusterManagement     bool `yaml:"cluster_management"`
+	CertificateManagement bool `yaml:"certificate_management"`
+	RealTimeMetrics       bool `yaml:"real_time_metrics"`
+	NodeDiscovery         bool `yaml:"node_discovery"`
+	AdvancedNetworking    bool `yaml:"advanced_networking"`
+	Experimental          bool `yaml:"experimental"`
+}
+
+// BrandingConfig contains UI customization settings
+type BrandingConfig struct {
+	Title        string `yaml:"title"`
+	LogoURL      string `yaml:"logo_url"`
+	FaviconURL   string `yaml:"favicon_url"`
+	PrimaryColor string `yaml:"primary_color"`
+	Theme        string `yaml:"theme"`
+}
+
+// CacheConfig contains caching settings
+type CacheConfig struct {
+	Enabled        bool   `yaml:"enabled"`
+	StaticMaxAge   string `yaml:"static_max_age"`
+	HTMLMaxAge     string `yaml:"html_max_age"`
+	APICacheMaxAge string `yaml:"api_cache_max_age"`
+}
+
+// CompressionConfig contains compression settings
+type CompressionConfig struct {
+	Enabled bool `yaml:"enabled"`
+	Level   int  `yaml:"level"`
+	MinSize int  `yaml:"min_size"`
+}
+
+// SecurityConfig contains security header settings
+type SecurityConfig struct {
+	HSTSEnabled         bool   `yaml:"hsts_enabled"`
+	HSTSMaxAge          string `yaml:"hsts_max_age"`
+	FrameDeny           bool   `yaml:"frame_deny"`
+	ContentTypeNoSniff  bool   `yaml:"content_type_nosniff"`
+	XSSProtection       bool   `yaml:"xss_protection"`
+	CSPEnabled          bool   `yaml:"csp_enabled"`
+	CSPDirectives       string `yaml:"csp_directives"`
+}
+
+// RateLimitConfig contains rate limiting settings
+type RateLimitConfig struct {
+	Enabled             bool `yaml:"enabled"`
+	RequestsPerMinute   int  `yaml:"requests_per_minute"`
+	BurstSize           int  `yaml:"burst_size"`
+}
+
+// ObservabilityConfig contains observability settings
+type ObservabilityConfig struct {
+	AccessLog         bool   `yaml:"access_log"`
+	AccessLogFormat   string `yaml:"access_log_format"`
+	MetricsEnabled    bool   `yaml:"metrics_enabled"`
+	MetricsPath       string `yaml:"metrics_path"`
+	TracingEnabled    bool   `yaml:"tracing_enabled"`
+}
+
+// ResourcesConfig contains resource limit settings
+type ResourcesConfig struct {
+	CPULimit      string `yaml:"cpu_limit"`
+	MemoryLimit   string `yaml:"memory_limit"`
+	CPURequest    string `yaml:"cpu_request"`
+	MemoryRequest string `yaml:"memory_request"`
+}
+
+// HealthConfig contains health check settings
+type HealthConfig struct {
+	Enabled       bool   `yaml:"enabled"`
+	Path          string `yaml:"path"`
+	LivenessPath  string `yaml:"liveness_path"`
+	ReadinessPath string `yaml:"readiness_path"`
+}
+
 // Load loads configuration from YAML file with defaults
 func Load(configPath string) (*Config, error) {
 	// Start with defaults
@@ -468,6 +651,11 @@ func getDevelopmentDefaults() Config {
 	config.CA.SSH.KnownHostsFile = ""
 	config.CA.Vault.AllowInsecure = true
 	config.CA.Vault.TLSConfig.InsecureSkipVerify = true
+
+	// Development-specific WebUI settings
+	config.WebUI.Auth.CookieSecure = false
+	config.WebUI.Backend.TLS.Enabled = false
+	config.WebUI.Security.HSTSEnabled = false
 
 	return config
 }
@@ -629,6 +817,118 @@ func getProductionDefaults() Config {
 			MaxBreadcrumbs:   100,
 			AttachStacktrace: true,
 		},
+		WebUI: WebUIConfig{
+			Enabled:   true,
+			Host:      "0.0.0.0",
+			Port:      3000,
+			StaticDir: "./web/dist",
+			IndexFile: "index.html",
+			SPAMode:   true,
+			Backend: BackendConfig{
+				API: BackendServiceConfig{
+					URL:         "http://localhost:8080",
+					InternalURL: "http://pi-controller-api:8080",
+					Prefix:      "/api",
+				},
+				GRPC: BackendServiceConfig{
+					URL:         "localhost:9090",
+					InternalURL: "pi-controller-grpc:9090",
+					WebEnabled:  false,
+				},
+				WebSocket: BackendServiceConfig{
+					URL:         "ws://localhost:8081",
+					InternalURL: "ws://pi-controller-ws:8081",
+					Path:        "/socket.io",
+				},
+				TLS: TLSConfig{
+					Enabled: false,
+				},
+			},
+			RuntimeConfig: RuntimeConfigSettings{
+				Enabled: true,
+				Path:    "/config.js",
+			},
+			Auth: WebAuthConfig{
+				Enabled:          true,
+				SessionSecretEnv: "WEBUI_SESSION_SECRET",
+				JWTSecretEnv:     "WEBUI_JWT_SECRET",
+				SessionTimeout:   "24h",
+				CookieSecure:     true,
+				CookieSameSite:   "strict",
+			},
+			CORS: CORSConfig{
+				Enabled: true,
+				AllowedOrigins: []string{
+					"http://localhost:3000",
+					"http://localhost:8080",
+				},
+				AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+				AllowedHeaders: []string{"Authorization", "Content-Type", "X-Requested-With"},
+				ExposedHeaders: []string{"X-Total-Count", "X-Page"},
+				Credentials:    true,
+				MaxAge:         "12h",
+			},
+			Features: FeatureFlags{
+				GPIOControl:           true,
+				ClusterManagement:     true,
+				CertificateManagement: true,
+				RealTimeMetrics:       true,
+				NodeDiscovery:         true,
+				AdvancedNetworking:    false,
+				Experimental:          false,
+			},
+			Branding: BrandingConfig{
+				Title:        "Pi Controller",
+				LogoURL:      "",
+				FaviconURL:   "",
+				PrimaryColor: "#10b981",
+				Theme:        "dark",
+			},
+			Cache: CacheConfig{
+				Enabled:        true,
+				StaticMaxAge:   "31536000", // 1 year
+				HTMLMaxAge:     "0",
+				APICacheMaxAge: "300", // 5 minutes
+			},
+			Compression: CompressionConfig{
+				Enabled: true,
+				Level:   6,
+				MinSize: 1024,
+			},
+			Security: SecurityConfig{
+				HSTSEnabled:        true,
+				HSTSMaxAge:         "31536000",
+				FrameDeny:          true,
+				ContentTypeNoSniff: true,
+				XSSProtection:      true,
+				CSPEnabled:         false,
+				CSPDirectives:      "",
+			},
+			RateLimit: RateLimitConfig{
+				Enabled:           true,
+				RequestsPerMinute: 60,
+				BurstSize:         100,
+			},
+			Observability: ObservabilityConfig{
+				AccessLog:       true,
+				AccessLogFormat: "json",
+				MetricsEnabled:  true,
+				MetricsPath:     "/metrics",
+				TracingEnabled:  false,
+			},
+			Resources: ResourcesConfig{
+				CPULimit:      "500m",
+				MemoryLimit:   "512Mi",
+				CPURequest:    "100m",
+				MemoryRequest: "128Mi",
+			},
+			Health: HealthConfig{
+				Enabled:       true,
+				Path:          "/health",
+				LivenessPath:  "/health/live",
+				ReadinessPath: "/health/ready",
+			},
+		},
 	}
 }
 
@@ -700,4 +1000,33 @@ func (c *APIConfig) IsTLSEnabled() bool {
 // IsTLSEnabled returns true if TLS is configured for gRPC
 func (c *GRPCConfig) IsTLSEnabled() bool {
 	return c.TLSCertFile != "" && c.TLSKeyFile != ""
+}
+
+// GetAddress returns the formatted address for WebUI service
+func (c *WebUIConfig) GetAddress() string {
+	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+}
+
+// GetBackendAPIURL returns the appropriate backend API URL based on environment
+func (c *WebUIConfig) GetBackendAPIURL(k8sMode bool) string {
+	if k8sMode {
+		return c.Backend.API.InternalURL
+	}
+	return c.Backend.API.URL
+}
+
+// GetBackendWebSocketURL returns the appropriate backend WebSocket URL based on environment
+func (c *WebUIConfig) GetBackendWebSocketURL(k8sMode bool) string {
+	if k8sMode {
+		return c.Backend.WebSocket.InternalURL
+	}
+	return c.Backend.WebSocket.URL
+}
+
+// GetBackendGRPCURL returns the appropriate backend gRPC URL based on environment
+func (c *WebUIConfig) GetBackendGRPCURL(k8sMode bool) string {
+	if k8sMode {
+		return c.Backend.GRPC.InternalURL
+	}
+	return c.Backend.GRPC.URL
 }

@@ -63,8 +63,7 @@ func (h *NodeHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"nodes":  nodes,
-		"count":  len(nodes),
+		"data":   nodes,
 		"total":  total,
 		"limit":  limit,
 		"offset": offset,
@@ -90,7 +89,9 @@ func (h *NodeHandler) Get(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, node)
+	c.JSON(http.StatusOK, gin.H{
+		"data": node,
+	})
 }
 
 // Create creates a new node
@@ -111,7 +112,9 @@ func (h *NodeHandler) Create(c *gin.Context) {
 	}
 
 	h.logger.WithField("node_id", node.ID).Info("Created new node")
-	c.JSON(http.StatusCreated, node)
+	c.JSON(http.StatusCreated, gin.H{
+		"data": node,
+	})
 }
 
 // Update updates a node
@@ -141,7 +144,9 @@ func (h *NodeHandler) Update(c *gin.Context) {
 	}
 
 	h.logger.WithField("node_id", node.ID).Info("Updated node")
-	c.JSON(http.StatusOK, node)
+	c.JSON(http.StatusOK, gin.H{
+		"data": node,
+	})
 }
 
 // Delete deletes a node

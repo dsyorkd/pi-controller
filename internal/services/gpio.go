@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	"github.com/dsyorkd/pi-controller/internal/grpc/client"
 	"github.com/dsyorkd/pi-controller/internal/logger"
@@ -191,6 +192,15 @@ func (s *GPIOService) GetByNodeAndPin(nodeID uint, pinNumber int) (*models.GPIOD
 
 // Create creates a new GPIO device
 func (s *GPIOService) Create(req CreateGPIODeviceRequest) (*models.GPIODevice, error) {
+	// Validate pin safety first - CRITICAL SECURITY CHECK
+	if err := config.ValidateGPIOPin(req.PinNumber); err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"pin_number": req.PinNumber,
+			"error":      err.Error(),
+		}).Warn("GPIO pin safety validation failed")
+		return nil, errors.Wrapf(ErrValidationFailed, "pin safety check failed: %s", err.Error())
+	}
+
 	// Validate node exists
 	var node models.Node
 	if err := s.db.DB().First(&node, req.NodeID).Error; err != nil {

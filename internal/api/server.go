@@ -31,6 +31,7 @@ type Server struct {
 	authManager         *middleware.AuthManager
 	validator           *middleware.Validator
 	rateLimiter         *middleware.RateLimiter
+	gpioRateLimiter     *middleware.GPIORateLimiter
 	router              *gin.Engine
 	server              *http.Server
 }
@@ -69,6 +70,9 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	logrusLogger := logrus.New()
 	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), logrusLogger)
 
+	// Initialize GPIO-specific rate limiter with stricter limits
+	gpioRateLimiter := middleware.NewGPIORateLimiter(middleware.DefaultGPIORateLimitConfig(), logrusLogger)
+
 	s := &Server{
 		config:              cfg,
 		logger:              log,
@@ -81,6 +85,7 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 		authManager:         authManager,
 		validator:           validator,
 		rateLimiter:         rateLimiter,
+		gpioRateLimiter:     gpioRateLimiter,
 		router:              router,
 	}
 
@@ -92,6 +97,11 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 func (s *Server) setupRoutes() {
 	// Global middleware
 	s.router.Use(middleware.Logger(s.logger))
+
+	// Add NoMethod handler to return 405 for unsupported methods
+	s.router.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+	})
 
 	// Add Sentry middleware if Sentry is initialized
 	if sentry.CurrentHub().Client() != nil {
@@ -177,10 +187,14 @@ func (s *Server) setupRoutes() {
 			nodes.DELETE("/:id", s.requireRole("admin"), nodeHandler.Delete)
 		}
 
-		// GPIO management
+		// GPIO management with strict rate limiting
 		gpioHandler := handlers.NewGPIOHandler(s.gpioService, s.logger)
 		gpio := v1.Group("/gpio")
 		{
+			// Apply GPIO-specific rate limiting to all GPIO endpoints
+			// This protects hardware from rapid switching that could cause damage
+			gpio.Use(s.gpioRateLimiter.RateLimit())
+
 			// Read operations - require viewer role
 			gpio.GET("", s.requireRole("viewer"), gpioHandler.List)
 			gpio.GET("/:id", s.requireRole("viewer"), gpioHandler.Get)
