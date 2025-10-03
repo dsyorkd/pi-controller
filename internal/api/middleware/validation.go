@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -22,23 +25,31 @@ var (
 
 // ValidationConfig holds validation configuration
 type ValidationConfig struct {
-	MaxNameLength  int      `yaml:"max_name_length"`
-	MaxDescLength  int      `yaml:"max_description_length"`
-	MaxQueryLimit  int      `yaml:"max_query_limit"`
-	AllowedMethods []string `yaml:"allowed_methods"`
-	EnableSQLCheck bool     `yaml:"enable_sql_check"`
-	EnableXSSCheck bool     `yaml:"enable_xss_check"`
+	MaxNameLength     int      `yaml:"max_name_length"`
+	MaxDescLength     int      `yaml:"max_description_length"`
+	MaxQueryLimit     int      `yaml:"max_query_limit"`
+	MaxRequestSize    int64    `yaml:"max_request_size"`
+	AllowedMethods    []string `yaml:"allowed_methods"`
+	EnableSQLCheck    bool     `yaml:"enable_sql_check"`
+	EnableXSSCheck    bool     `yaml:"enable_xss_check"`
+	EnableBodyCheck   bool     `yaml:"enable_body_check"`
+	EnablePathCheck   bool     `yaml:"enable_path_check"`
+	EnableSizeCheck   bool     `yaml:"enable_size_check"`
 }
 
 // DefaultValidationConfig returns secure validation defaults
 func DefaultValidationConfig() *ValidationConfig {
 	return &ValidationConfig{
-		MaxNameLength:  63,   // DNS-safe length
-		MaxDescLength:  255,  // Reasonable description length
-		MaxQueryLimit:  1000, // Prevent excessive queries
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		EnableSQLCheck: true,
-		EnableXSSCheck: true,
+		MaxNameLength:   63,                       // DNS-safe length
+		MaxDescLength:   255,                      // Reasonable description length
+		MaxQueryLimit:   1000,                     // Prevent excessive queries
+		MaxRequestSize:  1024 * 1024,              // 1MB max request size
+		AllowedMethods:  []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		EnableSQLCheck:  true,
+		EnableXSSCheck:  true,
+		EnableBodyCheck: true,
+		EnablePathCheck: true,
+		EnableSizeCheck: true,
 	}
 }
 
@@ -74,6 +85,30 @@ func (v *Validator) ValidateRequest() gin.HandlerFunc {
 			return
 		}
 
+		// Check request size first (before reading body)
+		if v.config.EnableSizeCheck && c.Request.ContentLength > v.config.MaxRequestSize {
+			v.logger.WithField("content_length", c.Request.ContentLength).Warn("Request size exceeds limit")
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+				"error":   "Request Entity Too Large",
+				"message": fmt.Sprintf("Request size exceeds maximum of %d bytes", v.config.MaxRequestSize),
+			})
+			c.Abort()
+			return
+		}
+
+		// Validate request path for traversal attempts
+		if v.config.EnablePathCheck {
+			if err := v.validatePath(c.Request.URL.Path); err != nil {
+				v.logger.WithError(err).Warn("Invalid request path")
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Bad Request",
+					"message": err.Error(),
+				})
+				c.Abort()
+				return
+			}
+		}
+
 		// Validate request headers
 		if err := v.validateHeaders(c); err != nil {
 			v.logger.WithError(err).Warn("Invalid request headers")
@@ -94,6 +129,19 @@ func (v *Validator) ValidateRequest() gin.HandlerFunc {
 			})
 			c.Abort()
 			return
+		}
+
+		// Validate JSON body for POST/PUT/PATCH requests
+		if v.config.EnableBodyCheck && (c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH") {
+			if err := v.validateJSONBody(c); err != nil {
+				v.logger.WithError(err).Warn("Invalid request body")
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Bad Request",
+					"message": err.Error(),
+				})
+				c.Abort()
+				return
+			}
 		}
 
 		c.Next()
@@ -332,4 +380,120 @@ func (v *Validator) SanitizeInput(input string) string {
 
 	// Trim whitespace
 	return strings.TrimSpace(input)
+}
+
+// validatePath checks for path traversal attempts
+func (v *Validator) validatePath(path string) error {
+	// Check for path traversal patterns
+	pathTraversalPatterns := []string{
+		"../",
+		"..\\",
+		"%2e%2e%2f",
+		"%2e%2e/",
+		"..%2f",
+		"%2e%2e%5c",
+	}
+
+	lowerPath := strings.ToLower(path)
+	for _, pattern := range pathTraversalPatterns {
+		if strings.Contains(lowerPath, pattern) {
+			return fmt.Errorf("path contains potentially malicious traversal pattern")
+		}
+	}
+
+	return nil
+}
+
+// validateJSONBody validates JSON request body for malicious content
+func (v *Validator) validateJSONBody(c *gin.Context) error {
+	// Check if body is nil first
+	if c.Request.Body == nil {
+		return nil
+	}
+
+	// Read the body
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read request body")
+	}
+
+	// Restore the body for subsequent handlers
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// Skip validation if body is empty
+	if len(bodyBytes) == 0 {
+		return nil
+	}
+
+	// Check total size again (in case ContentLength was not set)
+	if v.config.EnableSizeCheck && int64(len(bodyBytes)) > v.config.MaxRequestSize {
+		return fmt.Errorf("request body size exceeds maximum of %d bytes", v.config.MaxRequestSize)
+	}
+
+	// Parse JSON to validate structure and scan for malicious content
+	var data interface{}
+	if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		// Not valid JSON, but let the handler deal with it
+		return nil
+	}
+
+	// Recursively check all string values in the JSON
+	if err := v.validateJSONValue(data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateJSONValue recursively validates JSON values
+func (v *Validator) validateJSONValue(value interface{}) error {
+	switch val := value.(type) {
+	case string:
+		// Check string value for malicious content
+		if v.config.EnableSQLCheck && v.containsSQLInjection(val) {
+			return fmt.Errorf("request body contains potentially malicious content")
+		}
+		if v.config.EnableXSSCheck && v.containsXSS(val) {
+			return fmt.Errorf("request body contains potentially malicious content")
+		}
+		if v.config.EnablePathCheck && v.containsPathTraversal(val) {
+			return fmt.Errorf("request body contains potentially malicious content")
+		}
+	case map[string]interface{}:
+		// Recursively check all values in the map
+		for _, mapVal := range val {
+			if err := v.validateJSONValue(mapVal); err != nil {
+				return err
+			}
+		}
+	case []interface{}:
+		// Recursively check all values in the array
+		for _, arrVal := range val {
+			if err := v.validateJSONValue(arrVal); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// containsPathTraversal checks for path traversal patterns
+func (v *Validator) containsPathTraversal(input string) bool {
+	pathTraversalPatterns := []string{
+		"../",
+		"..\\",
+		"%2e%2e",
+		"etc/passwd",
+		"windows\\system32",
+	}
+
+	lowerInput := strings.ToLower(input)
+	for _, pattern := range pathTraversalPatterns {
+		if strings.Contains(lowerInput, pattern) {
+			return true
+		}
+	}
+
+	return false
 }

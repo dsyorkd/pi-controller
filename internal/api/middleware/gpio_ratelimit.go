@@ -13,6 +13,7 @@ import (
 
 // GPIORateLimitConfig holds rate limiting configuration specific to GPIO operations
 type GPIORateLimitConfig struct {
+	Enabled           bool          `yaml:"enabled"`
 	RequestsPerSecond int           `yaml:"requests_per_second"`
 	BurstSize         int           `yaml:"burst_size"`
 	CleanupInterval   time.Duration `yaml:"cleanup_interval"`
@@ -25,6 +26,7 @@ type GPIORateLimitConfig struct {
 // GPIO operations can cause hardware damage if performed too rapidly
 func DefaultGPIORateLimitConfig() *GPIORateLimitConfig {
 	return &GPIORateLimitConfig{
+		Enabled:           true,
 		RequestsPerSecond: 10, // Conservative limit to protect hardware
 		BurstSize:         20, // Allow small bursts for multi-pin operations
 		CleanupInterval:   5 * time.Minute,
@@ -72,6 +74,12 @@ func NewGPIORateLimiter(config *GPIORateLimitConfig, logger *logrus.Logger) *GPI
 // RateLimit returns a rate limiting middleware for GPIO operations
 func (rl *GPIORateLimiter) RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip rate limiting if disabled
+		if !rl.config.Enabled {
+			c.Next()
+			return
+		}
+
 		// Get client identifier
 		clientID := rl.getClientID(c)
 		if clientID == "" {

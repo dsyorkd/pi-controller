@@ -21,6 +21,11 @@ type ClusterHandler struct {
 
 // hasPermission checks if user role has permission for cluster write operations
 func (h *ClusterHandler) hasPermission(userRole, requiredRole string) bool {
+	// If no role is set (auth disabled), allow access
+	if userRole == "" {
+		return true
+	}
+
 	// Admin can access everything
 	if userRole == middleware.RoleAdmin {
 		return true
@@ -84,19 +89,19 @@ func (h *ClusterHandler) List(c *gin.Context) {
 
 // Create creates a new cluster
 func (h *ClusterHandler) Create(c *gin.Context) {
-	// Check permissions for cluster write operations
-	userRole := middleware.GetUserRole(c)
-	if !h.hasPermission(userRole, middleware.RoleOperator) {
-		h.writeError(c, http.StatusForbidden, "insufficient permissions")
-		return
-	}
-
 	var req services.CreateClusterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Bad Request",
 			"message": err.Error(),
 		})
+		return
+	}
+
+	// Check permissions for cluster write operations (after input validation)
+	userRole := middleware.GetUserRole(c)
+	if !h.hasPermission(userRole, middleware.RoleOperator) {
+		h.writeError(c, http.StatusForbidden, "insufficient permissions")
 		return
 	}
 

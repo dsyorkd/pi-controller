@@ -14,513 +14,513 @@ import (
 // Config holds the entire application configuration
 type Config struct {
 	// Application settings
-	App AppConfig `yaml:"app"`
+	App AppConfig `yaml:"app" mapstructure:"app"`
 
 	// Database configuration
-	Database storage.Config `yaml:"database"`
+	Database storage.Config `yaml:"database" mapstructure:"database"`
 
 	// API server configuration
-	API APIConfig `yaml:"api"`
+	API APIConfig `yaml:"api" mapstructure:"api"`
 
 	// gRPC server configuration
-	GRPC GRPCConfig `yaml:"grpc"`
+	GRPC GRPCConfig `yaml:"grpc" mapstructure:"grpc"`
 
 	// WebSocket configuration
-	WebSocket WebSocketConfig `yaml:"websocket"`
+	WebSocket WebSocketConfig `yaml:"websocket" mapstructure:"websocket"`
 
 	// Logging configuration
-	Log LogConfig `yaml:"log"`
+	Log LogConfig `yaml:"log" mapstructure:"log"`
 
 	// Kubernetes configuration
-	Kubernetes KubernetesConfig `yaml:"kubernetes"`
+	Kubernetes KubernetesConfig `yaml:"kubernetes" mapstructure:"kubernetes"`
 
 	// GPIO configuration
-	GPIO GPIOConfig `yaml:"gpio"`
+	GPIO GPIOConfig `yaml:"gpio" mapstructure:"gpio"`
 
 	// Discovery configuration
-	Discovery DiscoveryConfig `yaml:"discovery"`
+	Discovery DiscoveryConfig `yaml:"discovery" mapstructure:"discovery"`
 
 	// gRPC client configuration (for Pi Agent)
-	GRPCClient GRPCClientConfig `yaml:"grpc_client"`
+	GRPCClient GRPCClientConfig `yaml:"grpc_client" mapstructure:"grpc_client"`
 
 	// Pi Agent gRPC server configuration
-	AgentServer AgentServerConfig `yaml:"agent_server"`
+	AgentServer AgentServerConfig `yaml:"agent_server" mapstructure:"agent_server"`
 
 	// Certificate Authority configuration
-	CA CAConfig `yaml:"ca"`
+	CA CAConfig `yaml:"ca" mapstructure:"ca"`
 
 	// Sentry configuration
-	Sentry SentryConfig `yaml:"sentry"`
+	Sentry SentryConfig `yaml:"sentry" mapstructure:"sentry"`
 
 	// Web UI configuration
-	WebUI WebUIConfig `yaml:"webui"`
+	WebUI WebUIConfig `yaml:"webui" mapstructure:"webui"`
 }
 
 // AppConfig contains general application settings
 type AppConfig struct {
-	Name        string `yaml:"name"`
-	Version     string `yaml:"version"`
-	Environment string `yaml:"environment"`
-	DataDir     string `yaml:"data_dir"`
-	Debug       bool   `yaml:"debug"`
+	Name        string `yaml:"name" mapstructure:"name"`
+	Version     string `yaml:"version" mapstructure:"version"`
+	Environment string `yaml:"environment" mapstructure:"environment"`
+	DataDir     string `yaml:"data_dir" mapstructure:"data_dir"`
+	Debug       bool   `yaml:"debug" mapstructure:"debug"`
 }
 
 // APIConfig contains REST API server settings
 type APIConfig struct {
-	Host         string `yaml:"host"`
-	Port         int    `yaml:"port"`
-	ReadTimeout  string `yaml:"read_timeout"`
-	WriteTimeout string `yaml:"write_timeout"`
-	TLSCertFile  string `yaml:"tls_cert_file"`
-	TLSKeyFile   string `yaml:"tls_key_file"`
-	CORSEnabled  bool   `yaml:"cors_enabled"`
-	AuthEnabled  bool   `yaml:"auth_enabled"`
+	Host         string `yaml:"host" mapstructure:"host"`
+	Port         int    `yaml:"port" mapstructure:"port"`
+	ReadTimeout  string `yaml:"read_timeout" mapstructure:"read_timeout"`
+	WriteTimeout string `yaml:"write_timeout" mapstructure:"write_timeout"`
+	TLSCertFile  string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
+	TLSKeyFile   string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
+	CORSEnabled  bool   `yaml:"cors_enabled" mapstructure:"cors_enabled"`
+	AuthEnabled  bool   `yaml:"auth_enabled" mapstructure:"auth_enabled"`
 }
 
 // GRPCConfig contains gRPC server settings
 type GRPCConfig struct {
-	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
-	TLSCertFile string `yaml:"tls_cert_file"`
-	TLSKeyFile  string `yaml:"tls_key_file"`
+	Host        string `yaml:"host" mapstructure:"host"`
+	Port        int    `yaml:"port" mapstructure:"port"`
+	TLSCertFile string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
+	TLSKeyFile  string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
 }
 
 // WebSocketConfig contains WebSocket server settings
 type WebSocketConfig struct {
-	Host            string `yaml:"host"`
-	Port            int    `yaml:"port"`
-	Path            string `yaml:"path"`
-	ReadBufferSize  int    `yaml:"read_buffer_size"`
-	WriteBufferSize int    `yaml:"write_buffer_size"`
-	CheckOrigin     bool   `yaml:"check_origin"`
+	Host            string `yaml:"host" mapstructure:"host"`
+	Port            int    `yaml:"port" mapstructure:"port"`
+	Path            string `yaml:"path" mapstructure:"path"`
+	ReadBufferSize  int    `yaml:"read_buffer_size" mapstructure:"read_buffer_size"`
+	WriteBufferSize int    `yaml:"write_buffer_size" mapstructure:"write_buffer_size"`
+	CheckOrigin     bool   `yaml:"check_origin" mapstructure:"check_origin"`
 }
 
 // LogConfig contains logging configuration
 type LogConfig struct {
-	Level      string `yaml:"level"`
-	Format     string `yaml:"format"`
-	Output     string `yaml:"output"`
-	File       string `yaml:"file"`
-	MaxSize    int    `yaml:"max_size"`
-	MaxBackups int    `yaml:"max_backups"`
-	MaxAge     int    `yaml:"max_age"`
-	Compress   bool   `yaml:"compress"`
+	Level      string `yaml:"level" mapstructure:"level"`
+	Format     string `yaml:"format" mapstructure:"format"`
+	Output     string `yaml:"output" mapstructure:"output"`
+	File       string `yaml:"file" mapstructure:"file"`
+	MaxSize    int    `yaml:"max_size" mapstructure:"max_size"`
+	MaxBackups int    `yaml:"max_backups" mapstructure:"max_backups"`
+	MaxAge     int    `yaml:"max_age" mapstructure:"max_age"`
+	Compress   bool   `yaml:"compress" mapstructure:"compress"`
 }
 
 // KubernetesConfig contains Kubernetes client settings
 type KubernetesConfig struct {
-	ConfigPath     string `yaml:"config_path"`
-	InCluster      bool   `yaml:"in_cluster"`
-	Namespace      string `yaml:"namespace"`
-	ResyncInterval string `yaml:"resync_interval"`
+	ConfigPath     string `yaml:"config_path" mapstructure:"config_path"`
+	InCluster      bool   `yaml:"in_cluster" mapstructure:"in_cluster"`
+	Namespace      string `yaml:"namespace" mapstructure:"namespace"`
+	ResyncInterval string `yaml:"resync_interval" mapstructure:"resync_interval"`
 }
 
 // GPIOConfig contains GPIO service settings
 type GPIOConfig struct {
-	Enabled          bool   `yaml:"enabled"`
-	MockMode         bool   `yaml:"mock_mode"`
-	SampleInterval   string `yaml:"sample_interval"`
-	RetentionPeriod  string `yaml:"retention_period"`
-	AllowedPins      []int  `yaml:"allowed_pins"`
-	RestrictedPins   []int  `yaml:"restricted_pins"`
-	DefaultDirection string `yaml:"default_direction"`
-	DefaultPullMode  string `yaml:"default_pull_mode"`
+	Enabled          bool   `yaml:"enabled" mapstructure:"enabled"`
+	MockMode         bool   `yaml:"mock_mode" mapstructure:"mock_mode"`
+	SampleInterval   string `yaml:"sample_interval" mapstructure:"sample_interval"`
+	RetentionPeriod  string `yaml:"retention_period" mapstructure:"retention_period"`
+	AllowedPins      []int  `yaml:"allowed_pins" mapstructure:"allowed_pins"`
+	RestrictedPins   []int  `yaml:"restricted_pins" mapstructure:"restricted_pins"`
+	DefaultDirection string `yaml:"default_direction" mapstructure:"default_direction"`
+	DefaultPullMode  string `yaml:"default_pull_mode" mapstructure:"default_pull_mode"`
 }
 
 // DiscoveryConfig contains node discovery settings
 type DiscoveryConfig struct {
-	Enabled     bool     `yaml:"enabled"`
-	Method      string   `yaml:"method"` // mdns, scan, static
-	Interface   string   `yaml:"interface"`
-	Port        int      `yaml:"port"`
-	Interval    string   `yaml:"interval"`
-	Timeout     string   `yaml:"timeout"`
-	StaticNodes []string `yaml:"static_nodes"`
-	ServiceName string   `yaml:"service_name"`
-	ServiceType string   `yaml:"service_type"`
+	Enabled     bool     `yaml:"enabled" mapstructure:"enabled"`
+	Method      string   `yaml:"method" mapstructure:"method"` // mdns, scan, static
+	Interface   string   `yaml:"interface" mapstructure:"interface"`
+	Port        int      `yaml:"port" mapstructure:"port"`
+	Interval    string   `yaml:"interval" mapstructure:"interval"`
+	Timeout     string   `yaml:"timeout" mapstructure:"timeout"`
+	StaticNodes []string `yaml:"static_nodes" mapstructure:"static_nodes"`
+	ServiceName string   `yaml:"service_name" mapstructure:"service_name"`
+	ServiceType string   `yaml:"service_type" mapstructure:"service_type"`
 }
 
 // GRPCClientConfig contains gRPC client settings for Pi Agent
 type GRPCClientConfig struct {
 	// Server connection
-	ServerAddress string `yaml:"server_address"`
-	ServerPort    int    `yaml:"server_port"`
+	ServerAddress string `yaml:"server_address" mapstructure:"server_address"`
+	ServerPort    int    `yaml:"server_port" mapstructure:"server_port"`
 
 	// Connection settings
-	ConnectionTimeout string `yaml:"connection_timeout"`
-	RequestTimeout    string `yaml:"request_timeout"`
-	MaxMessageSize    int    `yaml:"max_message_size"`
+	ConnectionTimeout string `yaml:"connection_timeout" mapstructure:"connection_timeout"`
+	RequestTimeout    string `yaml:"request_timeout" mapstructure:"request_timeout"`
+	MaxMessageSize    int    `yaml:"max_message_size" mapstructure:"max_message_size"`
 
 	// Retry configuration
-	MaxRetries        int     `yaml:"max_retries"`
-	InitialRetryDelay string  `yaml:"initial_retry_delay"`
-	MaxRetryDelay     string  `yaml:"max_retry_delay"`
-	RetryMultiplier   float64 `yaml:"retry_multiplier"`
+	MaxRetries        int     `yaml:"max_retries" mapstructure:"max_retries"`
+	InitialRetryDelay string  `yaml:"initial_retry_delay" mapstructure:"initial_retry_delay"`
+	MaxRetryDelay     string  `yaml:"max_retry_delay" mapstructure:"max_retry_delay"`
+	RetryMultiplier   float64 `yaml:"retry_multiplier" mapstructure:"retry_multiplier"`
 
 	// Heartbeat settings
-	HeartbeatInterval string `yaml:"heartbeat_interval"`
-	HeartbeatTimeout  string `yaml:"heartbeat_timeout"`
+	HeartbeatInterval string `yaml:"heartbeat_interval" mapstructure:"heartbeat_interval"`
+	HeartbeatTimeout  string `yaml:"heartbeat_timeout" mapstructure:"heartbeat_timeout"`
 
 	// Keep-alive settings
-	KeepAliveTime    string `yaml:"keepalive_time"`
-	KeepAliveTimeout string `yaml:"keepalive_timeout"`
+	KeepAliveTime    string `yaml:"keepalive_time" mapstructure:"keepalive_time"`
+	KeepAliveTimeout string `yaml:"keepalive_timeout" mapstructure:"keepalive_timeout"`
 
 	// Security
-	Insecure bool   `yaml:"insecure"`
-	TLSCert  string `yaml:"tls_cert"`
-	TLSKey   string `yaml:"tls_key"`
+	Insecure bool   `yaml:"insecure" mapstructure:"insecure"`
+	TLSCert  string `yaml:"tls_cert" mapstructure:"tls_cert"`
+	TLSKey   string `yaml:"tls_key" mapstructure:"tls_key"`
 
 	// Node information
-	NodeID   string `yaml:"node_id"`
-	NodeName string `yaml:"node_name"`
+	NodeID   string `yaml:"node_id" mapstructure:"node_id"`
+	NodeName string `yaml:"node_name" mapstructure:"node_name"`
 }
 
 // CAConfig contains Certificate Authority settings
 type CAConfig struct {
 	// CA backend type: "local" or "vault"
-	Backend string `yaml:"backend"`
+	Backend string `yaml:"backend" mapstructure:"backend"`
 
 	// Local CA configuration
-	Local LocalCAConfig `yaml:"local"`
+	Local LocalCAConfig `yaml:"local" mapstructure:"local"`
 
 	// Vault CA configuration
-	Vault VaultCAConfig `yaml:"vault"`
+	Vault VaultCAConfig `yaml:"vault" mapstructure:"vault"`
 
 	// SSH configuration for remote certificate operations
-	SSH SSHConfig `yaml:"ssh"`
+	SSH SSHConfig `yaml:"ssh" mapstructure:"ssh"`
 
 	// Certificate settings
-	CertificateConfig CertificateConfig `yaml:"certificate"`
+	CertificateConfig CertificateConfig `yaml:"certificate" mapstructure:"certificate"`
 }
 
 // LocalCAConfig contains local CA backend settings
 type LocalCAConfig struct {
 	// Directory to store CA certificates and keys (on server nodes)
-	DataDir string `yaml:"data_dir"`
+	DataDir string `yaml:"data_dir" mapstructure:"data_dir"`
 
 	// CA certificate validity period
-	CAValidityPeriod string `yaml:"ca_validity_period"`
+	CAValidityPeriod string `yaml:"ca_validity_period" mapstructure:"ca_validity_period"`
 
 	// Default certificate validity period for issued certificates
-	CertValidityPeriod string `yaml:"cert_validity_period"`
+	CertValidityPeriod string `yaml:"cert_validity_period" mapstructure:"cert_validity_period"`
 
 	// Key size for RSA keys
-	KeySize int `yaml:"key_size"`
+	KeySize int `yaml:"key_size" mapstructure:"key_size"`
 
 	// Organization information for CA certificate
-	Organization       string `yaml:"organization"`
-	OrganizationalUnit string `yaml:"organizational_unit"`
-	Country            string `yaml:"country"`
-	Province           string `yaml:"province"`
-	Locality           string `yaml:"locality"`
+	Organization       string `yaml:"organization" mapstructure:"organization"`
+	OrganizationalUnit string `yaml:"organizational_unit" mapstructure:"organizational_unit"`
+	Country            string `yaml:"country" mapstructure:"country"`
+	Province           string `yaml:"province" mapstructure:"province"`
+	Locality           string `yaml:"locality" mapstructure:"locality"`
 }
 
 // VaultCAConfig contains Vault PKI backend settings
 type VaultCAConfig struct {
 	// Vault server address
-	Address string `yaml:"address"`
+	Address string `yaml:"address" mapstructure:"address"`
 
 	// PKI mount path
-	MountPath string `yaml:"mount_path"`
+	MountPath string `yaml:"mount_path" mapstructure:"mount_path"`
 
 	// AppRole authentication settings
-	AppRoleID   string `yaml:"app_role_id"`
-	SecretID    string `yaml:"secret_id"`
-	SecretIDEnv string `yaml:"secret_id_env"` // Environment variable for secret_id
+	AppRoleID   string `yaml:"app_role_id" mapstructure:"app_role_id"`
+	SecretID    string `yaml:"secret_id" mapstructure:"secret_id"`
+	SecretIDEnv string `yaml:"secret_id_env" mapstructure:"secret_id_env"` // Environment variable for secret_id
 
 	// Admin token for initial setup (dev only)
-	AdminToken    string `yaml:"admin_token"`
-	AdminTokenEnv string `yaml:"admin_token_env"` // Environment variable for admin_token
+	AdminToken    string `yaml:"admin_token" mapstructure:"admin_token"`
+	AdminTokenEnv string `yaml:"admin_token_env" mapstructure:"admin_token_env"` // Environment variable for admin_token
 
 	// Connection settings
-	Timeout   string         `yaml:"timeout"`
-	TLSConfig VaultTLSConfig `yaml:"tls"`
+	Timeout   string         `yaml:"timeout" mapstructure:"timeout"`
+	TLSConfig VaultTLSConfig `yaml:"tls" mapstructure:"tls"`
 
 	// Certificate role name in Vault
-	CertRole string `yaml:"cert_role"`
+	CertRole string `yaml:"cert_role" mapstructure:"cert_role"`
 
 	// Allow insecure connections (dev only)
-	AllowInsecure bool `yaml:"allow_insecure"`
+	AllowInsecure bool `yaml:"allow_insecure" mapstructure:"allow_insecure"`
 }
 
 // VaultTLSConfig contains TLS settings for Vault connection
 type VaultTLSConfig struct {
 	// Skip TLS verification (dev only)
-	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
-	CACert             string `yaml:"ca_cert"`
-	ClientCert         string `yaml:"client_cert"`
-	ClientKey          string `yaml:"client_key"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify" mapstructure:"insecure_skip_verify"`
+	CACert             string `yaml:"ca_cert" mapstructure:"ca_cert"`
+	ClientCert         string `yaml:"client_cert" mapstructure:"client_cert"`
+	ClientKey          string `yaml:"client_key" mapstructure:"client_key"`
 }
 
 // SSHConfig contains SSH settings for remote CA operations
 type SSHConfig struct {
 	// SSH key for authenticating to server nodes
-	PrivateKeyPath string `yaml:"private_key_path"`
-	PrivateKeyEnv  string `yaml:"private_key_env"` // Environment variable for private key
+	PrivateKeyPath string `yaml:"private_key_path" mapstructure:"private_key_path"`
+	PrivateKeyEnv  string `yaml:"private_key_env" mapstructure:"private_key_env"` // Environment variable for private key
 
 	// Default SSH user for server nodes
-	User string `yaml:"user"`
+	User string `yaml:"user" mapstructure:"user"`
 
 	// Default SSH port
-	Port int `yaml:"port"`
+	Port int `yaml:"port" mapstructure:"port"`
 
 	// Connection timeout
-	Timeout string `yaml:"timeout"`
+	Timeout string `yaml:"timeout" mapstructure:"timeout"`
 
 	// Host key checking
-	StrictHostKeyChecking bool `yaml:"strict_host_key_checking"`
+	StrictHostKeyChecking bool `yaml:"strict_host_key_checking" mapstructure:"strict_host_key_checking"`
 
 	// Known hosts file path
-	KnownHostsFile string `yaml:"known_hosts_file"`
+	KnownHostsFile string `yaml:"known_hosts_file" mapstructure:"known_hosts_file"`
 }
 
 // CertificateConfig contains general certificate settings
 type CertificateConfig struct {
 	// Default certificate validity period
-	DefaultValidityPeriod string `yaml:"default_validity_period"`
+	DefaultValidityPeriod string `yaml:"default_validity_period" mapstructure:"default_validity_period"`
 
 	// Certificate renewal threshold (renew when this much time is left)
-	RenewalThreshold string `yaml:"renewal_threshold"`
+	RenewalThreshold string `yaml:"renewal_threshold" mapstructure:"renewal_threshold"`
 
 	// Key usage settings
-	DefaultKeyUsage    []string `yaml:"default_key_usage"`
-	DefaultExtKeyUsage []string `yaml:"default_ext_key_usage"`
+	DefaultKeyUsage    []string `yaml:"default_key_usage" mapstructure:"default_key_usage"`
+	DefaultExtKeyUsage []string `yaml:"default_ext_key_usage" mapstructure:"default_ext_key_usage"`
 
 	// Subject Alternative Name settings
-	AllowWildcardDNS bool     `yaml:"allow_wildcard_dns"`
-	AllowedDomains   []string `yaml:"allowed_domains"`
+	AllowWildcardDNS bool     `yaml:"allow_wildcard_dns" mapstructure:"allow_wildcard_dns"`
+	AllowedDomains   []string `yaml:"allowed_domains" mapstructure:"allowed_domains"`
 
 	// Certificate storage and cleanup
-	StoragePath     string `yaml:"storage_path"`     // Path to store certificates on control machine
-	CleanupInterval string `yaml:"cleanup_interval"` // How often to clean up expired certificates
-	RetentionPeriod string `yaml:"retention_period"` // How long to keep expired certificates
+	StoragePath     string `yaml:"storage_path" mapstructure:"storage_path"`     // Path to store certificates on control machine
+	CleanupInterval string `yaml:"cleanup_interval" mapstructure:"cleanup_interval"` // How often to clean up expired certificates
+	RetentionPeriod string `yaml:"retention_period" mapstructure:"retention_period"` // How long to keep expired certificates
 }
 
 // AgentServerConfig contains Pi Agent gRPC server settings
 type AgentServerConfig struct {
 	// Server settings
-	Address string `yaml:"address"`
-	Port    int    `yaml:"port"`
+	Address string `yaml:"address" mapstructure:"address"`
+	Port    int    `yaml:"port" mapstructure:"port"`
 
 	// Service settings
-	EnableGPIO bool `yaml:"enable_gpio"`
+	EnableGPIO bool `yaml:"enable_gpio" mapstructure:"enable_gpio"`
 
 	// Security
-	TLSCertFile string `yaml:"tls_cert_file"`
-	TLSKeyFile  string `yaml:"tls_key_file"`
+	TLSCertFile string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
+	TLSKeyFile  string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
 }
 
 // SentryConfig contains Sentry error tracking and performance monitoring settings
 type SentryConfig struct {
 	// Sentry DSN (Data Source Name)
-	DSN string `yaml:"dsn"`
+	DSN string `yaml:"dsn" mapstructure:"dsn"`
 
 	// Environment name (e.g., development, staging, production)
-	Environment string `yaml:"environment"`
+	Environment string `yaml:"environment" mapstructure:"environment"`
 
 	// Release version for tracking
-	Release string `yaml:"release"`
+	Release string `yaml:"release" mapstructure:"release"`
 
 	// Enable debug mode for Sentry SDK
-	Debug bool `yaml:"debug"`
+	Debug bool `yaml:"debug" mapstructure:"debug"`
 
 	// Sample rate for performance monitoring (0.0 to 1.0)
-	TracesSampleRate float64 `yaml:"traces_sample_rate"`
+	TracesSampleRate float64 `yaml:"traces_sample_rate" mapstructure:"traces_sample_rate"`
 
 	// Sample rate for errors (0.0 to 1.0)
-	SampleRate float64 `yaml:"sample_rate"`
+	SampleRate float64 `yaml:"sample_rate" mapstructure:"sample_rate"`
 
 	// Enable performance monitoring
-	EnableTracing bool `yaml:"enable_tracing"`
+	EnableTracing bool `yaml:"enable_tracing" mapstructure:"enable_tracing"`
 
 	// Send PII (Personally Identifiable Information)
-	SendDefaultPII bool `yaml:"send_default_pii"`
+	SendDefaultPII bool `yaml:"send_default_pii" mapstructure:"send_default_pii"`
 
 	// Maximum number of breadcrumbs
-	MaxBreadcrumbs int `yaml:"max_breadcrumbs"`
+	MaxBreadcrumbs int `yaml:"max_breadcrumbs" mapstructure:"max_breadcrumbs"`
 
 	// Attach stack traces to messages
-	AttachStacktrace bool `yaml:"attach_stacktrace"`
+	AttachStacktrace bool `yaml:"attach_stacktrace" mapstructure:"attach_stacktrace"`
 }
 
 // WebUIConfig contains web UI server settings
 type WebUIConfig struct {
 	// Server settings
-	Enabled   bool   `yaml:"enabled"`
-	Host      string `yaml:"host"`
-	Port      int    `yaml:"port"`
-	StaticDir string `yaml:"static_dir"`
-	IndexFile string `yaml:"index_file"`
-	SPAMode   bool   `yaml:"spa_mode"`
+	Enabled   bool   `yaml:"enabled" mapstructure:"enabled"`
+	Host      string `yaml:"host" mapstructure:"host"`
+	Port      int    `yaml:"port" mapstructure:"port"`
+	StaticDir string `yaml:"static_dir" mapstructure:"static_dir"`
+	IndexFile string `yaml:"index_file" mapstructure:"index_file"`
+	SPAMode   bool   `yaml:"spa_mode" mapstructure:"spa_mode"`
 
 	// Backend connection
-	Backend BackendConfig `yaml:"backend"`
+	Backend BackendConfig `yaml:"backend" mapstructure:"backend"`
 
 	// Runtime config injection
-	RuntimeConfig RuntimeConfigSettings `yaml:"runtime_config"`
+	RuntimeConfig RuntimeConfigSettings `yaml:"runtime_config" mapstructure:"runtime_config"`
 
 	// Authentication
-	Auth WebAuthConfig `yaml:"auth"`
+	Auth WebAuthConfig `yaml:"auth" mapstructure:"auth"`
 
 	// CORS configuration
-	CORS CORSConfig `yaml:"cors"`
+	CORS CORSConfig `yaml:"cors" mapstructure:"cors"`
 
 	// Feature flags
-	Features FeatureFlags `yaml:"features"`
+	Features FeatureFlags `yaml:"features" mapstructure:"features"`
 
 	// UI branding
-	Branding BrandingConfig `yaml:"branding"`
+	Branding BrandingConfig `yaml:"branding" mapstructure:"branding"`
 
 	// Performance & caching
-	Cache CacheConfig `yaml:"cache"`
+	Cache CacheConfig `yaml:"cache" mapstructure:"cache"`
 
 	// Compression
-	Compression CompressionConfig `yaml:"compression"`
+	Compression CompressionConfig `yaml:"compression" mapstructure:"compression"`
 
 	// Security headers
-	Security SecurityConfig `yaml:"security"`
+	Security SecurityConfig `yaml:"security" mapstructure:"security"`
 
 	// Rate limiting
-	RateLimit RateLimitConfig `yaml:"rate_limit"`
+	RateLimit RateLimitConfig `yaml:"rate_limit" mapstructure:"rate_limit"`
 
 	// Observability
-	Observability ObservabilityConfig `yaml:"observability"`
+	Observability ObservabilityConfig `yaml:"observability" mapstructure:"observability"`
 
 	// Resource limits (for K8s)
-	Resources ResourcesConfig `yaml:"resources"`
+	Resources ResourcesConfig `yaml:"resources" mapstructure:"resources"`
 
 	// Health checks
-	Health HealthConfig `yaml:"health"`
+	Health HealthConfig `yaml:"health" mapstructure:"health"`
 }
 
 // BackendConfig contains backend service URLs
 type BackendConfig struct {
-	API       BackendServiceConfig `yaml:"api"`
-	GRPC      BackendServiceConfig `yaml:"grpc"`
-	WebSocket BackendServiceConfig `yaml:"websocket"`
-	TLS       TLSConfig            `yaml:"tls"`
+	API       BackendServiceConfig `yaml:"api" mapstructure:"api"`
+	GRPC      BackendServiceConfig `yaml:"grpc" mapstructure:"grpc"`
+	WebSocket BackendServiceConfig `yaml:"websocket" mapstructure:"websocket"`
+	TLS       TLSConfig            `yaml:"tls" mapstructure:"tls"`
 }
 
 // BackendServiceConfig contains configuration for a backend service
 type BackendServiceConfig struct {
-	URL         string `yaml:"url"`
-	InternalURL string `yaml:"internal_url"`
-	Prefix      string `yaml:"prefix"`
-	Path        string `yaml:"path"`
-	WebEnabled  bool   `yaml:"web_enabled"`
+	URL         string `yaml:"url" mapstructure:"url"`
+	InternalURL string `yaml:"internal_url" mapstructure:"internal_url"`
+	Prefix      string `yaml:"prefix" mapstructure:"prefix"`
+	Path        string `yaml:"path" mapstructure:"path"`
+	WebEnabled  bool   `yaml:"web_enabled" mapstructure:"web_enabled"`
 }
 
 // TLSConfig contains TLS settings
 type TLSConfig struct {
-	Enabled  bool   `yaml:"enabled"`
-	CertFile string `yaml:"cert_file"`
-	KeyFile  string `yaml:"key_file"`
-	CAFile   string `yaml:"ca_file"`
+	Enabled  bool   `yaml:"enabled" mapstructure:"enabled"`
+	CertFile string `yaml:"cert_file" mapstructure:"cert_file"`
+	KeyFile  string `yaml:"key_file" mapstructure:"key_file"`
+	CAFile   string `yaml:"ca_file" mapstructure:"ca_file"`
 }
 
 // RuntimeConfigSettings controls runtime config injection
 type RuntimeConfigSettings struct {
-	Enabled bool   `yaml:"enabled"`
-	Path    string `yaml:"path"`
+	Enabled bool   `yaml:"enabled" mapstructure:"enabled"`
+	Path    string `yaml:"path" mapstructure:"path"`
 }
 
 // WebAuthConfig contains web UI authentication settings
 type WebAuthConfig struct {
-	Enabled          bool   `yaml:"enabled"`
-	SessionSecretEnv string `yaml:"session_secret_env"`
-	JWTSecretEnv     string `yaml:"jwt_secret_env"`
-	SessionTimeout   string `yaml:"session_timeout"`
-	CookieSecure     bool   `yaml:"cookie_secure"`
-	CookieSameSite   string `yaml:"cookie_same_site"`
+	Enabled          bool   `yaml:"enabled" mapstructure:"enabled"`
+	SessionSecretEnv string `yaml:"session_secret_env" mapstructure:"session_secret_env"`
+	JWTSecretEnv     string `yaml:"jwt_secret_env" mapstructure:"jwt_secret_env"`
+	SessionTimeout   string `yaml:"session_timeout" mapstructure:"session_timeout"`
+	CookieSecure     bool   `yaml:"cookie_secure" mapstructure:"cookie_secure"`
+	CookieSameSite   string `yaml:"cookie_same_site" mapstructure:"cookie_same_site"`
 }
 
 // CORSConfig contains CORS settings
 type CORSConfig struct {
-	Enabled        bool     `yaml:"enabled"`
-	AllowedOrigins []string `yaml:"allowed_origins"`
-	AllowedMethods []string `yaml:"allowed_methods"`
-	AllowedHeaders []string `yaml:"allowed_headers"`
-	ExposedHeaders []string `yaml:"exposed_headers"`
-	Credentials    bool     `yaml:"credentials"`
-	MaxAge         string   `yaml:"max_age"`
+	Enabled        bool     `yaml:"enabled" mapstructure:"enabled"`
+	AllowedOrigins []string `yaml:"allowed_origins" mapstructure:"allowed_origins"`
+	AllowedMethods []string `yaml:"allowed_methods" mapstructure:"allowed_methods"`
+	AllowedHeaders []string `yaml:"allowed_headers" mapstructure:"allowed_headers"`
+	ExposedHeaders []string `yaml:"exposed_headers" mapstructure:"exposed_headers"`
+	Credentials    bool     `yaml:"credentials" mapstructure:"credentials"`
+	MaxAge         string   `yaml:"max_age" mapstructure:"max_age"`
 }
 
 // FeatureFlags contains UI feature toggles
 type FeatureFlags struct {
-	GPIOControl           bool `yaml:"gpio_control"`
-	ClusterManagement     bool `yaml:"cluster_management"`
-	CertificateManagement bool `yaml:"certificate_management"`
-	RealTimeMetrics       bool `yaml:"real_time_metrics"`
-	NodeDiscovery         bool `yaml:"node_discovery"`
-	AdvancedNetworking    bool `yaml:"advanced_networking"`
-	Experimental          bool `yaml:"experimental"`
+	GPIOControl           bool `yaml:"gpio_control" mapstructure:"gpio_control"`
+	ClusterManagement     bool `yaml:"cluster_management" mapstructure:"cluster_management"`
+	CertificateManagement bool `yaml:"certificate_management" mapstructure:"certificate_management"`
+	RealTimeMetrics       bool `yaml:"real_time_metrics" mapstructure:"real_time_metrics"`
+	NodeDiscovery         bool `yaml:"node_discovery" mapstructure:"node_discovery"`
+	AdvancedNetworking    bool `yaml:"advanced_networking" mapstructure:"advanced_networking"`
+	Experimental          bool `yaml:"experimental" mapstructure:"experimental"`
 }
 
 // BrandingConfig contains UI customization settings
 type BrandingConfig struct {
-	Title        string `yaml:"title"`
-	LogoURL      string `yaml:"logo_url"`
-	FaviconURL   string `yaml:"favicon_url"`
-	PrimaryColor string `yaml:"primary_color"`
-	Theme        string `yaml:"theme"`
+	Title        string `yaml:"title" mapstructure:"title"`
+	LogoURL      string `yaml:"logo_url" mapstructure:"logo_url"`
+	FaviconURL   string `yaml:"favicon_url" mapstructure:"favicon_url"`
+	PrimaryColor string `yaml:"primary_color" mapstructure:"primary_color"`
+	Theme        string `yaml:"theme" mapstructure:"theme"`
 }
 
 // CacheConfig contains caching settings
 type CacheConfig struct {
-	Enabled        bool   `yaml:"enabled"`
-	StaticMaxAge   string `yaml:"static_max_age"`
-	HTMLMaxAge     string `yaml:"html_max_age"`
-	APICacheMaxAge string `yaml:"api_cache_max_age"`
+	Enabled        bool   `yaml:"enabled" mapstructure:"enabled"`
+	StaticMaxAge   string `yaml:"static_max_age" mapstructure:"static_max_age"`
+	HTMLMaxAge     string `yaml:"html_max_age" mapstructure:"html_max_age"`
+	APICacheMaxAge string `yaml:"api_cache_max_age" mapstructure:"api_cache_max_age"`
 }
 
 // CompressionConfig contains compression settings
 type CompressionConfig struct {
-	Enabled bool `yaml:"enabled"`
-	Level   int  `yaml:"level"`
-	MinSize int  `yaml:"min_size"`
+	Enabled bool `yaml:"enabled" mapstructure:"enabled"`
+	Level   int  `yaml:"level" mapstructure:"level"`
+	MinSize int  `yaml:"min_size" mapstructure:"min_size"`
 }
 
 // SecurityConfig contains security header settings
 type SecurityConfig struct {
-	HSTSEnabled        bool   `yaml:"hsts_enabled"`
-	HSTSMaxAge         string `yaml:"hsts_max_age"`
-	FrameDeny          bool   `yaml:"frame_deny"`
-	ContentTypeNoSniff bool   `yaml:"content_type_nosniff"`
-	XSSProtection      bool   `yaml:"xss_protection"`
-	CSPEnabled         bool   `yaml:"csp_enabled"`
-	CSPDirectives      string `yaml:"csp_directives"`
+	HSTSEnabled        bool   `yaml:"hsts_enabled" mapstructure:"hsts_enabled"`
+	HSTSMaxAge         string `yaml:"hsts_max_age" mapstructure:"hsts_max_age"`
+	FrameDeny          bool   `yaml:"frame_deny" mapstructure:"frame_deny"`
+	ContentTypeNoSniff bool   `yaml:"content_type_nosniff" mapstructure:"content_type_nosniff"`
+	XSSProtection      bool   `yaml:"xss_protection" mapstructure:"xss_protection"`
+	CSPEnabled         bool   `yaml:"csp_enabled" mapstructure:"csp_enabled"`
+	CSPDirectives      string `yaml:"csp_directives" mapstructure:"csp_directives"`
 }
 
 // RateLimitConfig contains rate limiting settings
 type RateLimitConfig struct {
-	Enabled           bool `yaml:"enabled"`
-	RequestsPerMinute int  `yaml:"requests_per_minute"`
-	BurstSize         int  `yaml:"burst_size"`
+	Enabled           bool `yaml:"enabled" mapstructure:"enabled"`
+	RequestsPerMinute int  `yaml:"requests_per_minute" mapstructure:"requests_per_minute"`
+	BurstSize         int  `yaml:"burst_size" mapstructure:"burst_size"`
 }
 
 // ObservabilityConfig contains observability settings
 type ObservabilityConfig struct {
-	AccessLog       bool   `yaml:"access_log"`
-	AccessLogFormat string `yaml:"access_log_format"`
-	MetricsEnabled  bool   `yaml:"metrics_enabled"`
-	MetricsPath     string `yaml:"metrics_path"`
-	TracingEnabled  bool   `yaml:"tracing_enabled"`
+	AccessLog       bool   `yaml:"access_log" mapstructure:"access_log"`
+	AccessLogFormat string `yaml:"access_log_format" mapstructure:"access_log_format"`
+	MetricsEnabled  bool   `yaml:"metrics_enabled" mapstructure:"metrics_enabled"`
+	MetricsPath     string `yaml:"metrics_path" mapstructure:"metrics_path"`
+	TracingEnabled  bool   `yaml:"tracing_enabled" mapstructure:"tracing_enabled"`
 }
 
 // ResourcesConfig contains resource limit settings
 type ResourcesConfig struct {
-	CPULimit      string `yaml:"cpu_limit"`
-	MemoryLimit   string `yaml:"memory_limit"`
-	CPURequest    string `yaml:"cpu_request"`
-	MemoryRequest string `yaml:"memory_request"`
+	CPULimit      string `yaml:"cpu_limit" mapstructure:"cpu_limit"`
+	MemoryLimit   string `yaml:"memory_limit" mapstructure:"memory_limit"`
+	CPURequest    string `yaml:"cpu_request" mapstructure:"cpu_request"`
+	MemoryRequest string `yaml:"memory_request" mapstructure:"memory_request"`
 }
 
 // HealthConfig contains health check settings
 type HealthConfig struct {
-	Enabled       bool   `yaml:"enabled"`
-	Path          string `yaml:"path"`
-	LivenessPath  string `yaml:"liveness_path"`
-	ReadinessPath string `yaml:"readiness_path"`
+	Enabled       bool   `yaml:"enabled" mapstructure:"enabled"`
+	Path          string `yaml:"path" mapstructure:"path"`
+	LivenessPath  string `yaml:"liveness_path" mapstructure:"liveness_path"`
+	ReadinessPath string `yaml:"readiness_path" mapstructure:"readiness_path"`
 }
 
 // Load loads configuration from YAML file with defaults

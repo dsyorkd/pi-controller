@@ -22,6 +22,7 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/tls"
 	"github.com/dsyorkd/pi-controller/internal/websocket"
 	"github.com/dsyorkd/pi-controller/pkg/discovery"
 )
@@ -172,6 +173,33 @@ func runServer(cmd *cobra.Command, args []string) error {
 		if err := caService.InitializeCA(context.Background()); err != nil {
 			log.WithError(err).Warn("CA initialization failed - manual initialization may be required")
 		}
+	}
+
+	// Setup TLS/HTTPS if enabled or in production
+	if cfg.API.IsTLSEnabled() || cfg.App.Environment == "production" {
+		tlsConfig := tls.Config{
+			CertFile: cfg.API.TLSCertFile,
+			KeyFile:  cfg.API.TLSKeyFile,
+			// Auto-generate cert for development if not provided
+			AutoCert: cfg.App.Environment == "development" && !cfg.API.IsTLSEnabled(),
+			CertDir:  cfg.App.DataDir + "/tls",
+			// Default hostnames for development
+			Hostnames: []string{"localhost", "127.0.0.1", "::1"},
+		}
+
+		_, err := tls.Setup(tlsConfig, log)
+		if err != nil {
+			return errors.Wrapf(err, "failed to setup TLS")
+		}
+
+		log.WithFields(map[string]interface{}{
+			"cert_file": cfg.API.TLSCertFile,
+			"key_file":  cfg.API.TLSKeyFile,
+			"auto_cert": tlsConfig.AutoCert,
+		}).Info("TLS/HTTPS configured successfully")
+	} else if cfg.App.Environment == "production" {
+		log.Warn("⚠️  Production environment detected but TLS is not enabled!")
+		log.Warn("⚠️  It is STRONGLY recommended to enable TLS in production")
 	}
 
 	// Start REST API server

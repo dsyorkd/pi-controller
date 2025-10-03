@@ -271,9 +271,6 @@ func addPerformanceIndexes(db *gorm.DB) error {
 	
 	-- Index for active clusters with ready nodes
 	CREATE INDEX IF NOT EXISTS idx_clusters_active ON clusters(status) WHERE status = 'active' AND deleted_at IS NULL;
-	
-	-- Index for recent readings (last 24 hours pattern)
-	CREATE INDEX IF NOT EXISTS idx_gpio_readings_recent ON gpio_readings(timestamp) WHERE timestamp > datetime('now', '-1 day');
 	`
 
 	return db.Exec(sql).Error
@@ -282,7 +279,6 @@ func addPerformanceIndexes(db *gorm.DB) error {
 // dropPerformanceIndexes removes the performance optimization indexes
 func dropPerformanceIndexes(db *gorm.DB) error {
 	sql := `
-	DROP INDEX IF EXISTS idx_gpio_readings_recent;
 	DROP INDEX IF EXISTS idx_clusters_active;
 	DROP INDEX IF EXISTS idx_gpio_readings_device_time_desc;
 	DROP INDEX IF EXISTS idx_gpio_readings_timestamp_desc;

@@ -50,13 +50,13 @@ func (s *ClusterService) Create(req CreateClusterRequest) (*models.Cluster, erro
 
 	// Validate cluster name for malicious input
 	if err := validation.ValidateResourceName("name", req.Name, 255); err != nil {
-		return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+		return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
 	}
 
 	// Validate description if provided
 	if req.Description != "" {
 		if err := validation.ValidateDescription("description", req.Description, 1000); err != nil {
-			return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+			return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
 		}
 	}
 
@@ -101,7 +101,7 @@ func (s *ClusterService) Update(id uint, req UpdateClusterRequest) (*models.Clus
 	if req.Name != nil {
 		// Validate cluster name for malicious input
 		if err := validation.ValidateResourceName("name", *req.Name, 255); err != nil {
-			return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+			return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
 		}
 		cluster.Name = *req.Name
 	}
@@ -109,7 +109,7 @@ func (s *ClusterService) Update(id uint, req UpdateClusterRequest) (*models.Clus
 		// Validate description if provided
 		if *req.Description != "" {
 			if err := validation.ValidateDescription("description", *req.Description, 1000); err != nil {
-				return nil, errors.Wrapf(ErrInvalidInput, err.Error())
+				return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
 			}
 		}
 		cluster.Description = *req.Description

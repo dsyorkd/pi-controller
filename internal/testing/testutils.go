@@ -107,13 +107,15 @@ func CreateTestCluster(t *testing.T) *models.Cluster {
 func CreateTestNode(t *testing.T, clusterID uint) *models.Node {
 	// Use test name and timestamp to ensure unique names
 	uniqueName := fmt.Sprintf("test-node-%s-%d", t.Name(), time.Now().UnixNano())
+	uniqueMAC := fmt.Sprintf("00:00:00:00:%02x:%02x", time.Now().Unix()%256, time.Now().UnixNano()%256)
 	return &models.Node{
-		Name:      uniqueName,
-		IPAddress: "192.168.1.100",
-		Status:    models.NodeStatusReady,
-		ClusterID: &clusterID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Name:       uniqueName,
+		IPAddress:  "192.168.1.100",
+		MACAddress: uniqueMAC,
+		Status:     models.NodeStatusReady,
+		ClusterID:  &clusterID,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
 	}
 }
 

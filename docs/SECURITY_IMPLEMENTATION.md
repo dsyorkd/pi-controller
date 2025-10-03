@@ -316,31 +316,89 @@ Properly returns HTTP 405 for invalid methods on existing endpoints.
 | **Rate Limiting** | Global API limits | middleware/ratelimit.go | ✅ |
 | | GPIO-specific limits | middleware/gpio_ratelimit.go | ✅ Task 68 |
 | | Hardware protection | server.go:196 | ✅ Task 68 |
+| **TLS/HTTPS** | Auto-cert generation | tls/tls.go | ✅ |
+| | Production cert support | tls/tls.go:30-80 | ✅ |
+| | Secure cipher suites | tls/tls.go:223-234 | ✅ |
+| | Certificate validation | tls/tls.go:192-220 | ✅ |
 | **Logging** | Audit logging | auth.go:570-586 | ✅ |
 | | Security events | Throughout | ✅ |
 
+### ✅ TLS/HTTPS Implementation (COMPLETED)
+
+**Implementation:** `internal/tls/tls.go`
+
+**Features:**
+- Auto-generation of self-signed certificates for development
+- Production certificate support (load from files)
+- ECDSA key generation (more efficient than RSA)
+- TLS 1.2+ minimum with secure cipher suites
+- Automatic certificate expiry checking and renewal
+- Warning system for expired/expiring certificates
+
+**Usage:**
+
+**Development Mode:**
+```yaml
+app:
+  environment: development
+  data_dir: ./data
+
+# TLS will auto-generate self-signed certificates
+# No additional configuration needed
+```
+
+Certificates will be auto-generated at `./data/tls/server.crt` and `./data/tls/server.key`.
+
+**Production Mode:**
+```yaml
+app:
+  environment: production
+
+api:
+  tls_cert_file: /etc/pi-controller/tls/cert.pem
+  tls_key_file: /etc/pi-controller/tls/key.pem
+```
+
+**Environment Variables:**
+```bash
+# Production TLS certificate paths
+export TLS_CERT_FILE=/path/to/cert.pem
+export TLS_KEY_FILE=/path/to/key.pem
+
+# Or use Docker secrets
+export TLS_CERT_FILE=/run/secrets/tls_cert
+export TLS_KEY_FILE=/run/secrets/tls_key
+```
+
+**Certificate Requirements:**
+- Valid x509 certificate in PEM format
+- Private key in PEM format (RSA or ECDSA)
+- Certificate must be valid (not expired)
+- Must match configured hostnames
+
+**Security Notes:**
+- Auto-generated certificates are **ONLY** for development
+- Production **MUST** use properly signed certificates (Let's Encrypt, corporate CA, etc.)
+- Certificates are checked for expiry on startup
+- Warning logged if certificate expires within 30 days
+
 ### 🔄 Additional Recommendations
 
-1. **TLS/HTTPS** (High Priority)
-   - Currently optional via config
-   - **MUST** be enforced in production
-   - Set `API.TLSCertFile` and `API.TLSKeyFile` in config
-
-2. **Token Blacklist** (Medium Priority)
+1. **Token Blacklist** (Medium Priority)
    - Currently: tokens valid until expiry
    - Recommended: Add Redis-based token blacklist for logout
    - Prevents token reuse after logout
 
-3. **Password Requirements** (Medium Priority)
+2. **Password Requirements** (Medium Priority)
    - Currently: minimum 6 characters
    - Recommended: Add complexity rules (uppercase, numbers, symbols)
    - Consider password strength meter
 
-4. **2FA/MFA** (Low Priority)
+3. **2FA/MFA** (Low Priority)
    - Currently: Not implemented
    - Consider TOTP-based 2FA for admin accounts
 
-5. **IP Whitelisting** (Optional)
+4. **IP Whitelisting** (Optional)
    - Feature exists but disabled by default
    - Enable for production: `auth.EnableIPWhitelist: true`
 
@@ -424,6 +482,46 @@ For security vulnerabilities, please DO NOT open a public issue. Instead:
 
 ---
 
-**Last Updated:** 2025-01-20
-**Implemented Tasks:** 60, 61, 67, 68
-**Security Status:** Production-Ready (with TLS enabled)
+## TLS/HTTPS Quick Start
+
+### Development
+
+```bash
+# TLS is automatically configured with self-signed certificates
+export PI_CONTROLLER_ENVIRONMENT=development
+./pi-controller
+
+# Server starts on https://localhost:8080 with auto-generated cert
+# Cert stored at ./data/tls/server.crt
+```
+
+### Production with Let's Encrypt
+
+```bash
+# Use certbot to obtain certificates
+certbot certonly --standalone -d your-domain.com
+
+# Configure pi-controller
+export PI_CONTROLLER_ENVIRONMENT=production
+export TLS_CERT_FILE=/etc/letsencrypt/live/your-domain.com/fullchain.pem
+export TLS_KEY_FILE=/etc/letsencrypt/live/your-domain.com/privkey.pem
+
+./pi-controller
+```
+
+### Production with Custom CA
+
+```bash
+# Use your corporate CA certificates
+export PI_CONTROLLER_ENVIRONMENT=production
+export TLS_CERT_FILE=/path/to/your/cert.pem
+export TLS_KEY_FILE=/path/to/your/key.pem
+
+./pi-controller
+```
+
+---
+
+**Last Updated:** 2025-01-30
+**Implemented Tasks:** 60, 61, 67, 68, TLS/HTTPS
+**Security Status:** Production-Ready

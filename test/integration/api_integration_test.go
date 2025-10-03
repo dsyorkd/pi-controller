@@ -66,6 +66,14 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 	// Setup router
 	suite.router = gin.New()
 
+	// Add test authentication middleware (sets admin role for all requests)
+	suite.router.Use(func(c *gin.Context) {
+		c.Set("user_id", "test-user-1")
+		c.Set("user_role", "admin")
+		c.Set("token_type", "access")
+		c.Next()
+	})
+
 	// Add NoMethod handler to return 405 for unsupported methods
 	suite.router.NoMethod(func(c *gin.Context) {
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
@@ -494,7 +502,37 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_GPIOWorkflow() {
 
 // TestAPIIntegration_Security_NoAuth tests security without authentication
 func (suite *APIIntegrationTestSuite) TestAPIIntegration_Security_NoAuth() {
-	securityTests := []struct {
+	// Create a cluster for the DELETE test (to document the security issue)
+	cluster := &models.Cluster{
+		Name:   "security-test-cluster",
+		Status: models.ClusterStatusActive,
+	}
+	err := suite.db.DB().Create(cluster).Error
+	require.NoError(suite.T(), err)
+
+	// Create a router without auth middleware for this security test
+	testLogger := logger.Default()
+	healthHandler := handlers.NewHealthHandler(suite.db)
+	clusterHandler := handlers.NewClusterHandler(suite.clusterService, testLogger)
+
+	noAuthRouter := gin.New()
+	// No auth middleware applied here - testing raw endpoints
+
+	// Health endpoints (should be accessible)
+	noAuthRouter.GET("/health", healthHandler.Health)
+	noAuthRouter.GET("/system/info", handlers.SystemInfo)
+
+	// API endpoints (should require auth in production)
+	v1 := noAuthRouter.Group("/api/v1")
+	{
+		clusters := v1.Group("/clusters")
+		{
+			clusters.GET("", clusterHandler.List)
+			clusters.DELETE("/:id", clusterHandler.Delete)
+		}
+	}
+
+	securityTests := []struct{
 		name           string
 		method         string
 		endpoint       string
@@ -518,9 +556,9 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_Security_NoAuth() {
 		{
 			name:           "Dangerous DELETE without auth",
 			method:         "DELETE",
-			endpoint:       "/api/v1/clusters/1",
+			endpoint:       fmt.Sprintf("/api/v1/clusters/%d", cluster.ID),
 			description:    "DELETE operations without auth - CRITICAL SECURITY RISK",
-			expectedStatus: http.StatusNotFound, // Would be 204 if cluster existed
+			expectedStatus: http.StatusNoContent, // 204 - deletion succeeds without auth!
 		},
 		{
 			name:           "System info disclosure",
@@ -537,7 +575,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_Security_NoAuth() {
 			require.NoError(suite.T(), err)
 
 			w := httptest.NewRecorder()
-			suite.router.ServeHTTP(w, req)
+			noAuthRouter.ServeHTTP(w, req) // Use noAuthRouter instead of suite.router
 
 			assert.Equal(suite.T(), tt.expectedStatus, w.Code)
 

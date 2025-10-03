@@ -303,9 +303,14 @@ func (s *Server) Start() error {
 	s.logger.WithField("address", s.config.GetAddress()).Info("Starting API server")
 
 	if s.config.IsTLSEnabled() {
+		s.logger.WithFields(map[string]interface{}{
+			"cert_file": s.config.TLSCertFile,
+			"key_file":  s.config.TLSKeyFile,
+		}).Info("Starting HTTPS server with TLS enabled")
 		return s.server.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
 	}
 
+	s.logger.Warn("⚠️  Starting HTTP server without TLS - not recommended for production!")
 	return s.server.ListenAndServe()
 }
 
@@ -355,4 +360,64 @@ func (s *Server) requireRole(role string) gin.HandlerFunc {
 	}
 
 	return s.authManager.RequireRole(role)
+}
+
+// NewForTest creates a new API server instance with rate limiting disabled for testing
+func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
+	// Set Gin mode based on environment
+	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
+
+	router := gin.New()
+
+	// Initialize services
+	clusterService := services.NewClusterService(db, log)
+	nodeService := services.NewNodeService(db, log)
+	gpioService := services.NewGPIOService(db, log)
+	provisioningService := services.NewProvisioningService(nodeService, log)
+
+	// Set dependencies after all services are created
+	clusterService.SetDependencies(provisioningService, nodeService)
+
+	// Initialize authentication manager if auth is enabled
+	var authManager *middleware.AuthManager
+	if cfg.AuthEnabled {
+		authConfig := middleware.DefaultAuthConfig()
+		var err error
+		authManager, err = middleware.NewAuthManager(authConfig, log)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to initialize authentication manager")
+		}
+	}
+
+	// Initialize validator for input validation
+	validator := middleware.NewValidator(middleware.DefaultValidationConfig(), log)
+
+	// Initialize rate limiters with disabled configuration for testing
+	logrusLogger := logrus.New()
+	disabledConfig := middleware.DefaultRateLimitConfig()
+	disabledConfig.Enabled = false
+	rateLimiter := middleware.NewRateLimiter(disabledConfig, logrusLogger)
+
+	disabledGPIOConfig := middleware.DefaultGPIORateLimitConfig()
+	disabledGPIOConfig.Enabled = false
+	gpioRateLimiter := middleware.NewGPIORateLimiter(disabledGPIOConfig, logrusLogger)
+
+	s := &Server{
+		config:              cfg,
+		logger:              log,
+		database:            db,
+		clusterService:      clusterService,
+		nodeService:         nodeService,
+		gpioService:         gpioService,
+		provisioningService: provisioningService,
+		caService:           caService,
+		authManager:         authManager,
+		validator:           validator,
+		rateLimiter:         rateLimiter,
+		gpioRateLimiter:     gpioRateLimiter,
+		router:              router,
+	}
+
+	s.setupRoutes()
+	return s
 }
