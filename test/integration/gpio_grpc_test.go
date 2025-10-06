@@ -108,7 +108,7 @@ func TestGPIOService_ReadWithGRPCClient(t *testing.T) {
 
 	// Setup mock expectations
 	mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(mockManager.mockClient, nil)
-	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, device).Return(nil)
+	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(nil)
 	mockManager.mockClient.On("ReadGPIOPin", mock.Anything, 18).Return(1, nil)
 
 	// Test reading GPIO device
@@ -157,7 +157,7 @@ func TestGPIOService_WriteWithGRPCClient(t *testing.T) {
 
 	// Setup mock expectations
 	mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(mockManager.mockClient, nil)
-	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, device).Return(nil)
+	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(nil)
 	mockManager.mockClient.On("WriteGPIOPin", mock.Anything, 25, 1).Return(nil)
 
 	// Test writing to GPIO device
@@ -255,7 +255,7 @@ func TestGPIOService_ConfigurationError(t *testing.T) {
 
 	// Setup mock expectations - configuration fails
 	mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(mockManager.mockClient, nil)
-	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, device).Return(assert.AnError)
+	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(assert.AnError)
 
 	// Test reading GPIO device with configuration error
 	result, err := gpioService.Read(device.ID)
@@ -303,7 +303,7 @@ func TestGPIOService_HardwareReadError(t *testing.T) {
 
 	// Setup mock expectations - hardware read fails
 	mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(mockManager.mockClient, nil)
-	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, device).Return(nil)
+	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(nil)
 	mockManager.mockClient.On("ReadGPIOPin", mock.Anything, 18).Return(0, assert.AnError)
 
 	// Test reading GPIO device with hardware error
@@ -352,7 +352,7 @@ func TestGPIOService_HardwareWriteError(t *testing.T) {
 
 	// Setup mock expectations - hardware write fails
 	mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(mockManager.mockClient, nil)
-	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, device).Return(nil)
+	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(nil)
 	mockManager.mockClient.On("WriteGPIOPin", mock.Anything, 25, 1).Return(assert.AnError)
 
 	// Test writing to GPIO device with hardware error
@@ -451,7 +451,7 @@ func TestGPIOService_ReadingCreation(t *testing.T) {
 
 	// Setup mock expectations
 	mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(mockManager.mockClient, nil)
-	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, device).Return(nil)
+	mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(nil)
 	mockManager.mockClient.On("ReadGPIOPin", mock.Anything, 18).Return(1, nil)
 
 	// Test reading GPIO device

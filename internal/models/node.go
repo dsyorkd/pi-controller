@@ -18,6 +18,13 @@ type Node struct {
 	UpdatedAt  time.Time      `json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
 
+	// Discovery Information
+	DiscoveryMethod   DiscoveryMethod `json:"discovery_method" gorm:"not null;default:'manual'"`
+	DiscoveredAt      time.Time       `json:"discovered_at"`
+	NodeType          NodeType        `json:"node_type" gorm:"not null;default:'generic'"`
+	ControllerVersion string          `json:"controller_version"` // Version of pi-controller if it's a controller node
+	AgentPort         int             `json:"agent_port"`         // gRPC port for pi-agent (if running)
+
 	// Hardware Information
 	Architecture string `json:"architecture"`
 	Model        string `json:"model"`
@@ -61,6 +68,40 @@ const (
 	NodeRoleWorker NodeRole = "worker"
 )
 
+// DiscoveryMethod defines how a node was discovered
+type DiscoveryMethod string
+
+const (
+	// DiscoveryMethodMDNS - Node discovered via mDNS service discovery
+	DiscoveryMethodMDNS DiscoveryMethod = "mdns"
+
+	// DiscoveryMethodDHCP - Node discovered via DHCP lease scanning
+	DiscoveryMethodDHCP DiscoveryMethod = "dhcp"
+
+	// DiscoveryMethodNetworkScan - Node discovered via network scanning (nmap, etc.)
+	DiscoveryMethodNetworkScan DiscoveryMethod = "network_scan"
+
+	// DiscoveryMethodManual - Node manually added by user
+	DiscoveryMethodManual DiscoveryMethod = "manual"
+
+	// DiscoveryMethodRaftCluster - Node discovered via Raft cluster membership
+	DiscoveryMethodRaftCluster DiscoveryMethod = "raft_cluster"
+
+	// DiscoveryMethodAPI - Node registered via API
+	DiscoveryMethodAPI DiscoveryMethod = "api"
+)
+
+// NodeType defines the type/capability of a node
+type NodeType string
+
+const (
+	// NodeTypeGeneric - Raspberry Pi running pi-controller binary
+	NodeTypeGeneric NodeType = "generic"
+
+	// NodeTypeUnknown - Type not yet determined
+	NodeTypeUnknown NodeType = "unknown"
+)
+
 // IsReady returns true if the node is ready to accept workloads
 func (n *Node) IsReady() bool {
 	return n.Status == NodeStatusReady
@@ -79,6 +120,20 @@ func (n *Node) IsMaster() bool {
 // UpdateLastSeen updates the last seen timestamp
 func (n *Node) UpdateLastSeen() {
 	n.LastSeen = time.Now()
+}
+
+// IsDiscoveredAutomatically returns true if the node was discovered automatically
+func (n *Node) IsDiscoveredAutomatically() bool {
+	return n.DiscoveryMethod == DiscoveryMethodMDNS ||
+		n.DiscoveryMethod == DiscoveryMethodDHCP ||
+		n.DiscoveryMethod == DiscoveryMethodNetworkScan ||
+		n.DiscoveryMethod == DiscoveryMethodRaftCluster
+}
+
+// CanJoinRaftCluster returns true if the node can join the Raft cluster
+// All nodes running pi-controller can join the cluster (NodeTypeGeneric)
+func (n *Node) CanJoinRaftCluster() bool {
+	return n.NodeType == NodeTypeGeneric && n.Status != NodeStatusFailed
 }
 
 // TableName returns the table name for the Node model

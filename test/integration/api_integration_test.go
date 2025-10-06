@@ -17,6 +17,7 @@ import (
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -34,6 +35,7 @@ type APIIntegrationTestSuite struct {
 	clusterService *services.ClusterService
 	nodeService    *services.NodeService
 	gpioService    *services.GPIOService
+	mockManager    *MockPiAgentClientManager
 }
 
 // SetupSuite sets up the test suite
@@ -47,10 +49,13 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 
 	testLogger := logger.Default()
 
+	// Initialize mock manager for GPIO testing
+	suite.mockManager = NewMockPiAgentClientManager()
+
 	// Initialize services
 	suite.clusterService = services.NewClusterService(suite.db, testLogger)
 	suite.nodeService = services.NewNodeService(suite.db, testLogger)
-	suite.gpioService = services.NewGPIOService(suite.db, testLogger)
+	suite.gpioService = services.NewGPIOServiceWithManager(suite.db, testLogger, suite.mockManager)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(suite.db)
@@ -60,6 +65,19 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 
 	// Setup router
 	suite.router = gin.New()
+
+	// Add test authentication middleware (sets admin role for all requests)
+	suite.router.Use(func(c *gin.Context) {
+		c.Set("user_id", "test-user-1")
+		c.Set("user_role", "admin")
+		c.Set("token_type", "access")
+		c.Next()
+	})
+
+	// Add NoMethod handler to return 405 for unsupported methods
+	suite.router.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+	})
 
 	// Health endpoints
 	suite.router.GET("/health", healthHandler.Health)
@@ -78,6 +96,10 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 			clusters.GET("/:id", clusterHandler.Get)
 			clusters.PUT("/:id", clusterHandler.Update)
 			clusters.DELETE("/:id", clusterHandler.Delete)
+			// Handle unsupported methods explicitly
+			clusters.PATCH("/:id", func(c *gin.Context) {
+				c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+			})
 		}
 
 		// Node routes
@@ -103,6 +125,19 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 			gpio.GET("/:id/readings", gpioHandler.GetReadings)
 		}
 	}
+}
+
+// SetupTest runs before each test to ensure clean database state
+func (suite *APIIntegrationTestSuite) SetupTest() {
+	// Clear all tables to ensure clean state for each test
+	suite.db.DB().Exec("DELETE FROM gpio_readings")
+	suite.db.DB().Exec("DELETE FROM gpio_devices")
+	suite.db.DB().Exec("DELETE FROM nodes")
+	suite.db.DB().Exec("DELETE FROM clusters")
+	suite.db.DB().Exec("DELETE FROM certificate_requests")
+	suite.db.DB().Exec("DELETE FROM certificates")
+	suite.db.DB().Exec("DELETE FROM ca_info")
+	suite.db.DB().Exec("DELETE FROM users")
 }
 
 // TearDownSuite cleans up after the test suite
@@ -362,6 +397,13 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_GPIOWorkflow() {
 	node := testutils.CreateTestNode(suite.T(), cluster.ID)
 	require.NoError(suite.T(), suite.db.DB().Create(node).Error)
 
+	// Setup mock expectations for GPIO operations
+	suite.mockManager.On("GetClient", mock.AnythingOfType("*models.Node")).Return(suite.mockManager.mockClient, nil)
+	suite.mockManager.mockClient.On("IsConnected").Return(true)
+	suite.mockManager.mockClient.On("ConfigureGPIOPin", mock.Anything, mock.AnythingOfType("*models.GPIODevice")).Return(nil)
+	suite.mockManager.mockClient.On("WriteGPIOPin", mock.Anything, 18, 1).Return(nil)
+	suite.mockManager.mockClient.On("ReadGPIOPin", mock.Anything, 18).Return(1, nil)
+
 	// 1. Create a GPIO device
 	createReq := services.CreateGPIODeviceRequest{
 		Name:        "integration-test-gpio",
@@ -460,6 +502,36 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_GPIOWorkflow() {
 
 // TestAPIIntegration_Security_NoAuth tests security without authentication
 func (suite *APIIntegrationTestSuite) TestAPIIntegration_Security_NoAuth() {
+	// Create a cluster for the DELETE test (to document the security issue)
+	cluster := &models.Cluster{
+		Name:   "security-test-cluster",
+		Status: models.ClusterStatusActive,
+	}
+	err := suite.db.DB().Create(cluster).Error
+	require.NoError(suite.T(), err)
+
+	// Create a router without auth middleware for this security test
+	testLogger := logger.Default()
+	healthHandler := handlers.NewHealthHandler(suite.db)
+	clusterHandler := handlers.NewClusterHandler(suite.clusterService, testLogger)
+
+	noAuthRouter := gin.New()
+	// No auth middleware applied here - testing raw endpoints
+
+	// Health endpoints (should be accessible)
+	noAuthRouter.GET("/health", healthHandler.Health)
+	noAuthRouter.GET("/system/info", handlers.SystemInfo)
+
+	// API endpoints (should require auth in production)
+	v1 := noAuthRouter.Group("/api/v1")
+	{
+		clusters := v1.Group("/clusters")
+		{
+			clusters.GET("", clusterHandler.List)
+			clusters.DELETE("/:id", clusterHandler.Delete)
+		}
+	}
+
 	securityTests := []struct {
 		name           string
 		method         string
@@ -484,9 +556,9 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_Security_NoAuth() {
 		{
 			name:           "Dangerous DELETE without auth",
 			method:         "DELETE",
-			endpoint:       "/api/v1/clusters/1",
+			endpoint:       fmt.Sprintf("/api/v1/clusters/%d", cluster.ID),
 			description:    "DELETE operations without auth - CRITICAL SECURITY RISK",
-			expectedStatus: http.StatusNotFound, // Would be 204 if cluster existed
+			expectedStatus: http.StatusNoContent, // 204 - deletion succeeds without auth!
 		},
 		{
 			name:           "System info disclosure",
@@ -503,7 +575,7 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_Security_NoAuth() {
 			require.NoError(suite.T(), err)
 
 			w := httptest.NewRecorder()
-			suite.router.ServeHTTP(w, req)
+			noAuthRouter.ServeHTTP(w, req) // Use noAuthRouter instead of suite.router
 
 			assert.Equal(suite.T(), tt.expectedStatus, w.Code)
 
@@ -587,6 +659,281 @@ func (suite *APIIntegrationTestSuite) TestAPIIntegration_ErrorHandling() {
 // Helper function for string pointers
 func stringPtr(s string) *string {
 	return &s
+}
+
+// TestAPIIntegration_NodeDiscovery tests node discovery and type filtering
+func (suite *APIIntegrationTestSuite) TestAPIIntegration_NodeDiscovery() {
+	// Create nodes with different discovery methods and types
+
+	// 1. Create controller discovered via mDNS
+	controllerReq := services.CreateNodeRequest{
+		Name:              "pi-controller-1",
+		IPAddress:         "192.168.1.10",
+		MACAddress:        "aa:bb:cc:dd:ee:10",
+		Role:              models.NodeRoleMaster,
+		DiscoveryMethod:   models.DiscoveryMethodMDNS,
+		NodeType:          models.NodeTypeController,
+		ControllerVersion: "v1.0.0",
+		Architecture:      "arm64",
+		Model:             "Raspberry Pi 4",
+	}
+
+	body, err := json.Marshal(controllerReq)
+	require.NoError(suite.T(), err)
+
+	req, err := http.NewRequest("POST", "/api/v1/nodes", bytes.NewBuffer(body))
+	require.NoError(suite.T(), err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	suite.router.ServeHTTP(w, req)
+	assert.Equal(suite.T(), http.StatusCreated, w.Code)
+
+	// 2. Create agent discovered via mDNS
+	agentReq := services.CreateNodeRequest{
+		Name:            "pi-agent-1",
+		IPAddress:       "192.168.1.15",
+		MACAddress:      "aa:bb:cc:dd:ee:11",
+		Role:            models.NodeRoleWorker,
+		DiscoveryMethod: models.DiscoveryMethodMDNS,
+		NodeType:        models.NodeTypeAgent,
+		AgentPort:       9091,
+		Architecture:    "arm64",
+		Model:           "Raspberry Pi 4",
+	}
+
+	body, err = json.Marshal(agentReq)
+	require.NoError(suite.T(), err)
+
+	req, err = http.NewRequest("POST", "/api/v1/nodes", bytes.NewBuffer(body))
+	require.NoError(suite.T(), err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w = httptest.NewRecorder()
+	suite.router.ServeHTTP(w, req)
+	assert.Equal(suite.T(), http.StatusCreated, w.Code)
+
+	// 3. Create generic node via manual entry
+	genericReq := services.CreateNodeRequest{
+		Name:            "remote-pi",
+		IPAddress:       "10.0.5.50",
+		MACAddress:      "aa:bb:cc:dd:ee:12",
+		Role:            models.NodeRoleWorker,
+		DiscoveryMethod: models.DiscoveryMethodManual,
+		NodeType:        models.NodeTypeGeneric,
+		Architecture:    "arm64",
+		Model:           "Raspberry Pi 3",
+	}
+
+	body, err = json.Marshal(genericReq)
+	require.NoError(suite.T(), err)
+
+	req, err = http.NewRequest("POST", "/api/v1/nodes", bytes.NewBuffer(body))
+	require.NoError(suite.T(), err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w = httptest.NewRecorder()
+	suite.router.ServeHTTP(w, req)
+	assert.Equal(suite.T(), http.StatusCreated, w.Code)
+
+	// Test filtering by node_type=controller
+	suite.Run("filter by controller type", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes?node_type=controller", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(1))
+		for _, node := range response.Data {
+			assert.Equal(suite.T(), models.NodeTypeController, node.NodeType)
+		}
+	})
+
+	// Test filtering by node_type=agent
+	suite.Run("filter by agent type", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes?node_type=agent", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(1))
+		for _, node := range response.Data {
+			assert.Equal(suite.T(), models.NodeTypeAgent, node.NodeType)
+		}
+	})
+
+	// Test filtering by node_type=generic
+	suite.Run("filter by generic type", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes?node_type=generic", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(1))
+		for _, node := range response.Data {
+			assert.Equal(suite.T(), models.NodeTypeGeneric, node.NodeType)
+		}
+	})
+
+	// Test filtering by discovery_method=mdns
+	suite.Run("filter by mDNS discovery", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes?discovery_method=mdns", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(2)) // controller + agent
+		for _, node := range response.Data {
+			assert.Equal(suite.T(), models.DiscoveryMethodMDNS, node.DiscoveryMethod)
+		}
+	})
+
+	// Test filtering by discovery_method=manual
+	suite.Run("filter by manual discovery", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes?discovery_method=manual", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(1))
+		for _, node := range response.Data {
+			assert.Equal(suite.T(), models.DiscoveryMethodManual, node.DiscoveryMethod)
+		}
+	})
+
+	// Test combined filtering: discovery_method=mdns&node_type=controller
+	suite.Run("filter by mDNS controller", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes?discovery_method=mdns&node_type=controller", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(1))
+		for _, node := range response.Data {
+			assert.Equal(suite.T(), models.DiscoveryMethodMDNS, node.DiscoveryMethod)
+			assert.Equal(suite.T(), models.NodeTypeController, node.NodeType)
+		}
+	})
+
+	// Test combined filtering: discovery_method=manual&node_type=generic
+	suite.Run("filter by manual generic", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes?discovery_method=manual&node_type=generic", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(1))
+		for _, node := range response.Data {
+			assert.Equal(suite.T(), models.DiscoveryMethodManual, node.DiscoveryMethod)
+			assert.Equal(suite.T(), models.NodeTypeGeneric, node.NodeType)
+		}
+	})
+
+	// Test listing all nodes (no filters)
+	suite.Run("list all nodes", func() {
+		req, err := http.NewRequest("GET", "/api/v1/nodes", nil)
+		require.NoError(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+
+		assert.Equal(suite.T(), http.StatusOK, w.Code)
+
+		var response struct {
+			Data   []models.Node `json:"data"`
+			Total  int64         `json:"total"`
+			Limit  int           `json:"limit"`
+			Offset int           `json:"offset"`
+		}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(suite.T(), err)
+
+		assert.GreaterOrEqual(suite.T(), response.Total, int64(3)) // controller + agent + generic
+	})
 }
 
 // TestAPIIntegration runs the integration test suite

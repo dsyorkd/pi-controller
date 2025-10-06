@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -21,6 +22,23 @@ import (
 
 // TestRBACIntegration tests the complete Role-Based Access Control system
 func TestRBACIntegration(t *testing.T) {
+	// Set environment to development for testing (disables HTTPS requirement)
+	originalEnv := os.Getenv("PI_CONTROLLER_ENVIRONMENT")
+	originalRateLimit := os.Getenv("WEBUI_RATE_LIMIT_ENABLED")
+	defer func() {
+		if originalEnv == "" {
+			os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
+		} else {
+			os.Setenv("PI_CONTROLLER_ENVIRONMENT", originalEnv)
+		}
+		if originalRateLimit == "" {
+			os.Unsetenv("WEBUI_RATE_LIMIT_ENABLED")
+		} else {
+			os.Setenv("WEBUI_RATE_LIMIT_ENABLED", originalRateLimit)
+		}
+	}()
+	os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
+
 	// Create test database
 	dbConfig := &storage.Config{
 		Path:            ":memory:",
@@ -45,7 +63,7 @@ func TestRBACIntegration(t *testing.T) {
 		WriteTimeout: "30s",
 	}
 
-	server := api.New(apiConfig, testLogger, db, nil)
+	server := api.NewForTest(apiConfig, testLogger, db, nil)
 
 	// Test data
 	testUsers := []struct {
@@ -229,17 +247,17 @@ func testRoleBasedAuthorization(t *testing.T, server *api.Server, testUsers []st
 			requiredRole: "operator",
 			payload:      map[string]interface{}{"name": "test-cluster", "description": "Test cluster"},
 			expectedStatus: map[string]int{
-				"admin":    http.StatusOK,
-				"operator": http.StatusOK,
+				"admin":    http.StatusCreated,
+				"operator": http.StatusCreated,
 				"viewer":   http.StatusForbidden,
 			},
 		},
 		{
 			method:       "DELETE",
-			endpoint:     "/api/v1/clusters/1",
+			endpoint:     "/api/v1/clusters/9999",
 			requiredRole: "admin",
 			expectedStatus: map[string]int{
-				"admin":    http.StatusNotFound, // Cluster doesn't exist, but auth passes
+				"admin":    http.StatusNoContent, // GORM delete is idempotent, returns 204 even if not found
 				"operator": http.StatusForbidden,
 				"viewer":   http.StatusForbidden,
 			},
@@ -258,41 +276,55 @@ func testRoleBasedAuthorization(t *testing.T, server *api.Server, testUsers []st
 			method:       "POST",
 			endpoint:     "/api/v1/nodes",
 			requiredRole: "operator",
-			payload:      map[string]interface{}{"name": "test-node", "ip_address": "192.168.1.100"},
+			payload: map[string]interface{}{
+				"name":         "test-node",
+				"ip_address":   "192.168.1.100",
+				"mac_address":  "00:11:22:33:44:55",
+				"role":         "worker",
+				"cpu_cores":    4,
+				"memory":       4096,
+				"architecture": "arm64",
+			},
 			expectedStatus: map[string]int{
-				"admin":    http.StatusOK,
-				"operator": http.StatusOK,
+				"admin":    http.StatusCreated,
+				"operator": http.StatusCreated,
 				"viewer":   http.StatusForbidden,
 			},
 		},
 		{
 			method:       "DELETE",
-			endpoint:     "/api/v1/nodes/1",
+			endpoint:     "/api/v1/nodes/9999",
 			requiredRole: "admin",
+			expectedStatus: map[string]int{
+				"admin":    http.StatusNotFound, // Node service checks existence first, returns 404 if not found
+				"operator": http.StatusForbidden,
+				"viewer":   http.StatusForbidden,
+			},
+		},
+		{
+			method:       "GET",
+			endpoint:     "/api/v1/gpio",
+			requiredRole: "viewer",
+			expectedStatus: map[string]int{
+				"admin":    http.StatusOK,
+				"operator": http.StatusOK,
+				"viewer":   http.StatusOK,
+			},
+		},
+		{
+			method:       "POST",
+			endpoint:     "/api/v1/gpio",
+			requiredRole: "operator",
+			payload: map[string]interface{}{
+				"name":        "test-pin",
+				"pin_number":  18,
+				"node_id":     9999, // Non-existent node to test auth without data dependencies
+				"direction":   "output",
+				"device_type": "digital",
+			},
 			expectedStatus: map[string]int{
 				"admin":    http.StatusNotFound, // Node doesn't exist, but auth passes
-				"operator": http.StatusForbidden,
-				"viewer":   http.StatusForbidden,
-			},
-		},
-		{
-			method:       "GET",
-			endpoint:     "/api/v1/gpio",
-			requiredRole: "viewer",
-			expectedStatus: map[string]int{
-				"admin":    http.StatusOK,
-				"operator": http.StatusOK,
-				"viewer":   http.StatusOK,
-			},
-		},
-		{
-			method:       "POST",
-			endpoint:     "/api/v1/gpio",
-			requiredRole: "operator",
-			payload:      map[string]interface{}{"name": "test-pin", "pin_number": 18, "node_id": 1},
-			expectedStatus: map[string]int{
-				"admin":    http.StatusBadRequest, // Node doesn't exist, but auth passes
-				"operator": http.StatusBadRequest,
+				"operator": http.StatusNotFound,
 				"viewer":   http.StatusForbidden,
 			},
 		},
@@ -303,7 +335,16 @@ func testRoleBasedAuthorization(t *testing.T, server *api.Server, testUsers []st
 			t.Run(fmt.Sprintf("%s_%s_as_%s", tc.method, tc.endpoint, role), func(t *testing.T) {
 				var req *http.Request
 				if tc.payload != nil {
-					payloadBytes, _ := json.Marshal(tc.payload)
+					// Make payload unique per role to avoid conflicts
+					payload := make(map[string]interface{})
+					for k, v := range tc.payload {
+						if k == "name" || k == "ip_address" || k == "mac_address" {
+							payload[k] = fmt.Sprintf("%v-%s", v, role)
+						} else {
+							payload[k] = v
+						}
+					}
+					payloadBytes, _ := json.Marshal(payload)
 					req, _ = http.NewRequest(tc.method, tc.endpoint, bytes.NewBuffer(payloadBytes))
 					req.Header.Set("Content-Type", "application/json")
 				} else {

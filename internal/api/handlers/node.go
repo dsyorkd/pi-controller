@@ -25,7 +25,26 @@ func NewNodeHandler(service *services.NodeService, logger logger.Interface) *Nod
 	}
 }
 
-// List returns all nodes with optional filtering
+// List godoc
+// @Summary      List all nodes
+// @Description  Get a list of all discovered nodes with optional filtering
+// @Tags         nodes
+// @Accept       json
+// @Produce      json
+// @Param        limit             query     int     false  "Limit number of results (default 50)"
+// @Param        offset            query     int     false  "Offset for pagination (default 0)"
+// @Param        include_gpio      query     boolean false  "Include GPIO pins in response"
+// @Param        cluster_id        query     int     false  "Filter by cluster ID"
+// @Param        status            query     string  false  "Filter by node status"
+// @Param        role              query     string  false  "Filter by node role"
+// @Param        discovery_method  query     string  false  "Filter by discovery method"
+// @Param        node_type         query     string  false  "Filter by node type"
+// @Success      200  {object}  object{data=[]object,total=int,limit=int,offset=int}
+// @Failure      400  {object}  object{error=string,message=string}
+// @Failure      401  {object}  object{error=string,message=string}
+// @Failure      500  {object}  object{error=string,message=string}
+// @Security     BearerAuth
+// @Router       /nodes [get]
 func (h *NodeHandler) List(c *gin.Context) {
 	// Parse query parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
@@ -56,6 +75,16 @@ func (h *NodeHandler) List(c *gin.Context) {
 		opts.Role = &nodeRole
 	}
 
+	if discoveryMethod := c.Query("discovery_method"); discoveryMethod != "" {
+		method := models.DiscoveryMethod(discoveryMethod)
+		opts.DiscoveryMethod = &method
+	}
+
+	if nodeType := c.Query("node_type"); nodeType != "" {
+		nType := models.NodeType(nodeType)
+		opts.NodeType = &nType
+	}
+
 	nodes, total, err := h.service.List(opts)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to list nodes")
@@ -63,8 +92,7 @@ func (h *NodeHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"nodes":  nodes,
-		"count":  len(nodes),
+		"data":   nodes,
 		"total":  total,
 		"limit":  limit,
 		"offset": offset,
@@ -90,7 +118,9 @@ func (h *NodeHandler) Get(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, node)
+	c.JSON(http.StatusOK, gin.H{
+		"data": node,
+	})
 }
 
 // Create creates a new node
@@ -111,7 +141,9 @@ func (h *NodeHandler) Create(c *gin.Context) {
 	}
 
 	h.logger.WithField("node_id", node.ID).Info("Created new node")
-	c.JSON(http.StatusCreated, node)
+	c.JSON(http.StatusCreated, gin.H{
+		"data": node,
+	})
 }
 
 // Update updates a node
@@ -141,7 +173,9 @@ func (h *NodeHandler) Update(c *gin.Context) {
 	}
 
 	h.logger.WithField("node_id", node.ID).Info("Updated node")
-	c.JSON(http.StatusOK, node)
+	c.JSON(http.StatusOK, gin.H{
+		"data": node,
+	})
 }
 
 // Delete deletes a node
@@ -187,7 +221,6 @@ func (h *NodeHandler) ListGPIO(c *gin.Context) {
 		"node_id":      uint(id),
 	})
 }
-
 
 // handleServiceError handles service layer errors and maps them to appropriate HTTP responses
 func (h *NodeHandler) handleServiceError(c *gin.Context, err error, message string) {

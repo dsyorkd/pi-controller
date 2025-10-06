@@ -366,26 +366,6 @@ func (m *MockGPIOService) CleanupOldReadings(olderThan time.Duration) (int64, er
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockGPIOService) ReservePin(id uint, req GPIOReservationRequest) error {
-	args := m.Called(id, req)
-	return args.Error(0)
-}
-
-func (m *MockGPIOService) ReleasePin(id uint, req GPIOReleaseRequest) error {
-	args := m.Called(id, req)
-	return args.Error(0)
-}
-
-func (m *MockGPIOService) GetReservations() ([]GPIOReservationInfo, error) {
-	args := m.Called()
-	return args.Get(0).([]GPIOReservationInfo), args.Error(1)
-}
-
-func (m *MockGPIOService) CleanupExpiredReservations() (int64, error) {
-	args := m.Called()
-	return args.Get(0).(int64), args.Error(1)
-}
-
 func (m *MockGPIOService) ConfigurePin(ctx context.Context, req *GPIORequest) error {
 	args := m.Called(ctx, req)
 	return args.Error(0)

@@ -13,6 +13,7 @@ import (
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
+	Enabled           bool          `yaml:"enabled"`
 	RequestsPerMinute int           `yaml:"requests_per_minute"`
 	BurstSize         int           `yaml:"burst_size"`
 	CleanupInterval   time.Duration `yaml:"cleanup_interval"`
@@ -24,6 +25,7 @@ type RateLimitConfig struct {
 // DefaultRateLimitConfig returns secure default rate limiting configuration
 func DefaultRateLimitConfig() *RateLimitConfig {
 	return &RateLimitConfig{
+		Enabled:           true,
 		RequestsPerMinute: 60,
 		BurstSize:         10,
 		CleanupInterval:   5 * time.Minute,
@@ -71,6 +73,12 @@ func NewRateLimiter(config *RateLimitConfig, logger *logrus.Logger) *RateLimiter
 // RateLimit returns a rate limiting middleware
 func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip rate limiting if disabled
+		if !rl.config.Enabled {
+			c.Next()
+			return
+		}
+
 		// Get client identifier
 		clientID := rl.getClientID(c)
 		if clientID == "" {

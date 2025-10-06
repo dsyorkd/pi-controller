@@ -1,3 +1,24 @@
+// Package api provides the REST API server
+//
+// @title           Pi-Controller API
+// @version         1.0
+// @description     REST API for managing Raspberry Pi clusters, nodes, and GPIO resources
+// @termsOfService  http://swagger.io/terms/
+//
+// @contact.name   API Support
+// @contact.url    http://github.com/dsyorkd/pi-controller/issues
+// @contact.email  support@example.com
+//
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+//
+// @host      localhost:8765
+// @BasePath  /api/v1
+//
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 package api
 
 import (
@@ -11,6 +32,8 @@ import (
 
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/api/middleware"
+	"github.com/dsyorkd/pi-controller/internal/clustering"
+	"github.com/dsyorkd/pi-controller/internal/clustering/health"
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
@@ -31,6 +54,9 @@ type Server struct {
 	authManager         *middleware.AuthManager
 	validator           *middleware.Validator
 	rateLimiter         *middleware.RateLimiter
+	gpioRateLimiter     *middleware.GPIORateLimiter
+	raftCluster         *clustering.RaftCluster
+	healthChecker       *health.HealthChecker
 	router              *gin.Engine
 	server              *http.Server
 }
@@ -69,6 +95,9 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	logrusLogger := logrus.New()
 	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), logrusLogger)
 
+	// Initialize GPIO-specific rate limiter with stricter limits
+	gpioRateLimiter := middleware.NewGPIORateLimiter(middleware.DefaultGPIORateLimitConfig(), logrusLogger)
+
 	s := &Server{
 		config:              cfg,
 		logger:              log,
@@ -81,6 +110,7 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 		authManager:         authManager,
 		validator:           validator,
 		rateLimiter:         rateLimiter,
+		gpioRateLimiter:     gpioRateLimiter,
 		router:              router,
 	}
 
@@ -92,6 +122,11 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 func (s *Server) setupRoutes() {
 	// Global middleware
 	s.router.Use(middleware.Logger(s.logger))
+
+	// Add NoMethod handler to return 405 for unsupported methods
+	s.router.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+	})
 
 	// Add Sentry middleware if Sentry is initialized
 	if sentry.CurrentHub().Client() != nil {
@@ -177,10 +212,14 @@ func (s *Server) setupRoutes() {
 			nodes.DELETE("/:id", s.requireRole("admin"), nodeHandler.Delete)
 		}
 
-		// GPIO management
+		// GPIO management with strict rate limiting
 		gpioHandler := handlers.NewGPIOHandler(s.gpioService, s.logger)
 		gpio := v1.Group("/gpio")
 		{
+			// Apply GPIO-specific rate limiting to all GPIO endpoints
+			// This protects hardware from rapid switching that could cause damage
+			gpio.Use(s.gpioRateLimiter.RateLimit())
+
 			// Read operations - require viewer role
 			gpio.GET("", s.requireRole("viewer"), gpioHandler.List)
 			gpio.GET("/:id", s.requireRole("viewer"), gpioHandler.Get)
@@ -191,12 +230,6 @@ func (s *Server) setupRoutes() {
 			gpio.POST("", s.requireRole("operator"), gpioHandler.Create)
 			gpio.PUT("/:id", s.requireRole("operator"), gpioHandler.Update)
 			gpio.POST("/:id/write", s.requireRole("operator"), gpioHandler.Write)
-
-			// Pin reservation operations - require operator role
-			gpio.POST("/:id/reserve", s.requireRole("operator"), gpioHandler.ReservePin)
-			gpio.POST("/:id/release", s.requireRole("operator"), gpioHandler.ReleasePin)
-			gpio.GET("/reservations", s.requireRole("viewer"), gpioHandler.GetReservations)
-			gpio.POST("/reservations/cleanup", s.requireRole("admin"), gpioHandler.CleanupExpiredReservations)
 
 			// Delete operations - require admin role
 			gpio.DELETE("/:id", s.requireRole("admin"), gpioHandler.Delete)
@@ -263,7 +296,34 @@ func (s *Server) setupRoutes() {
 			system.GET("/info", s.requireRole("viewer"), handlers.SystemInfo)
 			system.GET("/metrics", s.requireRole("viewer"), handlers.SystemMetrics)
 		}
+
+		// Raft cluster management (if clustering is enabled)
+		if s.raftCluster != nil {
+			raftHandler := handlers.NewRaftClusterHandler(s.raftCluster, s.healthChecker, s.logger)
+			raft := v1.Group("/raft")
+			{
+				// Read operations - require viewer role
+				raft.GET("/status", s.requireRole("viewer"), raftHandler.GetStatus)
+				raft.GET("/members", s.requireRole("viewer"), raftHandler.GetMembers)
+				raft.GET("/leader", s.requireRole("viewer"), raftHandler.GetLeader)
+				raft.GET("/health", s.requireRole("viewer"), raftHandler.GetHealth)
+
+				// Write operations - require admin role
+				raft.POST("/members", s.requireRole("admin"), raftHandler.JoinMember)
+				raft.DELETE("/members/:id", s.requireRole("admin"), raftHandler.RemoveMember)
+			}
+		}
 	}
+}
+
+// SetClusteringComponents sets the Raft cluster and health checker for this server
+// This allows clustering to be initialized after the server is created
+func (s *Server) SetClusteringComponents(cluster *clustering.RaftCluster, healthChecker *health.HealthChecker) {
+	s.raftCluster = cluster
+	s.healthChecker = healthChecker
+
+	// Re-setup routes to include clustering endpoints
+	s.setupRoutes()
 }
 
 // Start starts the HTTP server
@@ -289,9 +349,14 @@ func (s *Server) Start() error {
 	s.logger.WithField("address", s.config.GetAddress()).Info("Starting API server")
 
 	if s.config.IsTLSEnabled() {
+		s.logger.WithFields(map[string]interface{}{
+			"cert_file": s.config.TLSCertFile,
+			"key_file":  s.config.TLSKeyFile,
+		}).Info("Starting HTTPS server with TLS enabled")
 		return s.server.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
 	}
 
+	s.logger.Warn("⚠️  Starting HTTP server without TLS - not recommended for production!")
 	return s.server.ListenAndServe()
 }
 
@@ -341,4 +406,64 @@ func (s *Server) requireRole(role string) gin.HandlerFunc {
 	}
 
 	return s.authManager.RequireRole(role)
+}
+
+// NewForTest creates a new API server instance with rate limiting disabled for testing
+func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
+	// Set Gin mode based on environment
+	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
+
+	router := gin.New()
+
+	// Initialize services
+	clusterService := services.NewClusterService(db, log)
+	nodeService := services.NewNodeService(db, log)
+	gpioService := services.NewGPIOService(db, log)
+	provisioningService := services.NewProvisioningService(nodeService, log)
+
+	// Set dependencies after all services are created
+	clusterService.SetDependencies(provisioningService, nodeService)
+
+	// Initialize authentication manager if auth is enabled
+	var authManager *middleware.AuthManager
+	if cfg.AuthEnabled {
+		authConfig := middleware.DefaultAuthConfig()
+		var err error
+		authManager, err = middleware.NewAuthManager(authConfig, log)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to initialize authentication manager")
+		}
+	}
+
+	// Initialize validator for input validation
+	validator := middleware.NewValidator(middleware.DefaultValidationConfig(), log)
+
+	// Initialize rate limiters with disabled configuration for testing
+	logrusLogger := logrus.New()
+	disabledConfig := middleware.DefaultRateLimitConfig()
+	disabledConfig.Enabled = false
+	rateLimiter := middleware.NewRateLimiter(disabledConfig, logrusLogger)
+
+	disabledGPIOConfig := middleware.DefaultGPIORateLimitConfig()
+	disabledGPIOConfig.Enabled = false
+	gpioRateLimiter := middleware.NewGPIORateLimiter(disabledGPIOConfig, logrusLogger)
+
+	s := &Server{
+		config:              cfg,
+		logger:              log,
+		database:            db,
+		clusterService:      clusterService,
+		nodeService:         nodeService,
+		gpioService:         gpioService,
+		provisioningService: provisioningService,
+		caService:           caService,
+		authManager:         authManager,
+		validator:           validator,
+		rateLimiter:         rateLimiter,
+		gpioRateLimiter:     gpioRateLimiter,
+		router:              router,
+	}
+
+	s.setupRoutes()
+	return s
 }

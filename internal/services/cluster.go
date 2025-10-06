@@ -11,12 +11,13 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/provisioner"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/validation"
 )
 
 // ClusterService is the service for managing clusters
 type ClusterService struct {
-	store              *storage.Database
-	log                logger.Interface
+	store               *storage.Database
+	log                 logger.Interface
 	provisioningService *ProvisioningService
 	nodeService         *NodeService
 }
@@ -47,9 +48,21 @@ func (s *ClusterService) Create(req CreateClusterRequest) (*models.Cluster, erro
 		return nil, errors.Wrapf(ErrInvalidInput, "name is required")
 	}
 
+	// Validate cluster name for malicious input
+	if err := validation.ValidateResourceName("name", req.Name, 255); err != nil {
+		return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
+	}
+
+	// Validate description if provided
+	if req.Description != "" {
+		if err := validation.ValidateDescription("description", req.Description, 1000); err != nil {
+			return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
+		}
+	}
+
 	// Check for duplicate name
 	existing, err := s.GetByName(req.Name)
-	if err != nil && err.Error() != "not found" {
+	if err != nil && !IsNotFound(err) {
 		return nil, err
 	}
 	if existing != nil {
@@ -86,9 +99,19 @@ func (s *ClusterService) Update(id uint, req UpdateClusterRequest) (*models.Clus
 	}
 
 	if req.Name != nil {
+		// Validate cluster name for malicious input
+		if err := validation.ValidateResourceName("name", *req.Name, 255); err != nil {
+			return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
+		}
 		cluster.Name = *req.Name
 	}
 	if req.Description != nil {
+		// Validate description if provided
+		if *req.Description != "" {
+			if err := validation.ValidateDescription("description", *req.Description, 1000); err != nil {
+				return nil, errors.Wrapf(ErrInvalidInput, "%s", err.Error())
+			}
+		}
 		cluster.Description = *req.Description
 	}
 	if req.Status != nil {
@@ -140,6 +163,9 @@ func (s *ClusterService) GetByID(id uint) (*models.Cluster, error) {
 	var cluster models.Cluster
 	err := s.store.DB().First(&cluster, id).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 	return &cluster, nil
@@ -379,7 +405,7 @@ func (s *ClusterService) GetClusterStatus(ctx context.Context, clusterID uint) (
 // ScaleCluster scales the cluster to the specified number of nodes
 func (s *ClusterService) ScaleCluster(ctx context.Context, clusterID uint, req ClusterScaleRequest) error {
 	s.log.WithFields(map[string]interface{}{
-		"cluster_id": clusterID,
+		"cluster_id":   clusterID,
 		"target_nodes": req.NodeCount,
 	}).Info("Starting cluster scaling")
 
@@ -417,9 +443,9 @@ func (s *ClusterService) scaleDown(ctx context.Context, clusterID uint, currentN
 	nodesToRemove := currentCount - targetCount
 
 	s.log.WithFields(map[string]interface{}{
-		"cluster_id": clusterID,
-		"current_nodes": currentCount,
-		"target_nodes": targetCount,
+		"cluster_id":      clusterID,
+		"current_nodes":   currentCount,
+		"target_nodes":    targetCount,
 		"nodes_to_remove": nodesToRemove,
 	}).Info("Scaling down cluster")
 
@@ -447,8 +473,8 @@ func (s *ClusterService) scaleDown(ctx context.Context, clusterID uint, currentN
 	for _, node := range nodesToDeprovision {
 		s.log.WithFields(map[string]interface{}{
 			"cluster_id": clusterID,
-			"node_id": node.ID,
-			"node_name": node.Name,
+			"node_id":    node.ID,
+			"node_name":  node.Name,
 		}).Info("Removing node from cluster")
 
 		if s.provisioningService != nil {
@@ -478,10 +504,10 @@ func (s *ClusterService) scaleUp(ctx context.Context, clusterID uint, currentNod
 	nodesToAdd := targetCount - currentCount
 
 	s.log.WithFields(map[string]interface{}{
-		"cluster_id": clusterID,
+		"cluster_id":    clusterID,
 		"current_nodes": currentCount,
-		"target_nodes": targetCount,
-		"nodes_to_add": nodesToAdd,
+		"target_nodes":  targetCount,
+		"nodes_to_add":  nodesToAdd,
 	}).Info("Scaling up cluster")
 
 	// For scale up, we need to find available nodes that are not part of any cluster
@@ -536,8 +562,8 @@ func (s *ClusterService) scaleUp(ctx context.Context, clusterID uint, currentNod
 
 		s.log.WithFields(map[string]interface{}{
 			"cluster_id": clusterID,
-			"node_id": node.ID,
-			"node_name": node.Name,
+			"node_id":    node.ID,
+			"node_name":  node.Name,
 		}).Info("Adding node to cluster")
 
 		// Assign node to cluster first

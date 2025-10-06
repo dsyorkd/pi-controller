@@ -226,8 +226,7 @@ docker-multiarch-test: docker-buildx-setup ## Test multi-arch Docker builds with
 		--build-arg COMMIT=$(COMMIT) \
 		--build-arg DATE=$(DATE) \
 		-t $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)-test \
-		-f docker/Dockerfile.controller \
-		--dry-run .
+		-f docker/Dockerfile.controller .
 	@echo "Testing pi-agent for linux/amd64,linux/arm64,linux/arm/v7..."
 	docker buildx build \
 		--platform linux/amd64,linux/arm64,linux/arm/v7 \
@@ -235,8 +234,7 @@ docker-multiarch-test: docker-buildx-setup ## Test multi-arch Docker builds with
 		--build-arg COMMIT=$(COMMIT) \
 		--build-arg DATE=$(DATE) \
 		-t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG)-test \
-		-f docker/Dockerfile.agent \
-		--dry-run .
+		-f docker/Dockerfile.agent .
 	@echo "Multi-architecture Docker build test completed successfully!"
 
 docker-multiarch-controller: docker-buildx-setup ## Build pi-controller Docker image for multiple architectures
@@ -492,10 +490,18 @@ ci-build: ## Run CI build
 	@$(MAKE) build-all
 
 # Documentation
-docs: ## Generate documentation
-	@echo "Generating documentation..."
-	@mkdir -p $(DOCS_DIR)
-	@echo "Documentation generation not yet implemented"
+docs: api-docs ## Generate documentation
+	@echo "Documentation generated successfully"
+
+api-docs: ## Generate API documentation from code annotations
+	@./scripts/generate-api-docs.sh
+
+api-serve: ## Serve interactive API documentation
+	@echo "Starting Swagger UI on http://localhost:8080"
+	@docker run -p 8080:8080 \
+		-e SWAGGER_JSON=/api/swagger.yaml \
+		-v $(PWD)/docs/api:/api \
+		swaggerapi/swagger-ui
 
 # Version info
 version: ## Show version information

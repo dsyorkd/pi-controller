@@ -1,0 +1,47 @@
+app:
+  name: "pi-controller-test"
+  environment: "development"
+  data_dir: "./test-data"
+  debug: false
+
+database:
+  path: "pi-controller-test.db"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+  log_level: "warn"
+
+api:
+  host: "0.0.0.0"
+  port: 9443
+  read_timeout: "30s"
+  write_timeout: "30s"
+  cors_enabled: true
+  auth_enabled: true
+  tls_cert_file: "test-data/tls/server.crt"
+  tls_key_file: "test-data/tls/server.key"
+
+grpc:
+  host: "0.0.0.0"
+  port: 9090
+  tls_cert_file: "test-data/tls/server.crt"
+  tls_key_file: "test-data/tls/server.key"
+
+log:
+  level: "info"
+  format: "text"
+
+gpio:
+  enabled: false
+  mock_mode: true
+
+discovery:
+  enabled: false
+
+websocket:
+  host: "0.0.0.0"
+  port: 9081
+  path: "/ws"
+
+webui:
+  enabled: false

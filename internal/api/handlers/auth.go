@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,8 @@ type RegisterRequest struct {
 
 // LoginResponse represents the login response payload
 type LoginResponse struct {
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
 	TokenType    string    `json:"token_type"`
 	ExpiresIn    int       `json:"expires_in"`
 	User         *UserInfo `json:"user"`
@@ -228,6 +231,24 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	// Normalize and validate username
 	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+
+	// Validate email format
+	if err := h.validateEmail(req.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Validate password strength
+	if err := h.validatePassword(req.Password); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": err.Error(),
+		})
+		return
+	}
 
 	// Set default role if not provided
 	if req.Role == "" {
@@ -508,4 +529,49 @@ func (h *AuthHandler) GetCSRFToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"csrf_token": csrfToken,
 	})
+}
+
+// validateEmail validates email format
+func (h *AuthHandler) validateEmail(email string) error {
+	if email == "" {
+		return fmt.Errorf("email is required")
+	}
+
+	// Basic email validation regex
+	emailRegex := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	matched, err := regexp.MatchString(emailRegex, email)
+	if err != nil {
+		return fmt.Errorf("email validation failed")
+	}
+	if !matched {
+		return fmt.Errorf("invalid email format")
+	}
+
+	return nil
+}
+
+// validatePassword validates password strength
+func (h *AuthHandler) validatePassword(password string) error {
+	if len(password) < 6 {
+		return fmt.Errorf("password must be at least 6 characters long")
+	}
+
+	if len(password) > 100 {
+		return fmt.Errorf("password cannot exceed 100 characters")
+	}
+
+	// Check for at least one number or special character for basic strength
+	hasNumberOrSpecial := false
+	for _, char := range password {
+		if (char >= '0' && char <= '9') || !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')) {
+			hasNumberOrSpecial = true
+			break
+		}
+	}
+
+	if !hasNumberOrSpecial {
+		return fmt.Errorf("password must contain at least one number or special character")
+	}
+
+	return nil
 }

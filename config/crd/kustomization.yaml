@@ -5,6 +5,7 @@ resources:
 - gpiopin-crd.yaml
 - pwmcontroller-crd.yaml
 - i2cdevice-crd.yaml
+- picontrollerwebui-crd.yaml
 
 commonLabels:
   app.kubernetes.io/name: pi-controller
