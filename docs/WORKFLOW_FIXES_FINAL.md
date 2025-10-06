@@ -36,6 +36,7 @@ go fmt ./...  # Fixed formatting in all 36 Go files
 - Complex format expressions for unused ARM builds
 
 **Solution**:
+{% raw %}
 ```yaml
 # Before (causing warnings)
 GOARM: ${{ matrix.goarm || '' }}
@@ -45,6 +46,7 @@ echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}${{ matrix.goarm && fo
 # Removed unused GOARM references
 echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}"
 ```
+{% endraw %}
 ✅ **Result**: No more workflow diagnostics warnings
 
 ### **4. Missing Job Dependencies**

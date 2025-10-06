@@ -18,8 +18,8 @@
 
 **Solutions Implemented**:
 - ✅ **Added missing matrix variables**: Added `experimental: false` to all matrix entries
-- ✅ **Fixed goarm handling**: Used `${{ matrix.goarm || '' }}` for safe access
-- ✅ **Fixed string formatting**: Used `format('v{0}', matrix.goarm)` for proper version formatting
+- ✅ **Fixed goarm handling**: Used {% raw %}`${{ matrix.goarm || '' }}`{% endraw %} for safe access
+- ✅ **Fixed string formatting**: Used {% raw %}`format('v{0}', matrix.goarm)`{% endraw %} for proper version formatting
 
 ### 3. **Renovate GitFlow Configuration** 
 **Problem**: Renovate was targeting `master` instead of `develop` branch.

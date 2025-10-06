@@ -229,6 +229,7 @@ sequenceDiagram
 ### 3.2 Certificate Template Specifications
 
 #### API Server Certificate Template
+{% raw %}
 ```yaml
 # api-server-cert-template.yaml
 common_name: "{{ .NodeName }}.pi-controller.local"
@@ -254,8 +255,10 @@ extended_key_usage:
   - "client_auth"
 ttl: "8760h"  # 1 year
 ```
+{% endraw %}
 
 #### etcd Certificate Template
+{% raw %}
 ```yaml
 # etcd-cert-template.yaml
 common_name: "{{ .NodeName }}-etcd"
@@ -276,10 +279,12 @@ extended_key_usage:
   - "client_auth"
 ttl: "8760h"  # 1 year
 ```
+{% endraw %}
 
 ### 3.3 K3s Configuration Integration
 
 #### Custom K3s Server Configuration
+{% raw %}
 ```yaml
 # /etc/rancher/k3s/config.yaml
 tls-san:
@@ -293,6 +298,7 @@ datastore-cafile: "/var/lib/rancher/k3s/server/tls/etcd/server-ca.crt"
 datastore-certfile: "/var/lib/rancher/k3s/server/tls/etcd/server-client.crt"
 datastore-keyfile: "/var/lib/rancher/k3s/server/tls/etcd/server-client.key"
 ```
+{% endraw %}
 
 ## 4. SSH Certificate Strategy
 
