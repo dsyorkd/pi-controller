@@ -22,7 +22,7 @@ jobs:
     name: Code Validation
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
