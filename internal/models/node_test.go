@@ -216,3 +216,107 @@ func TestNode_SystemInfo(t *testing.T) {
 	assert.Equal(t, "6.1.21-v8+", node.KernelVersion)
 	assert.Equal(t, now, node.LastSeen)
 }
+
+// Discovery and Type Tests
+
+func TestNode_CanJoinRaftCluster(t *testing.T) {
+	tests := []struct {
+		name     string
+		nodeType NodeType
+		status   NodeStatus
+		want     bool
+	}{
+		{"generic node with ready status", NodeTypeGeneric, NodeStatusReady, true},
+		{"generic node with discovered status", NodeTypeGeneric, NodeStatusDiscovered, true},
+		{"generic node with failed status", NodeTypeGeneric, NodeStatusFailed, false},
+		{"generic node with not_ready status", NodeTypeGeneric, NodeStatusNotReady, true},
+		{"unknown node with ready status", NodeTypeUnknown, NodeStatusReady, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node := &Node{
+				NodeType: tt.nodeType,
+				Status:   tt.status,
+			}
+			assert.Equal(t, tt.want, node.CanJoinRaftCluster())
+		})
+	}
+}
+
+func TestNode_IsDiscoveredAutomatically(t *testing.T) {
+	tests := []struct {
+		name   string
+		method DiscoveryMethod
+		want   bool
+	}{
+		{"mDNS is automatic", DiscoveryMethodMDNS, true},
+		{"DHCP is automatic", DiscoveryMethodDHCP, true},
+		{"network scan is automatic", DiscoveryMethodNetworkScan, true},
+		{"Raft cluster is automatic", DiscoveryMethodRaftCluster, true},
+		{"manual is not automatic", DiscoveryMethodManual, false},
+		{"API is not automatic", DiscoveryMethodAPI, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node := &Node{DiscoveryMethod: tt.method}
+			assert.Equal(t, tt.want, node.IsDiscoveredAutomatically())
+		})
+	}
+}
+
+func TestDiscoveryMethod_Constants(t *testing.T) {
+	// Test that all discovery method constants have correct values
+	assert.Equal(t, DiscoveryMethod("mdns"), DiscoveryMethodMDNS)
+	assert.Equal(t, DiscoveryMethod("dhcp"), DiscoveryMethodDHCP)
+	assert.Equal(t, DiscoveryMethod("network_scan"), DiscoveryMethodNetworkScan)
+	assert.Equal(t, DiscoveryMethod("manual"), DiscoveryMethodManual)
+	assert.Equal(t, DiscoveryMethod("raft_cluster"), DiscoveryMethodRaftCluster)
+	assert.Equal(t, DiscoveryMethod("api"), DiscoveryMethodAPI)
+}
+
+func TestNodeType_Constants(t *testing.T) {
+	// Test that all node type constants have correct values
+	assert.Equal(t, NodeType("generic"), NodeTypeGeneric)
+	assert.Equal(t, NodeType("unknown"), NodeTypeUnknown)
+}
+
+func TestNode_DiscoveryInfo(t *testing.T) {
+	now := time.Now()
+	node := &Node{
+		Name:              "test-node",
+		IPAddress:         "192.168.1.10",
+		Status:            NodeStatusDiscovered,
+		DiscoveryMethod:   DiscoveryMethodMDNS,
+		DiscoveredAt:      now,
+		NodeType:          NodeTypeGeneric,
+		ControllerVersion: "v1.0.0",
+		AgentPort:         0,
+	}
+
+	assert.Equal(t, DiscoveryMethodMDNS, node.DiscoveryMethod)
+	assert.Equal(t, now, node.DiscoveredAt)
+	assert.Equal(t, NodeTypeGeneric, node.NodeType)
+	assert.Equal(t, "v1.0.0", node.ControllerVersion)
+	assert.Equal(t, 0, node.AgentPort)
+	assert.True(t, node.IsDiscoveredAutomatically())
+	assert.True(t, node.CanJoinRaftCluster())
+}
+
+func TestNode_ManualEntry(t *testing.T) {
+	now := time.Now()
+	node := &Node{
+		Name:            "remote-pi",
+		IPAddress:       "10.0.5.50",
+		Status:          NodeStatusDiscovered,
+		DiscoveryMethod: DiscoveryMethodManual,
+		DiscoveredAt:    now,
+		NodeType:        NodeTypeGeneric,
+	}
+
+	assert.Equal(t, DiscoveryMethodManual, node.DiscoveryMethod)
+	assert.Equal(t, NodeTypeGeneric, node.NodeType)
+	assert.False(t, node.IsDiscoveredAutomatically())
+	assert.True(t, node.CanJoinRaftCluster())
+}

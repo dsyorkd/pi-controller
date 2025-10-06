@@ -12,9 +12,7 @@ The core philosophy is to provide a simple, single-binary deployment with zero e
 
 The system consists of two main components:
 
-- **Control Plane (`pi-controller`)**: A Go binary that runs on master nodes. It manages cluster state, node discovery, provisioning, and exposes REST, gRPC, and WebSocket APIs. It uses an embedded SQLite database for state persistence.
-- **Node Agent (`pi-agent`)**: A lightweight Go binary that runs as a DaemonSet on every node in the cluster. It provides hardware access (GPIO, I2C, etc.), system monitoring, and communicates with the Control Plane via gRPC.
-
+- **Control Plane (`pi-controller`)**: A Go binary that runs on every Pi in the cluster. It manages cluster configuration. It manages cluster state, node discovery, provisioning, and exposes REST, gRPC, and WebSocket APIs. It uses an embedded SQLite database for state persistence.
 For more details, refer to `ARCHITECTURE.md`.
 
 ## 3. Key Technologies
@@ -133,8 +131,3 @@ All code changes must be submitted via a Pull Request.
 5. **Code Review**:
   - At least **one** approval from another developer is required before merging.
   - Address all review comments before requesting a final review or merge.
-
-## Task Master AI Instructions
-
-**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
-@./.taskmaster/CLAUDE.md

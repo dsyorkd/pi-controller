@@ -64,6 +64,10 @@ type ClusterConfig struct {
 	// Enable clustering
 	Enabled bool `yaml:"enabled" mapstructure:"enabled"`
 
+	// Portable mode - run as client only without Raft participation
+	// When true, pi-controller acts as management interface without joining cluster
+	Portable bool `yaml:"portable" mapstructure:"portable"`
+
 	// Unique controller identifier
 	ControllerID string `yaml:"controller_id" mapstructure:"controller_id"`
 
@@ -322,7 +326,7 @@ type CertificateConfig struct {
 	AllowedDomains   []string `yaml:"allowed_domains" mapstructure:"allowed_domains"`
 
 	// Certificate storage and cleanup
-	StoragePath     string `yaml:"storage_path" mapstructure:"storage_path"`     // Path to store certificates on control machine
+	StoragePath     string `yaml:"storage_path" mapstructure:"storage_path"`         // Path to store certificates on control machine
 	CleanupInterval string `yaml:"cleanup_interval" mapstructure:"cleanup_interval"` // How often to clean up expired certificates
 	RetentionPeriod string `yaml:"retention_period" mapstructure:"retention_period"` // How long to keep expired certificates
 }
@@ -995,6 +999,10 @@ func applyEnvOverrides(config *Config) {
 	}
 	if env := os.Getenv("PI_CONTROLLER_DATA_DIR"); env != "" {
 		config.App.DataDir = env
+	}
+	if env := os.Getenv("PI_CONTROLLER_MODE"); env == "portable" {
+		config.Cluster.Portable = true
+		config.Cluster.Enabled = false // Disable clustering in portable mode
 	}
 
 	// Sentry configuration overrides

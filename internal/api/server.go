@@ -231,12 +231,6 @@ func (s *Server) setupRoutes() {
 			gpio.PUT("/:id", s.requireRole("operator"), gpioHandler.Update)
 			gpio.POST("/:id/write", s.requireRole("operator"), gpioHandler.Write)
 
-			// Pin reservation operations - require operator role
-			gpio.POST("/:id/reserve", s.requireRole("operator"), gpioHandler.ReservePin)
-			gpio.POST("/:id/release", s.requireRole("operator"), gpioHandler.ReleasePin)
-			gpio.GET("/reservations", s.requireRole("viewer"), gpioHandler.GetReservations)
-			gpio.POST("/reservations/cleanup", s.requireRole("admin"), gpioHandler.CleanupExpiredReservations)
-
 			// Delete operations - require admin role
 			gpio.DELETE("/:id", s.requireRole("admin"), gpioHandler.Delete)
 		}
