@@ -39,7 +39,14 @@ type ReadinessResponse struct {
 
 var startTime = time.Now()
 
-// Health returns the basic health status
+// Health godoc
+// @Summary      Health check
+// @Description  Returns basic health status of the API
+// @Tags         health
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  HealthResponse
+// @Router       /health [get]
 func (h *HealthHandler) Health(c *gin.Context) {
 	response := HealthResponse{
 		Status:    "ok",
@@ -50,7 +57,15 @@ func (h *HealthHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// Ready returns the readiness status including service dependencies
+// Ready godoc
+// @Summary      Readiness check
+// @Description  Returns readiness status including service dependencies
+// @Tags         health
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  ReadinessResponse
+// @Failure      503  {object}  ReadinessResponse
+// @Router       /ready [get]
 func (h *HealthHandler) Ready(c *gin.Context) {
 	services := make(map[string]string)
 	status := "ready"

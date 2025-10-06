@@ -1,3 +1,24 @@
+// Package api provides the REST API server
+//
+// @title           Pi-Controller API
+// @version         1.0
+// @description     REST API for managing Raspberry Pi clusters, nodes, and GPIO resources
+// @termsOfService  http://swagger.io/terms/
+//
+// @contact.name   API Support
+// @contact.url    http://github.com/dsyorkd/pi-controller/issues
+// @contact.email  support@example.com
+//
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+//
+// @host      localhost:8765
+// @BasePath  /api/v1
+//
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 package api
 
 import (
@@ -11,6 +32,8 @@ import (
 
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/api/middleware"
+	"github.com/dsyorkd/pi-controller/internal/clustering"
+	"github.com/dsyorkd/pi-controller/internal/clustering/health"
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
@@ -32,6 +55,8 @@ type Server struct {
 	validator           *middleware.Validator
 	rateLimiter         *middleware.RateLimiter
 	gpioRateLimiter     *middleware.GPIORateLimiter
+	raftCluster         *clustering.RaftCluster
+	healthChecker       *health.HealthChecker
 	router              *gin.Engine
 	server              *http.Server
 }
@@ -277,7 +302,34 @@ func (s *Server) setupRoutes() {
 			system.GET("/info", s.requireRole("viewer"), handlers.SystemInfo)
 			system.GET("/metrics", s.requireRole("viewer"), handlers.SystemMetrics)
 		}
+
+		// Raft cluster management (if clustering is enabled)
+		if s.raftCluster != nil {
+			raftHandler := handlers.NewRaftClusterHandler(s.raftCluster, s.healthChecker, s.logger)
+			raft := v1.Group("/raft")
+			{
+				// Read operations - require viewer role
+				raft.GET("/status", s.requireRole("viewer"), raftHandler.GetStatus)
+				raft.GET("/members", s.requireRole("viewer"), raftHandler.GetMembers)
+				raft.GET("/leader", s.requireRole("viewer"), raftHandler.GetLeader)
+				raft.GET("/health", s.requireRole("viewer"), raftHandler.GetHealth)
+
+				// Write operations - require admin role
+				raft.POST("/members", s.requireRole("admin"), raftHandler.JoinMember)
+				raft.DELETE("/members/:id", s.requireRole("admin"), raftHandler.RemoveMember)
+			}
+		}
 	}
+}
+
+// SetClusteringComponents sets the Raft cluster and health checker for this server
+// This allows clustering to be initialized after the server is created
+func (s *Server) SetClusteringComponents(cluster *clustering.RaftCluster, healthChecker *health.HealthChecker) {
+	s.raftCluster = cluster
+	s.healthChecker = healthChecker
+
+	// Re-setup routes to include clustering endpoints
+	s.setupRoutes()
 }
 
 // Start starts the HTTP server

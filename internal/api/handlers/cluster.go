@@ -62,7 +62,20 @@ func NewClusterHandler(service *services.ClusterService, logger logger.Interface
 
 // Request and response types are now defined in the services package
 
-// List returns all clusters
+// List godoc
+// @Summary      List all clusters
+// @Description  Get a list of all managed K3s clusters
+// @Tags         clusters
+// @Accept       json
+// @Produce      json
+// @Param        limit    query     int     false  "Limit number of results (default 50)"
+// @Param        offset   query     int     false  "Offset for pagination (default 0)"
+// @Success      200  {object}  object{data=[]object,total=int,limit=int,offset=int}
+// @Failure      400  {object}  object{error=string,message=string}
+// @Failure      401  {object}  object{error=string,message=string}
+// @Failure      500  {object}  object{error=string,message=string}
+// @Security     BearerAuth
+// @Router       /clusters [get]
 func (h *ClusterHandler) List(c *gin.Context) {
 	// Parse query parameters
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
@@ -87,7 +100,19 @@ func (h *ClusterHandler) List(c *gin.Context) {
 	})
 }
 
-// Create creates a new cluster
+// Create godoc
+// @Summary      Create a new cluster
+// @Description  Create a new K3s cluster with the specified configuration
+// @Tags         clusters
+// @Accept       json
+// @Produce      json
+// @Param        cluster  body      object  true  "Cluster creation request"
+// @Success      201  {object}  object{data=object}
+// @Failure      400  {object}  object{error=string,message=string}
+// @Failure      401  {object}  object{error=string,message=string}
+// @Failure      500  {object}  object{error=string,message=string}
+// @Security     BearerAuth
+// @Router       /clusters [post]
 func (h *ClusterHandler) Create(c *gin.Context) {
 	var req services.CreateClusterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -490,10 +490,18 @@ ci-build: ## Run CI build
 	@$(MAKE) build-all
 
 # Documentation
-docs: ## Generate documentation
-	@echo "Generating documentation..."
-	@mkdir -p $(DOCS_DIR)
-	@echo "Documentation generation not yet implemented"
+docs: api-docs ## Generate documentation
+	@echo "Documentation generated successfully"
+
+api-docs: ## Generate API documentation from code annotations
+	@./scripts/generate-api-docs.sh
+
+api-serve: ## Serve interactive API documentation
+	@echo "Starting Swagger UI on http://localhost:8080"
+	@docker run -p 8080:8080 \
+		-e SWAGGER_JSON=/api/swagger.yaml \
+		-v $(PWD)/docs/api:/api \
+		swaggerapi/swagger-ui
 
 # Version info
 version: ## Show version information
