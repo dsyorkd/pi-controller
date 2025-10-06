@@ -27,16 +27,20 @@ func NewNodeService(db *storage.Database, logger logger.Interface) *NodeService 
 
 // CreateNodeRequest represents the request to create a node
 type CreateNodeRequest struct {
-	Name         string          `json:"name" validate:"required,min=1,max=100"`
-	IPAddress    string          `json:"ip_address" validate:"required,ip"`
-	MACAddress   string          `json:"mac_address" validate:"required,mac"`
-	Role         models.NodeRole `json:"role" validate:"required,oneof=master worker"`
-	ClusterID    *uint           `json:"cluster_id,omitempty"`
-	Architecture string          `json:"architecture" validate:"max=50"`
-	Model        string          `json:"model" validate:"max=100"`
-	SerialNumber string          `json:"serial_number" validate:"max=100"`
-	CPUCores     int             `json:"cpu_cores" validate:"min=1"`
-	Memory       int64           `json:"memory" validate:"min=1"`
+	Name              string                  `json:"name" validate:"required,min=1,max=100"`
+	IPAddress         string                  `json:"ip_address" validate:"required,ip"`
+	MACAddress        string                  `json:"mac_address"`
+	Role              models.NodeRole         `json:"role" validate:"required,oneof=master worker"`
+	ClusterID         *uint                   `json:"cluster_id,omitempty"`
+	DiscoveryMethod   models.DiscoveryMethod  `json:"discovery_method" validate:"required"`
+	NodeType          models.NodeType         `json:"node_type" validate:"required"`
+	ControllerVersion string                  `json:"controller_version"`
+	AgentPort         int                     `json:"agent_port"`
+	Architecture      string                  `json:"architecture" validate:"max=50"`
+	Model             string                  `json:"model" validate:"max=100"`
+	SerialNumber      string                  `json:"serial_number" validate:"max=100"`
+	CPUCores          int                     `json:"cpu_cores" validate:"min=1"`
+	Memory            int64                   `json:"memory" validate:"min=1"`
 }
 
 // UpdateNodeRequest represents the request to update a node
@@ -60,12 +64,14 @@ type UpdateNodeRequest struct {
 
 // NodeListOptions represents options for listing nodes
 type NodeListOptions struct {
-	ClusterID   *uint
-	Status      *models.NodeStatus
-	Role        *models.NodeRole
-	IncludeGPIO bool
-	Limit       int
-	Offset      int
+	ClusterID       *uint
+	Status          *models.NodeStatus
+	Role            *models.NodeRole
+	DiscoveryMethod *models.DiscoveryMethod
+	NodeType        *models.NodeType
+	IncludeGPIO     bool
+	Limit           int
+	Offset          int
 }
 
 // List returns a paginated list of nodes
@@ -84,6 +90,12 @@ func (s *NodeService) List(opts NodeListOptions) ([]models.Node, int64, error) {
 	}
 	if opts.Role != nil {
 		query = query.Where("role = ?", *opts.Role)
+	}
+	if opts.DiscoveryMethod != nil {
+		query = query.Where("discovery_method = ?", *opts.DiscoveryMethod)
+	}
+	if opts.NodeType != nil {
+		query = query.Where("node_type = ?", *opts.NodeType)
 	}
 
 	// Get total count
@@ -209,18 +221,23 @@ func (s *NodeService) Create(req CreateNodeRequest) (*models.Node, error) {
 	}
 
 	node := models.Node{
-		Name:         req.Name,
-		IPAddress:    req.IPAddress,
-		MACAddress:   req.MACAddress,
-		Status:       models.NodeStatusDiscovered,
-		Role:         req.Role,
-		ClusterID:    req.ClusterID,
-		Architecture: req.Architecture,
-		Model:        req.Model,
-		SerialNumber: req.SerialNumber,
-		CPUCores:     req.CPUCores,
-		Memory:       req.Memory,
-		LastSeen:     time.Now(),
+		Name:              req.Name,
+		IPAddress:         req.IPAddress,
+		MACAddress:        req.MACAddress,
+		Status:            models.NodeStatusDiscovered,
+		Role:              req.Role,
+		ClusterID:         req.ClusterID,
+		DiscoveryMethod:   req.DiscoveryMethod,
+		DiscoveredAt:      time.Now(),
+		NodeType:          req.NodeType,
+		ControllerVersion: req.ControllerVersion,
+		AgentPort:         req.AgentPort,
+		Architecture:      req.Architecture,
+		Model:             req.Model,
+		SerialNumber:      req.SerialNumber,
+		CPUCores:          req.CPUCores,
+		Memory:            req.Memory,
+		LastSeen:          time.Now(),
 	}
 
 	if err := s.db.DB().Create(&node).Error; err != nil {
