@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -14,6 +15,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dsyorkd/pi-controller/internal/api"
+	"github.com/dsyorkd/pi-controller/internal/clustering"
+	"github.com/dsyorkd/pi-controller/internal/clustering/health"
+	"github.com/dsyorkd/pi-controller/internal/clustering/replication"
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	grpcserver "github.com/dsyorkd/pi-controller/internal/grpc/server"
@@ -153,6 +157,95 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	log.Info("Database initialized successfully")
 
+	// Initialize clustering if enabled
+	var cluster *clustering.RaftCluster
+	var healthChecker *health.HealthChecker
+	var replicator *replication.Replicator
+
+	if cfg.Cluster.Enabled {
+		log.Info("Initializing controller clustering...")
+
+		// Parse duration configs
+		heartbeatTimeout, err := time.ParseDuration(cfg.Cluster.HeartbeatTimeout)
+		if err != nil {
+			return errors.Wrapf(err, "invalid heartbeat timeout")
+		}
+		electionTimeout, err := time.ParseDuration(cfg.Cluster.ElectionTimeout)
+		if err != nil {
+			return errors.Wrapf(err, "invalid election timeout")
+		}
+		snapshotInterval, err := time.ParseDuration(cfg.Cluster.SnapshotInterval)
+		if err != nil {
+			return errors.Wrapf(err, "invalid snapshot interval")
+		}
+
+		// Create cluster configuration
+		clusterConfig := &clustering.ClusterConfig{
+			ControllerID:      cfg.Cluster.ControllerID,
+			BindAddr:          cfg.Cluster.BindAddr,
+			DataDir:           cfg.Cluster.DataDir,
+			Bootstrap:         cfg.Cluster.Bootstrap,
+			InitialPeers:      cfg.Cluster.InitialPeers,
+			HeartbeatTimeout:  heartbeatTimeout,
+			ElectionTimeout:   electionTimeout,
+			SnapshotInterval:  snapshotInterval,
+			SnapshotThreshold: cfg.Cluster.SnapshotThreshold,
+			MaxAppendEntries:  cfg.Cluster.MaxAppendEntries,
+		}
+
+		// Create Raft cluster
+		cluster, err = clustering.NewRaftCluster(clusterConfig, log)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create Raft cluster")
+		}
+
+		log.WithFields(map[string]interface{}{
+			"controller_id": clusterConfig.ControllerID,
+			"bind_addr":     clusterConfig.BindAddr,
+			"bootstrap":     clusterConfig.Bootstrap,
+		}).Info("Raft cluster initialized")
+
+		// Wait for leader election
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := cluster.WaitForLeader(ctx); err != nil {
+			log.WithError(err).Warn("No leader elected within timeout - continuing anyway")
+		} else {
+			log.WithField("leader", cluster.GetLeader()).Info("Cluster leader elected")
+		}
+
+		// Initialize database replication
+		replicator = replication.NewReplicator(db, cluster, log)
+		if err := replicator.Start(context.Background()); err != nil {
+			return errors.Wrapf(err, "failed to start replicator")
+		}
+
+		log.Info("Database replication initialized")
+
+		// Initialize health checker
+		healthChecker = health.NewHealthChecker(log, 5*time.Second)
+
+		// Register health checks
+		healthChecker.RegisterCheck("database", health.DatabaseHealthCheck(db))
+		healthChecker.RegisterCheck("raft", health.RaftHealthCheck(cluster))
+
+		if err := healthChecker.Start(context.Background()); err != nil {
+			return errors.Wrapf(err, "failed to start health checker")
+		}
+
+		log.Info("Health checking initialized")
+
+		// Set up leadership callbacks
+		cluster.OnBecomeLeader(func() {
+			log.Info("🎖️  This controller became the cluster leader")
+		})
+
+		cluster.OnLoseLeadership(func() {
+			log.Warn("Lost cluster leadership - switching to follower mode")
+		})
+	}
+
 	// Setup graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -204,6 +297,13 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Start REST API server
 	apiServer := api.New(&cfg.API, log, db, caService)
+
+	// Set clustering components on API server if clustering is enabled
+	if cfg.Cluster.Enabled && cluster != nil {
+		apiServer.SetClusteringComponents(cluster, healthChecker)
+		log.Info("Clustering API endpoints enabled")
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -336,6 +436,29 @@ func runServer(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
+	// Stop clustering components
+	if cfg.Cluster.Enabled {
+		go func() {
+			if healthChecker != nil {
+				if err := healthChecker.Stop(); err != nil {
+					log.WithError(err).Error("Error stopping health checker")
+				}
+			}
+
+			if replicator != nil {
+				if err := replicator.Stop(); err != nil {
+					log.WithError(err).Error("Error stopping replicator")
+				}
+			}
+
+			if cluster != nil {
+				if err := cluster.Shutdown(); err != nil {
+					log.WithError(err).Error("Error shutting down cluster")
+				}
+			}
+		}()
+	}
+
 	// Wait for all servers to stop or timeout
 	done := make(chan struct{})
 	go func() {
@@ -412,6 +535,8 @@ func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log
 	model := node.TXTRecords["model"]
 	version := node.TXTRecords["version"]
 	nodeIdFromTXT := node.TXTRecords["node_id"]
+	nodeType := node.TXTRecords["type"] // "controller" or "agent"
+	agentPort := node.TXTRecords["agent_port"]
 
 	// Use discovery node_id if available from TXT records, otherwise use discovery ID
 	nodeName := node.Name
@@ -419,19 +544,40 @@ func handleNodeRegistration(event discovery.NodeEvent, db *storage.Database, log
 		nodeName = nodeIdFromTXT
 	}
 
+	// Determine node type based on TXT records
+	discoveredNodeType := models.NodeTypeGeneric
+	controllerVersion := ""
+	discoveredAgentPort := 0
+
+	if nodeType == "controller" {
+		discoveredNodeType = models.NodeTypeController
+		controllerVersion = version
+	} else if nodeType == "agent" {
+		discoveredNodeType = models.NodeTypeAgent
+		if port := agentPort; port != "" {
+			if p, err := strconv.Atoi(port); err == nil {
+				discoveredAgentPort = p
+			}
+		}
+	}
+
 	// Default role to worker - could be enhanced to detect master nodes
 	role := models.NodeRoleWorker
 
 	// Create new node registration request
 	createReq := services.CreateNodeRequest{
-		Name:         nodeName,
-		IPAddress:    node.IPAddress,
-		MACAddress:   "", // Not available from mDNS discovery
-		Role:         role,
-		Architecture: architecture,
-		Model:        model,
-		CPUCores:     1,                  // Default, will be updated when node connects
-		Memory:       1024 * 1024 * 1024, // Default 1GB, will be updated when node connects
+		Name:              nodeName,
+		IPAddress:         node.IPAddress,
+		MACAddress:        "", // Not available from mDNS discovery
+		Role:              role,
+		DiscoveryMethod:   models.DiscoveryMethodMDNS,
+		NodeType:          discoveredNodeType,
+		ControllerVersion: controllerVersion,
+		AgentPort:         discoveredAgentPort,
+		Architecture:      architecture,
+		Model:             model,
+		CPUCores:          1,                  // Default, will be updated when node connects
+		Memory:            1024 * 1024 * 1024, // Default 1GB, will be updated when node connects
 	}
 
 	// Create the new node

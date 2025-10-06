@@ -79,6 +79,12 @@ func getAllMigrations() []MigrationDefinition {
 			Up:          fixGPIODeviceColumnNames,
 			Down:        revertGPIODeviceColumnNames,
 		},
+		{
+			ID:          "20241201000013",
+			Description: "Add node discovery and type tracking fields",
+			Up:          addNodeDiscoveryFields,
+			Down:        dropNodeDiscoveryFields,
+		},
 	}
 }
 
@@ -668,5 +674,34 @@ func fixGPIODeviceColumnNames(db *gorm.DB) error {
 func revertGPIODeviceColumnNames(db *gorm.DB) error {
 	// This would be complex to implement for SQLite, but since this is a fix migration,
 	// reverting is not critical for normal operation
+	return nil
+}
+
+// addNodeDiscoveryFields adds discovery tracking fields to nodes table
+func addNodeDiscoveryFields(db *gorm.DB) error {
+	migrations := []string{
+		"ALTER TABLE nodes ADD COLUMN discovery_method TEXT NOT NULL DEFAULT 'manual'",
+		"ALTER TABLE nodes ADD COLUMN discovered_at DATETIME",
+		"ALTER TABLE nodes ADD COLUMN node_type TEXT NOT NULL DEFAULT 'generic'",
+		"ALTER TABLE nodes ADD COLUMN controller_version TEXT",
+		"ALTER TABLE nodes ADD COLUMN agent_port INTEGER DEFAULT 0",
+		// Update existing nodes to have discovered_at = created_at
+		"UPDATE nodes SET discovered_at = created_at WHERE discovered_at IS NULL",
+	}
+
+	for _, sql := range migrations {
+		if err := db.Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// dropNodeDiscoveryFields removes discovery tracking fields from nodes table
+func dropNodeDiscoveryFields(db *gorm.DB) error {
+	// SQLite doesn't support DROP COLUMN directly
+	// Would need to recreate table, which is complex
+	// For simplicity, this is a no-op
 	return nil
 }

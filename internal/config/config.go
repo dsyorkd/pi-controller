@@ -54,6 +54,37 @@ type Config struct {
 
 	// Web UI configuration
 	WebUI WebUIConfig `yaml:"webui" mapstructure:"webui"`
+
+	// Clustering configuration
+	Cluster ClusterConfig `yaml:"cluster" mapstructure:"cluster"`
+}
+
+// ClusterConfig contains controller clustering settings
+type ClusterConfig struct {
+	// Enable clustering
+	Enabled bool `yaml:"enabled" mapstructure:"enabled"`
+
+	// Unique controller identifier
+	ControllerID string `yaml:"controller_id" mapstructure:"controller_id"`
+
+	// Raft bind address (e.g., "192.168.1.10:9091")
+	BindAddr string `yaml:"bind_addr" mapstructure:"bind_addr"`
+
+	// Bootstrap this node as the first cluster member
+	Bootstrap bool `yaml:"bootstrap" mapstructure:"bootstrap"`
+
+	// Initial cluster peers (only used during bootstrap)
+	InitialPeers []string `yaml:"initial_peers" mapstructure:"initial_peers"`
+
+	// Data directory for Raft logs and snapshots
+	DataDir string `yaml:"data_dir" mapstructure:"data_dir"`
+
+	// Raft tuning parameters (optimized for Raspberry Pi)
+	HeartbeatTimeout  string `yaml:"heartbeat_timeout" mapstructure:"heartbeat_timeout"`
+	ElectionTimeout   string `yaml:"election_timeout" mapstructure:"election_timeout"`
+	SnapshotInterval  string `yaml:"snapshot_interval" mapstructure:"snapshot_interval"`
+	SnapshotThreshold uint64 `yaml:"snapshot_threshold" mapstructure:"snapshot_threshold"`
+	MaxAppendEntries  int    `yaml:"max_append_entries" mapstructure:"max_append_entries"`
 }
 
 // AppConfig contains general application settings
@@ -816,6 +847,19 @@ func getProductionDefaults() Config {
 			SendDefaultPII:   false, // Security: don't send PII by default
 			MaxBreadcrumbs:   100,
 			AttachStacktrace: true,
+		},
+		Cluster: ClusterConfig{
+			Enabled:           false, // Disabled by default, enable in production for HA
+			ControllerID:      "",    // Must be set if enabled
+			BindAddr:          "",    // Must be set if enabled (e.g., "192.168.1.10:9091")
+			Bootstrap:         false,
+			InitialPeers:      []string{},
+			DataDir:           "./data/raft",
+			HeartbeatTimeout:  "1s",
+			ElectionTimeout:   "1s",
+			SnapshotInterval:  "30m",
+			SnapshotThreshold: 8192,
+			MaxAppendEntries:  64,
 		},
 		WebUI: WebUIConfig{
 			Enabled:   true,
