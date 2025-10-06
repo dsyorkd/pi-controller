@@ -78,7 +78,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -134,7 +134,7 @@ jobs:
     name: Build Binaries
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -262,7 +262,7 @@ jobs:
     name: Database Migration Tests
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -303,7 +303,7 @@ jobs:
     name: Performance & Race Tests
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -342,7 +342,7 @@ jobs:
     name: Comprehensive Test Suite
     runs-on: ubuntu-latest
     container:
-      image: ${{ env.CI_IMAGE }}
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
