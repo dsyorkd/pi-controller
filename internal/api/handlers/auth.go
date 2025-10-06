@@ -174,19 +174,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Create user info response
-	userInfo := &UserInfo{
-		ID:        user.ID,
-		Username:  user.Username,
-		Email:     user.Email,
-		Role:      user.Role,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		IsActive:  user.IsActive,
-		LastLogin: user.LastLogin,
-		CreatedAt: user.CreatedAt,
-	}
-
 	// Set secure httpOnly cookies for tokens
 	if err := h.authManager.SetSecureCookies(c, accessToken, refreshToken); err != nil {
 		h.logger.WithError(err).Error("Failed to set secure cookies")
@@ -204,18 +191,25 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}).Info("User logged in successfully")
 
 	// Create response
-	response := LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		TokenType:    "Bearer",
-		ExpiresIn:    15 * 60, // 15 minutes
-		User:         userInfo,
+	response := map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":        user.ID,
+			"username":  user.Username,
+			"role":      user.Role,
+			"firstName": user.FirstName,
+			"lastName":  user.LastName,
+			"email":     user.Email,
+		},
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"token_type":    "Bearer",
+		"expires_in":    15 * 60, // 15 minutes
 	}
 
 	// Include CSRF token in response if enabled
 	if csrfToken, exists := c.Get(middleware.CSRFTokenKey); exists {
 		if token, ok := csrfToken.(string); ok {
-			response.CSRFToken = token
+			response["csrf_token"] = token
 		}
 	}
 
