@@ -3,10 +3,10 @@
     "info": {
         "description": "REST API for managing Raspberry Pi clusters, nodes, and GPIO resources",
         "title": "Pi-Controller API",
-        "termsOfService": "http://swagger.io/terms/",
+        "termsOfService": "https://swagger.io/terms/",
         "contact": {
             "name": "API Support",
-            "url": "http://github.com/dsyorkd/pi-controller/issues",
+            "url": "https://github.com/dsyorkd/pi-controller/issues",
             "email": "support@example.com"
         },
         "license": {
