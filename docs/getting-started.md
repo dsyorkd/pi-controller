@@ -1,4 +1,22 @@
+---
+layout: default
+title: Getting Started
+nav_order: 1
+---
+
 # Getting Started with Development
+{: .no_toc }
+
+Set up your local development environment for Pi-Controller
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 This guide will walk you through setting up your local development environment for Pi-Controller.
 

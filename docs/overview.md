@@ -1,4 +1,22 @@
+---
+layout: default
+title: System Overview
+nav_order: 2
+---
+
 # System Architecture Overview
+{: .no_toc }
+
+Comprehensive Kubernetes management platform for Raspberry Pi clusters
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 Pi-Controller is a comprehensive Kubernetes management platform designed specifically for Raspberry Pi clusters. The system provides automated discovery, provisioning, and lifecycle management of K3s clusters while offering GPIO-as-a-Service capabilities through Kubernetes Custom Resources.
 
