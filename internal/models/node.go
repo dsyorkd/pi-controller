@@ -95,6 +95,12 @@ const (
 type NodeType string
 
 const (
+	// NodeTypeController - Raspberry Pi running pi-controller as a control plane
+	NodeTypeController NodeType = "controller"
+
+	// NodeTypeAgent - Raspberry Pi running pi-agent for GPIO/hardware control
+	NodeTypeAgent NodeType = "agent"
+
 	// NodeTypeGeneric - Raspberry Pi running pi-controller binary
 	NodeTypeGeneric NodeType = "generic"
 
