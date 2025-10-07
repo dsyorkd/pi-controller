@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25"  # Use Go 1.25 with compatible golangci-lint v2.4.0
+  GO_VERSION: "1.25.1"  # Use Go 1.25 with compatible golangci-lint v2.4.0
   GOLANGCI_LINT_VERSION: "v2.4.0"
-  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v2.0"
+  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
   # Quick validation job using optimized CI image
@@ -22,7 +22,7 @@ jobs:
     name: Code Validation
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v1.0
     timeout-minutes: 5
     steps:
       - name: Checkout code

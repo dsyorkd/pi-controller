@@ -16,7 +16,7 @@ concurrency:
 
 env:
   GO_VERSION: "1.25"  # Use Go 1.25 for consistency
-  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v2.0"
+  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
   # Dependency vulnerability scanning using optimized CI image
