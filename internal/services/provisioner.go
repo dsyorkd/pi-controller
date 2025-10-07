@@ -908,16 +908,8 @@ func (s *ProvisioningService) installPiControllerOnNode(
 		errorMsg = fmt.Sprintf("command execution failed: %v", err)
 	}
 
-	// Update node type to Generic (capable of running pi-controller)
-	if success {
-		nodeType := models.NodeTypeGeneric
-		updateReq := UpdateNodeRequest{
-			NodeType: &nodeType,
-		}
-		if _, err := s.nodeService.Update(nodeID, updateReq); err != nil {
-			s.logger.WithError(err).WithField("node_id", nodeID).Error("Failed to update node type")
-		}
-	}
+	// Note: Node is now capable of running pi-controller
+	// The node type should already be Generic after discovery
 
 	duration := time.Since(start)
 	s.logger.WithFields(map[string]interface{}{
