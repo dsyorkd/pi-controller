@@ -86,6 +86,9 @@ testdata/
 .env.production
 .env.staging
 
+
+**/_site/
+
 # Local configuration overrides
 **/config/*local*
 **/config/*.local.*

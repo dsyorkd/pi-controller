@@ -1,4 +1,23 @@
+---
+layout: default
+title: Security Implementation
+parent: Security
+nav_order: 1
+---
+
 # Security Implementation Summary
+{: .no_toc }
+
+Comprehensive security measures and best practices
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 This document provides a comprehensive overview of the security measures implemented in the pi-controller project.
 

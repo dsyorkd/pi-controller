@@ -1,4 +1,23 @@
-# Certificate Authority Architecture and Vault Integration Strategy
+---
+layout: default
+title: Certificate Authority
+parent: Security
+nav_order: 3
+---
+
+# Certificate Authority Architecture
+{: .no_toc }
+
+PKI infrastructure and Vault integration strategy
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 ## Executive Summary
 

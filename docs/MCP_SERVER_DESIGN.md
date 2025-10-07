@@ -1,4 +1,23 @@
+---
+layout: default
+title: MCP Server Integration
+parent: Advanced Topics
+nav_order: 2
+---
+
 # Pi-Controller MCP Server Design
+{: .no_toc }
+
+Model Context Protocol integration for AI-assisted operations
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 ## Executive Summary
 

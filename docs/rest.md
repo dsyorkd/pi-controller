@@ -1,4 +1,23 @@
+---
+layout: default
+title: REST API
+parent: API Reference
+nav_order: 1
+---
+
 # REST API Reference
+{: .no_toc }
+
+RESTful HTTP API for cluster and resource management
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 The Pi-Controller provides a comprehensive RESTful API for managing clusters, nodes, and GPIO resources. The API is served by the main `pi-controller` control plane binary.
 

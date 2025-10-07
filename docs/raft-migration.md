@@ -1,7 +1,8 @@
 ---
 layout: default
-title: Raft Migration Strategy
-nav_order: 6
+title: Raft Migration
+parent: Deployment
+nav_order: 2
 ---
 
 # Raft State Migration: systemd → DaemonSet

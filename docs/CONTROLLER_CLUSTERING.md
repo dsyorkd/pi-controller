@@ -1,4 +1,23 @@
+---
+layout: default
+title: Clustering & Raft
+parent: Architecture
+nav_order: 2
+---
+
 # Pi-Controller Clustering Architecture
+{: .no_toc }
+
+High-availability clustering using HashiCorp Raft consensus
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 ## Overview
 

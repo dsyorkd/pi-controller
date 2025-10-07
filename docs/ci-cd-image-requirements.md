@@ -1,4 +1,23 @@
-# CI/CD Image Requirements for Pi-Controller Repository
+---
+layout: default
+title: CI/CD Requirements
+parent: Advanced Topics
+nav_order: 3
+---
+
+# CI/CD Image Requirements
+{: .no_toc }
+
+Container requirements for CI/CD pipelines
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 ## Base System Requirements
 

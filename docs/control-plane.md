@@ -1,4 +1,23 @@
+---
+layout: default
+title: Control Plane
+parent: Architecture
+nav_order: 1
+---
+
 # Control Plane Architecture
+{: .no_toc }
+
+The brain of the system - cluster management and API gateway
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 The Pi-Controller Control Plane is the brain of the system. It runs as a single Go binary and is responsible for cluster management, node provisioning, and exposing the system's APIs. It can be deployed in a high-availability configuration across multiple master nodes.
 

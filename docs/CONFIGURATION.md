@@ -1,4 +1,22 @@
+---
+layout: default
+title: Configuration
+nav_order: 10
+---
+
 # Pi Controller Configuration Guide
+{: .no_toc }
+
+Unified configuration system for all deployment modes
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 This guide covers the unified configuration system supporting binary, Docker, and Kubernetes deployments.
 

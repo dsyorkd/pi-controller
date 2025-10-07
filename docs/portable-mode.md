@@ -1,7 +1,8 @@
 ---
 layout: default
 title: Portable Mode
-nav_order: 5
+parent: Deployment
+nav_order: 1
 ---
 
 # Portable Mode

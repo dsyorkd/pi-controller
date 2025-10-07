@@ -1,6 +1,25 @@
-# gRPC API Reference
+---
+layout: default
+title: gRPC API
+parent: API Reference
+nav_order: 2
+---
 
-The Pi-Controller uses gRPC for high-performance, low-latency communication, primarily between the Control Plane and the Node Agents. All gRPC communication is secured using mutual TLS (mTLS), ensuring that both the client and server can verify each other's identity.
+# gRPC API Reference
+{: .no_toc }
+
+High-performance RPC communication for internal services
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
+
+The Pi-Controller uses gRPC for high-performance, low-latency communication between distributed components. All gRPC communication is secured using mutual TLS (mTLS), ensuring that both the client and server can verify each other's identity.
 
 ## Communication Flow
 

@@ -1,4 +1,23 @@
+---
+layout: default
+title: WebSocket API
+parent: API Reference
+nav_order: 3
+---
+
 # WebSocket API Reference
+{: .no_toc }
+
+Real-time event streaming for responsive applications
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 The Pi-Controller provides a WebSocket endpoint for clients (like the Web UI) to receive real-time event notifications from the control plane. This allows for a dynamic and responsive user experience without the need for constant polling.
 

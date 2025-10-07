@@ -1,4 +1,23 @@
+---
+layout: default
+title: TLS Setup
+parent: Security
+nav_order: 2
+---
+
 # TLS/HTTPS Setup Guide
+{: .no_toc }
+
+Secure communication configuration for Pi-Controller
+{: .fs-6 .fw-300 }
+
+## Table of contents
+{: .no_toc .text-delta }
+
+1. TOC
+{:toc}
+
+---
 
 This guide covers TLS/HTTPS configuration for the pi-controller project.
 
