@@ -65,6 +65,9 @@ aux_links:
 # Makes Aux links open in a new tab
 aux_links_new_tab: true
 
+
+exclude: ["README.md", "LICENSE", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "index.html"]
+
 # Exclude from processing.
 # The following items will not be processed, by default.
 # Any item listed under the `exclude:` key here will be automatically added to
