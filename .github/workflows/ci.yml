@@ -22,10 +22,7 @@ jobs:
     name: Code Validation
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      image: ghcr.io/dsyorkd/ci-image/ci-go:v2.0
     timeout-minutes: 5
     steps:
       - name: Checkout code
@@ -79,9 +76,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     needs: validate
     timeout-minutes: 6
     steps:
@@ -135,9 +129,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     needs: validate
     timeout-minutes: 6
     strategy:
@@ -263,9 +254,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     needs: validate
     timeout-minutes: 8
     steps:
@@ -304,9 +292,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     needs: [validate, test]
     timeout-minutes: 8
     steps:
@@ -343,9 +328,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     needs: [test, build, migration-test, performance-test]
     timeout-minutes: 12
     steps:
