@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -725,4 +726,469 @@ func (s *ProvisioningService) GetKubeConfig(ctx context.Context, masterNodeID ui
 	}
 
 	return result.Stdout, nil
+}
+
+// PiControllerConfig represents pi-controller installation configuration
+type PiControllerConfig struct {
+	// Version to install (e.g., "v1.0.0", "latest")
+	Version string `json:"version,omitempty"`
+
+	// GitHub release URL (defaults to official repo)
+	ReleaseURL string `json:"release_url,omitempty"`
+
+	// Installation directory
+	InstallDir string `json:"install_dir,omitempty"`
+
+	// Binary name
+	BinaryName string `json:"binary_name,omitempty"`
+
+	// Systemd service configuration
+	EnableSystemd bool   `json:"enable_systemd,omitempty"`
+	ServiceName   string `json:"service_name,omitempty"`
+
+	// Configuration file path
+	ConfigPath string `json:"config_path,omitempty"`
+
+	// Data directory for SQLite and Raft
+	DataDir string `json:"data_dir,omitempty"`
+
+	// Cluster configuration
+	ClusterEnabled    bool   `json:"cluster_enabled,omitempty"`
+	ClusterID         string `json:"cluster_id,omitempty"`
+	BootstrapExpected int    `json:"bootstrap_expected,omitempty"` // Number of nodes expected for Raft bootstrap
+
+	// API configuration
+	APIHost string `json:"api_host,omitempty"`
+	APIPort int    `json:"api_port,omitempty"`
+
+	// gRPC configuration
+	GRPCHost string `json:"grpc_host,omitempty"`
+	GRPCPort int    `json:"grpc_port,omitempty"`
+}
+
+// DefaultPiControllerConfig returns default configuration for pi-controller installation
+func DefaultPiControllerConfig() PiControllerConfig {
+	return PiControllerConfig{
+		Version:           "latest",
+		ReleaseURL:        "https://api.github.com/repos/dsyorkd/pi-controller/releases",
+		InstallDir:        "/usr/local/bin",
+		BinaryName:        "pi-controller",
+		EnableSystemd:     true,
+		ServiceName:       "pi-controller",
+		ConfigPath:        "/etc/pi-controller/config.yaml",
+		DataDir:           "/var/lib/pi-controller",
+		ClusterEnabled:    true,
+		BootstrapExpected: 3,
+		APIHost:           "0.0.0.0",
+		APIPort:           8080,
+		GRPCHost:          "0.0.0.0",
+		GRPCPort:          9090,
+	}
+}
+
+// InstallPiControllerRequest represents a request to install pi-controller on remote nodes
+type InstallPiControllerRequest struct {
+	NodeIDs   []uint                      `json:"node_ids" validate:"required,min=1"`
+	Config    PiControllerConfig          `json:"config,omitempty"`
+	SSHConfig provisioner.SSHClientConfig `json:"ssh_config"`
+	Bootstrap bool                        `json:"bootstrap,omitempty"` // Whether to bootstrap new Raft cluster
+}
+
+// InstallPiController installs pi-controller binary on remote nodes
+func (s *ProvisioningService) InstallPiController(ctx context.Context, req InstallPiControllerRequest) ([]*ProvisioningResult, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"node_ids": req.NodeIDs,
+		"version":  req.Config.Version,
+	}).Info("Starting pi-controller installation on remote nodes")
+
+	// Merge with default config
+	config := DefaultPiControllerConfig()
+	if req.Config.Version != "" {
+		config.Version = req.Config.Version
+	}
+	if req.Config.InstallDir != "" {
+		config.InstallDir = req.Config.InstallDir
+	}
+	if req.Config.DataDir != "" {
+		config.DataDir = req.Config.DataDir
+	}
+	if req.Config.ClusterID != "" {
+		config.ClusterID = req.Config.ClusterID
+	}
+	if req.Config.BootstrapExpected > 0 {
+		config.BootstrapExpected = req.Config.BootstrapExpected
+	}
+
+	var results []*ProvisioningResult
+
+	// Install on each node
+	for i, nodeID := range req.NodeIDs {
+		isBootstrapNode := req.Bootstrap && i == 0
+
+		result, err := s.installPiControllerOnNode(ctx, nodeID, config, req.SSHConfig, isBootstrapNode)
+		results = append(results, result)
+
+		if err != nil {
+			s.logger.WithError(err).WithField("node_id", nodeID).Error("Failed to install pi-controller on node")
+			// Continue with other nodes
+			continue
+		}
+	}
+
+	// Count successes
+	successCount := 0
+	for _, result := range results {
+		if result.Success {
+			successCount++
+		}
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"total_nodes":      len(req.NodeIDs),
+		"successful_nodes": successCount,
+		"failed_nodes":     len(req.NodeIDs) - successCount,
+	}).Info("Pi-controller installation completed")
+
+	return results, nil
+}
+
+// installPiControllerOnNode installs pi-controller on a single node
+func (s *ProvisioningService) installPiControllerOnNode(
+	ctx context.Context,
+	nodeID uint,
+	config PiControllerConfig,
+	sshConfig provisioner.SSHClientConfig,
+	isBootstrapNode bool,
+) (*ProvisioningResult, error) {
+	start := time.Now()
+
+	// Get node details
+	node, err := s.nodeService.GetByID(nodeID, false)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get node %d", nodeID)
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"node_id":          nodeID,
+		"node_name":        node.Name,
+		"node_ip":          node.IPAddress,
+		"is_bootstrap":     isBootstrapNode,
+		"pi_ctrl_version": config.Version,
+	}).Info("Installing pi-controller on node")
+
+	// Setup SSH connection
+	sshConfig.Host = node.IPAddress
+	if sshConfig.Username == "" {
+		sshConfig.Username = "pi"
+	}
+
+	sshClient, err := provisioner.NewSSHClient(sshConfig, s.logger)
+	if err != nil {
+		return &ProvisioningResult{
+			NodeID:   nodeID,
+			NodeName: node.Name,
+			Success:  false,
+			Error:    fmt.Sprintf("failed to create SSH client: %v", err),
+			Duration: time.Since(start),
+		}, errors.Wrap(err, "failed to create SSH client")
+	}
+	defer sshClient.Close()
+
+	// Generate installation commands
+	commands := s.generatePiControllerInstallCommands(node, config, isBootstrapNode)
+
+	// Execute installation commands
+	s.logger.WithField("command_count", len(commands)).Debug("Executing pi-controller installation commands")
+
+	results, err := sshClient.ExecuteCommands(ctx, commands)
+
+	success := err == nil
+	var errorMsg string
+	if !success {
+		errorMsg = fmt.Sprintf("command execution failed: %v", err)
+	}
+
+	// Update node type to Generic (capable of running pi-controller)
+	if success {
+		nodeType := models.NodeTypeGeneric
+		updateReq := UpdateNodeRequest{
+			NodeType: &nodeType,
+		}
+		if _, err := s.nodeService.Update(nodeID, updateReq); err != nil {
+			s.logger.WithError(err).WithField("node_id", nodeID).Error("Failed to update node type")
+		}
+	}
+
+	duration := time.Since(start)
+	s.logger.WithFields(map[string]interface{}{
+		"node_id":   nodeID,
+		"node_name": node.Name,
+		"success":   success,
+		"duration":  duration,
+	}).Info("Pi-controller installation completed")
+
+	return &ProvisioningResult{
+		NodeID:   nodeID,
+		NodeName: node.Name,
+		Success:  success,
+		Error:    errorMsg,
+		Duration: duration,
+		Commands: results,
+	}, nil
+}
+
+// generatePiControllerInstallCommands generates commands to install pi-controller binary
+func (s *ProvisioningService) generatePiControllerInstallCommands(
+	node *models.Node,
+	config PiControllerConfig,
+	isBootstrapNode bool,
+) []string {
+	var commands []string
+
+	// Detect architecture
+	commands = append(commands, "export ARCH=$(dpkg --print-architecture)")
+
+	// Determine download URL based on version
+	var downloadURL string
+	if config.Version == "latest" {
+		downloadURL = fmt.Sprintf(
+			"https://github.com/dsyorkd/pi-controller/releases/latest/download/pi-controller-linux-${ARCH}",
+		)
+	} else {
+		downloadURL = fmt.Sprintf(
+			"https://github.com/dsyorkd/pi-controller/releases/download/%s/pi-controller-linux-${ARCH}",
+			config.Version,
+		)
+	}
+
+	// Installation commands
+	commands = append(commands,
+		// Create directories
+		fmt.Sprintf("sudo mkdir -p %s", config.InstallDir),
+		fmt.Sprintf("sudo mkdir -p %s", config.DataDir),
+		fmt.Sprintf("sudo mkdir -p $(dirname %s)", config.ConfigPath),
+
+		// Download binary
+		fmt.Sprintf("curl -sSL %s -o /tmp/%s", downloadURL, config.BinaryName),
+		fmt.Sprintf("sudo chmod +x /tmp/%s", config.BinaryName),
+		fmt.Sprintf("sudo mv /tmp/%s %s/%s", config.BinaryName, config.InstallDir, config.BinaryName),
+
+		// Verify installation
+		fmt.Sprintf("%s/%s version", config.InstallDir, config.BinaryName),
+	)
+
+	// Generate configuration file
+	configContent := s.generatePiControllerConfig(node, config, isBootstrapNode)
+	commands = append(commands,
+		fmt.Sprintf("sudo tee %s > /dev/null <<'EOFCONFIG'\n%s\nEOFCONFIG", config.ConfigPath, configContent),
+	)
+
+	// Create systemd service if enabled
+	if config.EnableSystemd {
+		serviceContent := s.generateSystemdService(config)
+		commands = append(commands,
+			fmt.Sprintf("sudo tee /etc/systemd/system/%s.service > /dev/null <<'EOFSERVICE'\n%s\nEOFSERVICE",
+				config.ServiceName, serviceContent),
+			"sudo systemctl daemon-reload",
+			fmt.Sprintf("sudo systemctl enable %s", config.ServiceName),
+			fmt.Sprintf("sudo systemctl start %s", config.ServiceName),
+			"sleep 5",
+			fmt.Sprintf("sudo systemctl status %s --no-pager", config.ServiceName),
+		)
+	}
+
+	return commands
+}
+
+// generatePiControllerConfig generates the YAML configuration file content
+func (s *ProvisioningService) generatePiControllerConfig(
+	node *models.Node,
+	config PiControllerConfig,
+	isBootstrapNode bool,
+) string {
+	clusterID := config.ClusterID
+	if clusterID == "" {
+		clusterID = fmt.Sprintf("cluster-%s", node.Name)
+	}
+
+	var configYAML strings.Builder
+
+	configYAML.WriteString(fmt.Sprintf(`app:
+  name: pi-controller
+  environment: production
+  data_dir: %s
+
+api:
+  host: %s
+  port: %d
+  tls:
+    enabled: false
+
+grpc:
+  host: %s
+  port: %d
+  tls:
+    enabled: false
+
+cluster:
+  enabled: %t
+  controller_id: %s
+  raft_bind_addr: %s:9091
+  raft_advertise_addr: %s:9091
+  bootstrap_expected: %d
+  data_dir: %s/raft
+
+discovery:
+  mdns:
+    enabled: true
+    domain: local
+    service: _pi-controller._tcp
+
+database:
+  type: sqlite
+  path: %s/pi-controller.db
+`,
+		config.DataDir,
+		config.APIHost,
+		config.APIPort,
+		config.GRPCHost,
+		config.GRPCPort,
+		config.ClusterEnabled,
+		clusterID,
+		node.IPAddress,
+		node.IPAddress,
+		config.BootstrapExpected,
+		config.DataDir,
+		config.DataDir,
+	))
+
+	return configYAML.String()
+}
+
+// generateSystemdService generates the systemd service file content
+func (s *ProvisioningService) generateSystemdService(config PiControllerConfig) string {
+	return fmt.Sprintf(`[Unit]
+Description=Pi Controller - Kubernetes Management for Raspberry Pi
+Documentation=https://github.com/dsyorkd/pi-controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=%s/%s start --config=%s
+Restart=on-failure
+RestartSec=10
+KillMode=process
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=%s
+ReadWritePaths=%s
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
+`,
+		config.InstallDir,
+		config.BinaryName,
+		config.ConfigPath,
+		config.DataDir,
+		filepath.Dir(config.ConfigPath),
+	)
+}
+
+// UninstallPiController removes pi-controller from remote nodes
+func (s *ProvisioningService) UninstallPiController(ctx context.Context, nodeIDs []uint, sshConfig provisioner.SSHClientConfig) ([]*ProvisioningResult, error) {
+	s.logger.WithField("node_ids", nodeIDs).Info("Starting pi-controller uninstallation")
+
+	var results []*ProvisioningResult
+
+	for _, nodeID := range nodeIDs {
+		result, err := s.uninstallPiControllerFromNode(ctx, nodeID, sshConfig)
+		results = append(results, result)
+
+		if err != nil {
+			s.logger.WithError(err).WithField("node_id", nodeID).Error("Failed to uninstall pi-controller from node")
+		}
+	}
+
+	return results, nil
+}
+
+// uninstallPiControllerFromNode removes pi-controller from a single node
+func (s *ProvisioningService) uninstallPiControllerFromNode(
+	ctx context.Context,
+	nodeID uint,
+	sshConfig provisioner.SSHClientConfig,
+) (*ProvisioningResult, error) {
+	start := time.Now()
+
+	node, err := s.nodeService.GetByID(nodeID, false)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get node %d", nodeID)
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"node_id":   nodeID,
+		"node_name": node.Name,
+		"node_ip":   node.IPAddress,
+	}).Info("Uninstalling pi-controller from node")
+
+	sshConfig.Host = node.IPAddress
+	if sshConfig.Username == "" {
+		sshConfig.Username = "pi"
+	}
+
+	sshClient, err := provisioner.NewSSHClient(sshConfig, s.logger)
+	if err != nil {
+		return &ProvisioningResult{
+			NodeID:   nodeID,
+			NodeName: node.Name,
+			Success:  false,
+			Error:    fmt.Sprintf("failed to create SSH client: %v", err),
+			Duration: time.Since(start),
+		}, errors.Wrap(err, "failed to create SSH client")
+	}
+	defer sshClient.Close()
+
+	commands := []string{
+		"sudo systemctl stop pi-controller || true",
+		"sudo systemctl disable pi-controller || true",
+		"sudo rm -f /etc/systemd/system/pi-controller.service",
+		"sudo systemctl daemon-reload",
+		"sudo rm -f /usr/local/bin/pi-controller",
+		"sudo rm -rf /var/lib/pi-controller",
+		"sudo rm -rf /etc/pi-controller",
+	}
+
+	results, err := sshClient.ExecuteCommands(ctx, commands)
+
+	success := err == nil
+	var errorMsg string
+	if !success {
+		errorMsg = fmt.Sprintf("uninstallation failed: %v", err)
+	}
+
+	duration := time.Since(start)
+	s.logger.WithFields(map[string]interface{}{
+		"node_id":   nodeID,
+		"node_name": node.Name,
+		"success":   success,
+		"duration":  duration,
+	}).Info("Pi-controller uninstallation completed")
+
+	return &ProvisioningResult{
+		NodeID:   nodeID,
+		NodeName: node.Name,
+		Success:  success,
+		Error:    errorMsg,
+		Duration: duration,
+		Commands: results,
+	}, nil
 }
