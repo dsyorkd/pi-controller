@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25"  # Use Go 1.25 for consistency
+  GO_VERSION: "1.25.1"  # Use Go 1.25 for consistency
   CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
@@ -25,9 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 8
     steps:
       - name: Checkout code
@@ -75,9 +72,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 6
     steps:
       - name: Checkout code
@@ -291,9 +285,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: $CI_IMAGE
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     timeout-minutes: 8
     steps:
       - name: Checkout code
