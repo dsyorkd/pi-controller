@@ -71,7 +71,6 @@ exclude:
   - "LICENSE"
   - "CONTRIBUTING.md"
   - "CODE_OF_CONDUCT.md"
-  - "index.html"
   - "about.markdown"
   - "WORKFLOW_FIXES_FINAL.md"
   - "WORKFLOW_FIXES_SUMMARY.md"
