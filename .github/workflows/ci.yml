@@ -75,7 +75,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     needs: validate
     timeout-minutes: 6
     steps:
@@ -128,7 +128,7 @@ jobs:
     name: Build Binaries
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     needs: validate
     timeout-minutes: 6
     strategy:
@@ -253,7 +253,7 @@ jobs:
     name: Database Migration Tests
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     needs: validate
     timeout-minutes: 8
     steps:
@@ -291,7 +291,7 @@ jobs:
     name: Performance & Race Tests
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     needs: [validate, test]
     timeout-minutes: 8
     steps:
@@ -327,7 +327,7 @@ jobs:
     name: Comprehensive Test Suite
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     needs: [test, build, migration-test, performance-test]
     timeout-minutes: 12
     steps:

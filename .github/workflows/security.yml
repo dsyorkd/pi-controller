@@ -24,7 +24,7 @@ jobs:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     timeout-minutes: 8
     steps:
       - name: Checkout code
@@ -71,7 +71,7 @@ jobs:
     name: Static Code Analysis
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     timeout-minutes: 6
     steps:
       - name: Checkout code
@@ -284,7 +284,7 @@ jobs:
     name: License Compliance
     runs-on: ubuntu-latest
     container:
-      image: $CI_IMAGE
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     timeout-minutes: 8
     steps:
       - name: Checkout code
