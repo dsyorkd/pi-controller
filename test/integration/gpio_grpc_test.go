@@ -5,15 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/dsyorkd/pi-controller/internal/grpc/client"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // MockPiAgentClient implements PiAgentClientInterface for testing

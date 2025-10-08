@@ -8,14 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/models"
+	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	"github.com/dsyorkd/pi-controller/internal/models"
-	"github.com/dsyorkd/pi-controller/internal/services"
 )
 
 // ClusterServiceInterface defines the interface that ClusterService implements

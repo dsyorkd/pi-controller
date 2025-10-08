@@ -9,15 +9,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	"github.com/dsyorkd/pi-controller/internal/services"
 )
 
 // DeploymentServiceInterface defines the interface that DeploymentService implements

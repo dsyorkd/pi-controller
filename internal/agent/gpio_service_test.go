@@ -4,13 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	pb "github.com/dsyorkd/pi-controller/proto"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func createTestGPIOService(t *testing.T) *GPIOService {

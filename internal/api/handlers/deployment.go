@@ -4,11 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
+	"github.com/gin-gonic/gin"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // DeploymentHandler handles pod deployment-related API operations

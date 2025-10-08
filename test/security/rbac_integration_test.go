@@ -10,14 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/dsyorkd/pi-controller/internal/api"
 	"github.com/dsyorkd/pi-controller/internal/api/middleware"
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRBACIntegration tests the complete Role-Based Access Control system

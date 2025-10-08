@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/services"
+	"github.com/dsyorkd/pi-controller/internal/storage"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -12,11 +16,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	"github.com/dsyorkd/pi-controller/internal/services"
-	"github.com/dsyorkd/pi-controller/internal/storage"
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // ControllerManagerConfig holds configuration for the controller manager

@@ -26,10 +26,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/getsentry/sentry-go"
-	sentrygin "github.com/getsentry/sentry-go/gin"
-	"github.com/gin-gonic/gin"
-
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/api/middleware"
 	"github.com/dsyorkd/pi-controller/internal/clustering"
@@ -38,6 +34,9 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/getsentry/sentry-go"
+	sentrygin "github.com/getsentry/sentry-go/gin"
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 

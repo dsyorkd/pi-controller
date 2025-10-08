@@ -3,6 +3,8 @@ package middleware
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,7 +33,10 @@ func RequestID() gin.HandlerFunc {
 // generateRequestID generates a random request ID
 func generateRequestID() string {
 	bytes := make([]byte, 8)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		// If random generation fails, use a timestamp-based fallback
+		return fmt.Sprintf("%016x", time.Now().UnixNano())
+	}
 	return hex.EncodeToString(bytes)
 }
 

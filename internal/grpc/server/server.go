@@ -4,13 +4,12 @@ import (
 	"context"
 	"net"
 
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-
 	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	pb "github.com/dsyorkd/pi-controller/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // Server represents the gRPC server

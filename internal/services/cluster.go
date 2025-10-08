@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"gorm.io/gorm"
-
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/provisioner"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	"github.com/dsyorkd/pi-controller/internal/validation"
+	"gorm.io/gorm"
 )
 
 // ClusterService is the service for managing clusters

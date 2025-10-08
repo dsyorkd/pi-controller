@@ -8,10 +8,9 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/dsyorkd/pi-controller/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 // RegisterNode registers the node with the Pi Controller server

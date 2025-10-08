@@ -5,11 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/services"
+	"github.com/gin-gonic/gin"
 )
 
 // CAHandler handles Certificate Authority related API operations

@@ -7,11 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	"github.com/gorilla/websocket"
-
 	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/gorilla/websocket"
 )
 
 // Server represents the WebSocket server

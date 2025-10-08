@@ -18,20 +18,20 @@ type EtcdElector struct {
 	config *Config
 
 	// etcd client and session
-	client  *clientv3.Client
-	session *concurrency.Session
+	client   *clientv3.Client
+	session  *concurrency.Session
 	election *concurrency.Election
 
 	// State
-	isLeader  bool
-	leaderID  string
-	term      uint64
-	mu        sync.RWMutex
+	isLeader bool
+	leaderID string
+	term     uint64
+	mu       sync.RWMutex
 
 	// Callbacks
-	becomeLeaderCallback  func()
-	loseLeaderCallback    func()
-	callbackMu            sync.RWMutex
+	becomeLeaderCallback func()
+	loseLeaderCallback   func()
+	callbackMu           sync.RWMutex
 
 	// Control
 	ctx    context.Context

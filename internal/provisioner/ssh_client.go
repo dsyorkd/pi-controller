@@ -11,12 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/errors"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-
-	"github.com/dsyorkd/pi-controller/internal/errors"
-	"github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // SSHClientConfig holds configuration for SSH connections

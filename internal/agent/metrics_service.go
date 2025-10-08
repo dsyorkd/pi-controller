@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	pb "github.com/dsyorkd/pi-controller/proto"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/host"
@@ -13,9 +15,6 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 // MetricsService handles system metrics collection and reporting

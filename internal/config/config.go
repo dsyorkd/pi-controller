@@ -5,10 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dsyorkd/pi-controller/internal/storage"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-
-	"github.com/dsyorkd/pi-controller/internal/storage"
 )
 
 // Config holds the entire application configuration
@@ -1082,4 +1081,3 @@ func (c *WebUIConfig) GetBackendGRPCURL(k8sMode bool) string {
 	}
 	return c.Backend.GRPC.URL
 }
-

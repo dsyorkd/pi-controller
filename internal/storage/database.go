@@ -7,14 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
-
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/migrations"
 	"github.com/dsyorkd/pi-controller/internal/models"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // Database wraps GORM database connection with additional functionality

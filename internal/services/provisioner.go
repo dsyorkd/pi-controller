@@ -869,10 +869,10 @@ func (s *ProvisioningService) installPiControllerOnNode(
 	}
 
 	s.logger.WithFields(map[string]interface{}{
-		"node_id":          nodeID,
-		"node_name":        node.Name,
-		"node_ip":          node.IPAddress,
-		"is_bootstrap":     isBootstrapNode,
+		"node_id":         nodeID,
+		"node_name":       node.Name,
+		"node_ip":         node.IPAddress,
+		"is_bootstrap":    isBootstrapNode,
 		"pi_ctrl_version": config.Version,
 	}).Info("Installing pi-controller on node")
 
@@ -943,9 +943,7 @@ func (s *ProvisioningService) generatePiControllerInstallCommands(
 	// Determine download URL based on version
 	var downloadURL string
 	if config.Version == "latest" {
-		downloadURL = fmt.Sprintf(
-			"https://github.com/dsyorkd/pi-controller/releases/latest/download/pi-controller-linux-${ARCH}",
-		)
+		downloadURL = "https://github.com/dsyorkd/pi-controller/releases/latest/download/pi-controller-linux-${ARCH}"
 	} else {
 		downloadURL = fmt.Sprintf(
 			"https://github.com/dsyorkd/pi-controller/releases/download/%s/pi-controller-linux-${ARCH}",

@@ -66,10 +66,10 @@ type TLSConfig struct {
 
 // ElectionEvent represents a leadership change event
 type ElectionEvent struct {
-	Type         EventType
-	LeaderID     string
-	Term         uint64
-	Timestamp    time.Time
+	Type           EventType
+	LeaderID       string
+	Term           uint64
+	Timestamp      time.Time
 	PreviousLeader string
 }
 

@@ -25,25 +25,25 @@ var (
 
 // ValidationConfig holds validation configuration
 type ValidationConfig struct {
-	MaxNameLength     int      `yaml:"max_name_length"`
-	MaxDescLength     int      `yaml:"max_description_length"`
-	MaxQueryLimit     int      `yaml:"max_query_limit"`
-	MaxRequestSize    int64    `yaml:"max_request_size"`
-	AllowedMethods    []string `yaml:"allowed_methods"`
-	EnableSQLCheck    bool     `yaml:"enable_sql_check"`
-	EnableXSSCheck    bool     `yaml:"enable_xss_check"`
-	EnableBodyCheck   bool     `yaml:"enable_body_check"`
-	EnablePathCheck   bool     `yaml:"enable_path_check"`
-	EnableSizeCheck   bool     `yaml:"enable_size_check"`
+	MaxNameLength   int      `yaml:"max_name_length"`
+	MaxDescLength   int      `yaml:"max_description_length"`
+	MaxQueryLimit   int      `yaml:"max_query_limit"`
+	MaxRequestSize  int64    `yaml:"max_request_size"`
+	AllowedMethods  []string `yaml:"allowed_methods"`
+	EnableSQLCheck  bool     `yaml:"enable_sql_check"`
+	EnableXSSCheck  bool     `yaml:"enable_xss_check"`
+	EnableBodyCheck bool     `yaml:"enable_body_check"`
+	EnablePathCheck bool     `yaml:"enable_path_check"`
+	EnableSizeCheck bool     `yaml:"enable_size_check"`
 }
 
 // DefaultValidationConfig returns secure validation defaults
 func DefaultValidationConfig() *ValidationConfig {
 	return &ValidationConfig{
-		MaxNameLength:   63,                       // DNS-safe length
-		MaxDescLength:   255,                      // Reasonable description length
-		MaxQueryLimit:   1000,                     // Prevent excessive queries
-		MaxRequestSize:  1024 * 1024,              // 1MB max request size
+		MaxNameLength:   63,          // DNS-safe length
+		MaxDescLength:   255,         // Reasonable description length
+		MaxQueryLimit:   1000,        // Prevent excessive queries
+		MaxRequestSize:  1024 * 1024, // 1MB max request size
 		AllowedMethods:  []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
 		EnableSQLCheck:  true,
 		EnableXSSCheck:  true,

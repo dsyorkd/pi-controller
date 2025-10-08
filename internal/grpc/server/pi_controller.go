@@ -5,17 +5,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/api/middleware"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/internal/models"
+	"github.com/dsyorkd/pi-controller/internal/storage"
+	pb "github.com/dsyorkd/pi-controller/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
-
-	"github.com/dsyorkd/pi-controller/internal/api/middleware"
-	"github.com/dsyorkd/pi-controller/internal/models"
-	"github.com/dsyorkd/pi-controller/internal/storage"
-	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 // PiControllerServer implements the gRPC PiControllerService

@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	pb "github.com/dsyorkd/pi-controller/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 // MockServer provides a mock gRPC server for testing the client

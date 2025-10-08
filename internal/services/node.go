@@ -3,12 +3,11 @@ package services
 import (
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"gorm.io/gorm"
 )
 
 // NodeService handles node business logic
@@ -27,20 +26,20 @@ func NewNodeService(db *storage.Database, logger logger.Interface) *NodeService 
 
 // CreateNodeRequest represents the request to create a node
 type CreateNodeRequest struct {
-	Name              string                  `json:"name" validate:"required,min=1,max=100"`
-	IPAddress         string                  `json:"ip_address" validate:"required,ip"`
-	MACAddress        string                  `json:"mac_address"`
-	Role              models.NodeRole         `json:"role" validate:"required,oneof=master worker"`
-	ClusterID         *uint                   `json:"cluster_id,omitempty"`
-	DiscoveryMethod   models.DiscoveryMethod  `json:"discovery_method" validate:"required"`
-	NodeType          models.NodeType         `json:"node_type" validate:"required"`
-	ControllerVersion string                  `json:"controller_version"`
-	AgentPort         int                     `json:"agent_port"`
-	Architecture      string                  `json:"architecture" validate:"max=50"`
-	Model             string                  `json:"model" validate:"max=100"`
-	SerialNumber      string                  `json:"serial_number" validate:"max=100"`
-	CPUCores          int                     `json:"cpu_cores" validate:"min=1"`
-	Memory            int64                   `json:"memory" validate:"min=1"`
+	Name              string                 `json:"name" validate:"required,min=1,max=100"`
+	IPAddress         string                 `json:"ip_address" validate:"required,ip"`
+	MACAddress        string                 `json:"mac_address"`
+	Role              models.NodeRole        `json:"role" validate:"required,oneof=master worker"`
+	ClusterID         *uint                  `json:"cluster_id,omitempty"`
+	DiscoveryMethod   models.DiscoveryMethod `json:"discovery_method" validate:"required"`
+	NodeType          models.NodeType        `json:"node_type" validate:"required"`
+	ControllerVersion string                 `json:"controller_version"`
+	AgentPort         int                    `json:"agent_port"`
+	Architecture      string                 `json:"architecture" validate:"max=50"`
+	Model             string                 `json:"model" validate:"max=100"`
+	SerialNumber      string                 `json:"serial_number" validate:"max=100"`
+	CPUCores          int                    `json:"cpu_cores" validate:"min=1"`
+	Memory            int64                  `json:"memory" validate:"min=1"`
 }
 
 // UpdateNodeRequest represents the request to update a node

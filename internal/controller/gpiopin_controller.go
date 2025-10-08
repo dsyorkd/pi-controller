@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/services"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -17,9 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/dsyorkd/pi-controller/internal/services"
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // GPIOPinReconciler reconciles a GPIOPin object

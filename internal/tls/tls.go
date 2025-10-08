@@ -20,10 +20,10 @@ import (
 
 // Config holds TLS configuration
 type Config struct {
-	CertFile string
-	KeyFile  string
-	AutoCert bool // Auto-generate self-signed cert for development
-	CertDir  string
+	CertFile  string
+	KeyFile   string
+	AutoCert  bool // Auto-generate self-signed cert for development
+	CertDir   string
 	Hostnames []string
 }
 

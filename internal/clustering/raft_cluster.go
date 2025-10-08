@@ -10,22 +10,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // RaftCluster implements a self-contained Raft-based clustering system
 // All consensus and replication is embedded in the binary with minimal external dependencies
 type RaftCluster struct {
-	config      *ClusterConfig
-	logger      logger.Interface
-	raft        *raft.Raft
-	fsm         *clusterFSM
-	transport   *raft.NetworkTransport
-	isLeader    bool
-	leaderMu    sync.RWMutex
+	config    *ClusterConfig
+	logger    logger.Interface
+	raft      *raft.Raft
+	fsm       *clusterFSM
+	transport *raft.NetworkTransport
+	isLeader  bool
+	leaderMu  sync.RWMutex
 
 	// Callbacks
 	becomeLeaderCallback func()

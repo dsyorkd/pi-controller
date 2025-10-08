@@ -4,13 +4,12 @@ import (
 	"testing"
 	"time"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // testLogger implements a simple logger for testing

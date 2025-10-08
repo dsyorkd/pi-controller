@@ -11,14 +11,14 @@ import (
 
 // HealthChecker monitors the health of cluster components
 type HealthChecker struct {
-	logger          logger.Interface
-	checks          map[string]HealthCheck
-	checksMu        sync.RWMutex
-	status          *HealthStatus
-	statusMu        sync.RWMutex
-	checkInterval   time.Duration
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
+	logger        logger.Interface
+	checks        map[string]HealthCheck
+	checksMu      sync.RWMutex
+	status        *HealthStatus
+	statusMu      sync.RWMutex
+	checkInterval time.Duration
+	stopCh        chan struct{}
+	wg            sync.WaitGroup
 }
 
 // HealthCheck is a function that checks a component's health
@@ -26,10 +26,10 @@ type HealthCheck func() error
 
 // HealthStatus represents the overall health status
 type HealthStatus struct {
-	Healthy        bool                       `json:"healthy"`
-	Components     map[string]ComponentHealth `json:"components"`
-	LastCheck      time.Time                  `json:"last_check"`
-	Message        string                     `json:"message,omitempty"`
+	Healthy    bool                       `json:"healthy"`
+	Components map[string]ComponentHealth `json:"components"`
+	LastCheck  time.Time                  `json:"last_check"`
+	Message    string                     `json:"message,omitempty"`
 }
 
 // ComponentHealth represents the health of a single component

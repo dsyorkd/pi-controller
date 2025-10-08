@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"net"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	pb "github.com/dsyorkd/pi-controller/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Server represents the Pi Agent gRPC server

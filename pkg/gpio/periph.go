@@ -392,13 +392,19 @@ func (p *PeriphGPIO) runSoftwarePWM(pinNum int) {
 
 		// PWM cycle: ON phase
 		if onTime > 0 {
-			pwmState.pin.Out(gpio.High)
+			if err := pwmState.pin.Out(gpio.High); err != nil {
+				p.logger.WithError(err).WithField("pin", pinNum).Error("Failed to set pin high during PWM")
+				break
+			}
 			time.Sleep(onTime)
 		}
 
 		// PWM cycle: OFF phase
 		if offTime > 0 {
-			pwmState.pin.Out(gpio.Low)
+			if err := pwmState.pin.Out(gpio.Low); err != nil {
+				p.logger.WithError(err).WithField("pin", pinNum).Error("Failed to set pin low during PWM")
+				break
+			}
 			time.Sleep(offTime)
 		}
 

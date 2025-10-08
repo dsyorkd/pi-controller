@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/pkg/k8s"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/dsyorkd/pi-controller/pkg/k8s"
 )
 
 var (

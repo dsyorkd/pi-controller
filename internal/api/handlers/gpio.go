@@ -4,10 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
+	"github.com/gin-gonic/gin"
 )
 
 // GPIOHandler handles GPIO-related API operations

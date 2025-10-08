@@ -3,11 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/dsyorkd/pi-controller/internal/clustering"
 	"github.com/dsyorkd/pi-controller/internal/clustering/health"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/gin-gonic/gin"
 )
 
 // RaftClusterHandler handles Raft cluster management API operations
@@ -61,13 +60,13 @@ func (h *RaftClusterHandler) GetStatus(c *gin.Context) {
 	stats := h.cluster.Stats()
 
 	c.JSON(http.StatusOK, gin.H{
-		"state":         state.String(),
-		"leader":        leader,
-		"is_leader":     isLeader,
-		"members":       members,
-		"member_count":  len(members),
-		"health":        healthStatus,
-		"raft_stats":    stats,
+		"state":        state.String(),
+		"leader":       leader,
+		"is_leader":    isLeader,
+		"members":      members,
+		"member_count": len(members),
+		"health":       healthStatus,
+		"raft_stats":   stats,
 	})
 }
 

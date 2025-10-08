@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	pb "github.com/dsyorkd/pi-controller/proto"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // GPIOService implements the PiAgent GPIO gRPC service

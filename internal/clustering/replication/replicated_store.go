@@ -3,9 +3,8 @@ package replication
 import (
 	"fmt"
 
-	"gorm.io/gorm"
-
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"gorm.io/gorm"
 )
 
 // ReplicatedStore wraps a storage.Database and automatically replicates writes

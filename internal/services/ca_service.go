@@ -201,12 +201,8 @@ func (s *CAServiceImpl) RenewCertificate(ctx context.Context, certID uint) (*mod
 	if existingCert.SANs != "" {
 		var sans map[string][]string
 		if err := json.Unmarshal([]byte(existingCert.SANs), &sans); err == nil {
-			for _, dnsNames := range sans["dns"] {
-				req.SANs = append(req.SANs, dnsNames)
-			}
-			for _, ips := range sans["ip"] {
-				req.SANs = append(req.SANs, ips)
-			}
+			req.SANs = append(req.SANs, sans["dns"]...)
+			req.SANs = append(req.SANs, sans["ip"]...)
 		}
 	}
 

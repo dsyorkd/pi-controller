@@ -8,11 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 func setupTestAuthManager() *AuthManager {

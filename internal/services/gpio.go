@@ -4,14 +4,13 @@ import (
 	"context"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	"github.com/dsyorkd/pi-controller/internal/grpc/client"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"gorm.io/gorm"
 )
 
 // GPIOService handles GPIO device business logic

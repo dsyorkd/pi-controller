@@ -5,9 +5,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/gin-gonic/gin"
 )
 
 // HealthHandler handles health check endpoints

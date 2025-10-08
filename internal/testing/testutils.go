@@ -9,12 +9,11 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	"github.com/dsyorkd/pi-controller/internal/models"
 )
 
 // TestDB holds test database connection and mock

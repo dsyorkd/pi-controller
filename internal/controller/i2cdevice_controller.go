@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/services"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -17,9 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/dsyorkd/pi-controller/internal/services"
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // I2CDeviceReconciler reconciles an I2CDevice object
@@ -223,7 +222,6 @@ func (r *I2CDeviceReconciler) configureI2CDevice(ctx context.Context, i2cDevice 
 // updateStatus updates the I2CDevice status
 func (r *I2CDeviceReconciler) updateStatus(ctx context.Context, i2cDevice *gpiov1.I2CDevice,
 	phase gpiov1.I2CPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
-
 	// Update basic status fields
 	now := metav1.Now()
 	i2cDevice.Status.Phase = phase
@@ -313,7 +311,6 @@ func (r *I2CDeviceReconciler) readDeviceData(ctx context.Context, i2cDevice *gpi
 func (r *I2CDeviceReconciler) setI2CCondition(status *gpiov1.I2CDeviceStatus,
 	conditionType gpiov1.I2CConditionType, conditionStatus metav1.ConditionStatus,
 	reason, message string) {
-
 	now := metav1.Now()
 	newCondition := gpiov1.I2CCondition{
 		Type:               conditionType,

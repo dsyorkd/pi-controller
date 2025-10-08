@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	pb "github.com/dsyorkd/pi-controller/proto"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func createTestMetricsService(t *testing.T) *MetricsService {

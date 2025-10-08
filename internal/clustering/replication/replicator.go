@@ -13,13 +13,13 @@ import (
 
 // Replicator handles SQLite database replication across cluster nodes
 type Replicator struct {
-	db         *storage.Database
-	logger     logger.Interface
-	applier    LogApplier
-	isLeader   bool
-	leaderMu   sync.RWMutex
-	stopCh     chan struct{}
-	wg         sync.WaitGroup
+	db       *storage.Database
+	logger   logger.Interface
+	applier  LogApplier
+	isLeader bool
+	leaderMu sync.RWMutex
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
 }
 
 // LogApplier is the interface for applying replicated commands

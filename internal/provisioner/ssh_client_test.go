@@ -12,12 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/ssh"
-
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
+	"golang.org/x/crypto/ssh"
 )
 
 // MockSSHServer implements a minimal SSH server for testing

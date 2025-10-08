@@ -8,13 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-
 	"github.com/dsyorkd/pi-controller/internal/api/middleware"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // AuthHandler handles authentication and user management endpoints

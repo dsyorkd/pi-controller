@@ -6,13 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	pb "github.com/dsyorkd/pi-controller/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 // Client provides a gRPC client interface for the Pi Agent to communicate with the Pi Controller

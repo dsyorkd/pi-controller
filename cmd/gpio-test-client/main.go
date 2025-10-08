@@ -7,10 +7,9 @@ import (
 	"log"
 	"time"
 
+	pb "github.com/dsyorkd/pi-controller/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 var (

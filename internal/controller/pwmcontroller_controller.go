@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/services"
+	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -17,9 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/dsyorkd/pi-controller/internal/services"
-	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
 )
 
 // PWMControllerReconciler reconciles a PWMController object
@@ -214,7 +213,6 @@ func (r *PWMControllerReconciler) configurePWMController(ctx context.Context, pw
 // updateStatus updates the PWMController status
 func (r *PWMControllerReconciler) updateStatus(ctx context.Context, pwmController *gpiov1.PWMController,
 	phase gpiov1.PWMPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
-
 	// Update basic status fields
 	now := metav1.Now()
 	pwmController.Status.Phase = phase
@@ -274,7 +272,6 @@ func (r *PWMControllerReconciler) updateStatus(ctx context.Context, pwmControlle
 func (r *PWMControllerReconciler) setPWMCondition(status *gpiov1.PWMControllerStatus,
 	conditionType gpiov1.PWMConditionType, conditionStatus metav1.ConditionStatus,
 	reason, message string) {
-
 	now := metav1.Now()
 	newCondition := gpiov1.PWMCondition{
 		Type:               conditionType,
