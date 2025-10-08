@@ -338,7 +338,7 @@ func (m *MetricsService) collectProcessMetrics() (*pb.ProcessMetrics, error) {
 	}
 
 	metrics := &pb.ProcessMetrics{
-		Total: uint32(len(processes)),
+		Total: uint32(len(processes)), // #nosec G115 -- Process count fits in uint32
 	}
 
 	// Count processes by status

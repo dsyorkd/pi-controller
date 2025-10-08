@@ -39,7 +39,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
 # Dependencies
-deps: ## Install Go dependencies
+deps: proto ## Install Go dependencies (generates proto first)
 	@echo "Installing dependencies..."
 	go mod download
 	go mod tidy
@@ -47,12 +47,17 @@ deps: ## Install Go dependencies
 # Protocol buffers
 proto: ## Generate protobuf code
 	@echo "Generating protobuf code..."
-	@command -v protoc >/dev/null 2>&1 || { echo "protoc is required but not installed. Aborting." >&2; exit 1; }
-	@command -v protoc-gen-go >/dev/null 2>&1 || go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	@command -v protoc-gen-go-grpc >/dev/null 2>&1 || go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		$(PROTO_DIR)/*.proto
+	@if [ -f "$(PROTO_DIR)/pi_controller.pb.go" ] && [ -f "$(PROTO_DIR)/pi_agent.pb.go" ]; then \
+		echo "Proto files already exist, skipping generation..."; \
+	elif command -v protoc >/dev/null 2>&1; then \
+		command -v protoc-gen-go >/dev/null 2>&1 || go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; \
+		command -v protoc-gen-go-grpc >/dev/null 2>&1 || go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; \
+		protoc --go_out=. --go_opt=paths=source_relative \
+			--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+			$(PROTO_DIR)/*.proto; \
+	else \
+		echo "Warning: protoc not found and proto files don't exist. Using committed proto files."; \
+	fi
 
 # Code quality
 fmt: ## Format Go code

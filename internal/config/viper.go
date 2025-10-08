@@ -272,136 +272,141 @@ func setViperDefaults(v *viper.Viper) {
 	v.SetDefault("webui.health.readiness_path", defaults.WebUI.Health.ReadinessPath)
 }
 
+// bindEnv wraps viper.BindEnv with error handling
+func bindEnv(v *viper.Viper, key string) {
+	_ = v.BindEnv(key) // Errors are non-critical for env bindings
+}
+
 // bindNestedEnvVars explicitly binds all nested configuration fields to environment variables
 // This is necessary because Viper's AutomaticEnv() doesn't automatically map nested struct fields
 func bindNestedEnvVars(v *viper.Viper) {
 	// App
-	v.BindEnv("app.name")
-	v.BindEnv("app.version")
-	v.BindEnv("app.environment")
-	v.BindEnv("app.data_dir")
-	v.BindEnv("app.debug")
+	bindEnv(v, "app.name")
+	bindEnv(v, "app.version")
+	bindEnv(v, "app.environment")
+	bindEnv(v, "app.data_dir")
+	bindEnv(v, "app.debug")
 
 	// Database
-	v.BindEnv("database.path")
-	v.BindEnv("database.max_open_conns")
-	v.BindEnv("database.max_idle_conns")
-	v.BindEnv("database.conn_max_lifetime")
-	v.BindEnv("database.log_level")
+	bindEnv(v, "database.path")
+	bindEnv(v, "database.max_open_conns")
+	bindEnv(v, "database.max_idle_conns")
+	bindEnv(v, "database.conn_max_lifetime")
+	bindEnv(v, "database.log_level")
 
 	// API
-	v.BindEnv("api.host")
-	v.BindEnv("api.port")
-	v.BindEnv("api.read_timeout")
-	v.BindEnv("api.write_timeout")
-	v.BindEnv("api.cors_enabled")
-	v.BindEnv("api.auth_enabled")
+	bindEnv(v, "api.host")
+	bindEnv(v, "api.port")
+	bindEnv(v, "api.read_timeout")
+	bindEnv(v, "api.write_timeout")
+	bindEnv(v, "api.cors_enabled")
+	bindEnv(v, "api.auth_enabled")
 
 	// gRPC
-	v.BindEnv("grpc.host")
-	v.BindEnv("grpc.port")
+	bindEnv(v, "grpc.host")
+	bindEnv(v, "grpc.port")
 
 	// WebSocket
-	v.BindEnv("websocket.host")
-	v.BindEnv("websocket.port")
-	v.BindEnv("websocket.path")
+	bindEnv(v, "websocket.host")
+	bindEnv(v, "websocket.port")
+	bindEnv(v, "websocket.path")
 
 	// Log
-	v.BindEnv("log.level")
-	v.BindEnv("log.format")
-	v.BindEnv("log.output")
+	bindEnv(v, "log.level")
+	bindEnv(v, "log.format")
+	bindEnv(v, "log.output")
 
 	// GPIO
-	v.BindEnv("gpio.enabled")
-	v.BindEnv("gpio.mock_mode")
+	bindEnv(v, "gpio.enabled")
+	bindEnv(v, "gpio.mock_mode")
 
 	// Discovery
-	v.BindEnv("discovery.enabled")
-	v.BindEnv("discovery.method")
-	v.BindEnv("discovery.port")
+	bindEnv(v, "discovery.enabled")
+	bindEnv(v, "discovery.method")
+	bindEnv(v, "discovery.port")
 
 	// WebUI
-	v.BindEnv("webui.enabled")
-	v.BindEnv("webui.host")
-	v.BindEnv("webui.port")
-	v.BindEnv("webui.static_dir")
-	v.BindEnv("webui.index_file")
-	v.BindEnv("webui.spa_mode")
+	bindEnv(v, "webui.enabled")
+	bindEnv(v, "webui.host")
+	bindEnv(v, "webui.port")
+	bindEnv(v, "webui.static_dir")
+	bindEnv(v, "webui.index_file")
+	bindEnv(v, "webui.spa_mode")
 
 	// WebUI Backend API
-	v.BindEnv("webui.backend.api.url")
-	v.BindEnv("webui.backend.api.internal_url")
-	v.BindEnv("webui.backend.api.prefix")
+	bindEnv(v, "webui.backend.api.url")
+	bindEnv(v, "webui.backend.api.internal_url")
+	bindEnv(v, "webui.backend.api.prefix")
 
 	// WebUI Backend gRPC
-	v.BindEnv("webui.backend.grpc.url")
-	v.BindEnv("webui.backend.grpc.internal_url")
+	bindEnv(v, "webui.backend.grpc.url")
+	bindEnv(v, "webui.backend.grpc.internal_url")
 
 	// WebUI Backend WebSocket
-	v.BindEnv("webui.backend.websocket.url")
-	v.BindEnv("webui.backend.websocket.internal_url")
-	v.BindEnv("webui.backend.websocket.path")
+	bindEnv(v, "webui.backend.websocket.url")
+	bindEnv(v, "webui.backend.websocket.internal_url")
+	bindEnv(v, "webui.backend.websocket.path")
 
 	// WebUI Runtime Config
-	v.BindEnv("webui.runtime_config.enabled")
-	v.BindEnv("webui.runtime_config.path")
+	bindEnv(v, "webui.runtime_config.enabled")
+	bindEnv(v, "webui.runtime_config.path")
 
 	// WebUI Auth
-	v.BindEnv("webui.auth.enabled")
-	v.BindEnv("webui.auth.session_secret_env")
-	v.BindEnv("webui.auth.jwt_secret_env")
-	v.BindEnv("webui.auth.session_timeout")
-	v.BindEnv("webui.auth.cookie_secure")
-	v.BindEnv("webui.auth.cookie_same_site")
+	bindEnv(v, "webui.auth.enabled")
+	bindEnv(v, "webui.auth.session_secret_env")
+	bindEnv(v, "webui.auth.jwt_secret_env")
+	bindEnv(v, "webui.auth.session_timeout")
+	bindEnv(v, "webui.auth.cookie_secure")
+	bindEnv(v, "webui.auth.cookie_same_site")
 
 	// WebUI CORS
-	v.BindEnv("webui.cors.enabled")
-	v.BindEnv("webui.cors.allowed_origins")
-	v.BindEnv("webui.cors.allowed_methods")
-	v.BindEnv("webui.cors.allowed_headers")
-	v.BindEnv("webui.cors.credentials")
+	bindEnv(v, "webui.cors.enabled")
+	bindEnv(v, "webui.cors.allowed_origins")
+	bindEnv(v, "webui.cors.allowed_methods")
+	bindEnv(v, "webui.cors.allowed_headers")
+	bindEnv(v, "webui.cors.credentials")
 
 	// WebUI Features
-	v.BindEnv("webui.features.gpio_control")
-	v.BindEnv("webui.features.cluster_management")
-	v.BindEnv("webui.features.certificate_management")
-	v.BindEnv("webui.features.real_time_metrics")
-	v.BindEnv("webui.features.node_discovery")
-	v.BindEnv("webui.features.advanced_networking")
-	v.BindEnv("webui.features.experimental")
+	bindEnv(v, "webui.features.gpio_control")
+	bindEnv(v, "webui.features.cluster_management")
+	bindEnv(v, "webui.features.certificate_management")
+	bindEnv(v, "webui.features.real_time_metrics")
+	bindEnv(v, "webui.features.node_discovery")
+	bindEnv(v, "webui.features.advanced_networking")
+	bindEnv(v, "webui.features.experimental")
 
 	// WebUI Branding
-	v.BindEnv("webui.branding.title")
-	v.BindEnv("webui.branding.primary_color")
-	v.BindEnv("webui.branding.theme")
+	bindEnv(v, "webui.branding.title")
+	bindEnv(v, "webui.branding.primary_color")
+	bindEnv(v, "webui.branding.theme")
 
 	// WebUI Cache
-	v.BindEnv("webui.cache.enabled")
-	v.BindEnv("webui.cache.static_max_age")
-	v.BindEnv("webui.cache.html_max_age")
+	bindEnv(v, "webui.cache.enabled")
+	bindEnv(v, "webui.cache.static_max_age")
+	bindEnv(v, "webui.cache.html_max_age")
 
 	// WebUI Compression
-	v.BindEnv("webui.compression.enabled")
-	v.BindEnv("webui.compression.level")
-	v.BindEnv("webui.compression.min_size")
+	bindEnv(v, "webui.compression.enabled")
+	bindEnv(v, "webui.compression.level")
+	bindEnv(v, "webui.compression.min_size")
 
 	// WebUI Security
-	v.BindEnv("webui.security.hsts_enabled")
-	v.BindEnv("webui.security.hsts_max_age")
-	v.BindEnv("webui.security.frame_deny")
-	v.BindEnv("webui.security.content_type_nosniff")
-	v.BindEnv("webui.security.xss_protection")
-	v.BindEnv("webui.security.csp_enabled")
-	v.BindEnv("webui.security.csp_directives")
+	bindEnv(v, "webui.security.hsts_enabled")
+	bindEnv(v, "webui.security.hsts_max_age")
+	bindEnv(v, "webui.security.frame_deny")
+	bindEnv(v, "webui.security.content_type_nosniff")
+	bindEnv(v, "webui.security.xss_protection")
+	bindEnv(v, "webui.security.csp_enabled")
+	bindEnv(v, "webui.security.csp_directives")
 
 	// WebUI Rate Limit
-	v.BindEnv("webui.rate_limit.enabled")
-	v.BindEnv("webui.rate_limit.requests_per_minute")
-	v.BindEnv("webui.rate_limit.burst_size")
+	bindEnv(v, "webui.rate_limit.enabled")
+	bindEnv(v, "webui.rate_limit.requests_per_minute")
+	bindEnv(v, "webui.rate_limit.burst_size")
 
 	// WebUI Health
-	v.BindEnv("webui.health.enabled")
-	v.BindEnv("webui.health.path")
-	v.BindEnv("webui.health.liveness_path")
-	v.BindEnv("webui.health.readiness_path")
+	bindEnv(v, "webui.health.enabled")
+	bindEnv(v, "webui.health.path")
+	bindEnv(v, "webui.health.liveness_path")
+	bindEnv(v, "webui.health.readiness_path")
 }

@@ -38,7 +38,7 @@ const (
 
 // Security headers
 const (
-	CSRFTokenHeader = "X-CSRF-Token"
+	CSRFTokenHeader = "X-CSRF-Token" // #nosec G101 -- This is a header name, not a credential
 	CSRFHeaderName  = "X-Requested-With"
 )
 

@@ -148,8 +148,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc(s.config.Path, s.handleWebSocket)
 
 	server := &http.Server{
-		Addr:    s.config.GetAddress(),
-		Handler: mux,
+		Addr:              s.config.GetAddress(),
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second, // Protect against Slowloris attacks
 	}
 
 	s.logger.WithFields(map[string]interface{}{
@@ -364,9 +365,13 @@ func (c *Client) readPump() {
 	}()
 
 	// Set read deadline and pong handler
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	if err := c.conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
+		c.server.logger.WithError(err).Warn("Failed to set read deadline")
+	}
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		if err := c.conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
+			c.server.logger.WithError(err).Warn("Failed to set read deadline in pong handler")
+		}
 		return nil
 	})
 
@@ -400,7 +405,9 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+				c.server.logger.WithError(err).Warn("Failed to set write deadline")
+			}
 			if !ok {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
@@ -411,7 +418,9 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+				c.server.logger.WithError(err).Warn("Failed to set write deadline for ping")
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

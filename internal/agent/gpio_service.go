@@ -113,7 +113,7 @@ func (s *GPIOService) ReadGPIOPin(ctx context.Context, req *pb.ReadGPIOPinReques
 
 	return &pb.ReadGPIOPinResponse{
 		Pin:       req.Pin,
-		Value:     int32(value),
+		Value:     int32(value), // #nosec G115 -- GPIO values are 0 or 1
 		Timestamp: timestamppb.Now(),
 	}, nil
 }
@@ -189,10 +189,10 @@ func (s *GPIOService) ListConfiguredPins(ctx context.Context, req *pb.ListConfig
 	pbPins := make([]*pb.GPIOPinState, len(pins))
 	for i, pin := range pins {
 		pbPins[i] = &pb.GPIOPinState{
-			Pin:         int32(pin.Pin),
+			Pin:         int32(pin.Pin),   // #nosec G115 -- GPIO pin numbers are small (0-40)
 			Direction:   convertDirectionToPB(pin.Direction),
 			PullMode:    convertPullModeToPB(pin.PullMode),
-			Value:       int32(pin.Value),
+			Value:       int32(pin.Value), // #nosec G115 -- GPIO values are 0 or 1
 			LastUpdated: timestamppb.New(pin.Timestamp),
 		}
 	}

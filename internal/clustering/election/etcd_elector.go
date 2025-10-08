@@ -272,7 +272,9 @@ func (e *EtcdElector) Stop() error {
 
 // buildTLSConfig creates a TLS configuration from the provided config
 func buildTLSConfig(config *TLSConfig) (*tls.Config, error) {
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12, // Enforce TLS 1.2 minimum for security
+	}
 
 	// Load client certificate and key
 	if config.CertFile != "" && config.KeyFile != "" {

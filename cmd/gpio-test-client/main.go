@@ -76,7 +76,7 @@ func testConfigurePin(ctx context.Context, client pb.PiAgentServiceClient, pin i
 	fmt.Printf("Configuring pin %d as output...\n", pin)
 
 	resp, err := client.ConfigureGPIOPin(ctx, &pb.ConfigureGPIOPinRequest{
-		Pin:       int32(pin),
+		Pin:       int32(pin), // #nosec G115 -- GPIO pin numbers are small (0-40)
 		Direction: pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
 		PullMode:  pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE,
 	})
@@ -95,7 +95,7 @@ func testReadPin(ctx context.Context, client pb.PiAgentServiceClient, pin int) {
 	fmt.Printf("Reading pin %d...\n", pin)
 
 	resp, err := client.ReadGPIOPin(ctx, &pb.ReadGPIOPinRequest{
-		Pin: int32(pin),
+		Pin: int32(pin), // #nosec G115 -- GPIO pin numbers are small (0-40)
 	})
 	if err != nil {
 		log.Printf("Read failed: %v", err)
@@ -111,8 +111,8 @@ func testWritePin(ctx context.Context, client pb.PiAgentServiceClient, pin int, 
 	fmt.Printf("Writing value %d to pin %d...\n", value, pin)
 
 	resp, err := client.WriteGPIOPin(ctx, &pb.WriteGPIOPinRequest{
-		Pin:   int32(pin),
-		Value: int32(value),
+		Pin:   int32(pin),   // #nosec G115 -- GPIO pin numbers are small (0-40)
+		Value: int32(value), // #nosec G115 -- GPIO values are 0 or 1
 	})
 	if err != nil {
 		log.Printf("Write failed: %v", err)
