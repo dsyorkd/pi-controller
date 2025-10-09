@@ -56,7 +56,7 @@ func DefaultSSHClientConfig() SSHClientConfig {
 		RetryDelay:      2 * time.Second,
 		PoolSize:        5,
 		IdleTimeout:     5 * time.Minute,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Implement proper host key validation
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 -- TODO: Implement proper host key validation for production
 		ClientVersion:   "SSH-2.0-Pi-Controller",
 	}
 }
@@ -307,14 +307,11 @@ func (c *SSHClient) createNewConnection(ctx context.Context) (*SSHConnection, er
 		go func() {
 			t := time.NewTicker(c.config.KeepAlive)
 			defer t.Stop()
-			for {
-				select {
-				case <-t.C:
-					_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
-					if err != nil {
-						c.logger.WithError(err).Debug("Keep-alive failed, connection may be dead")
-						return
-					}
+			for range t.C {
+				_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+				if err != nil {
+					c.logger.WithError(err).Debug("Keep-alive failed, connection may be dead")
+					return
 				}
 			}
 		}()

@@ -168,7 +168,7 @@ func (e *EtcdElector) observe(ctx context.Context) {
 		case <-e.stopCh:
 			return
 		case resp := <-observeChan:
-			if resp.Kvs == nil || len(resp.Kvs) == 0 {
+			if len(resp.Kvs) == 0 {
 				continue
 			}
 

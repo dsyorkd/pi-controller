@@ -994,7 +994,7 @@ func (s *ProvisioningService) generatePiControllerInstallCommands(
 func (s *ProvisioningService) generatePiControllerConfig(
 	node *models.Node,
 	config PiControllerConfig,
-	isBootstrapNode bool,
+	isBootstrapNode bool, // nolint:unparam // reserved for future bootstrap-specific configuration
 ) string {
 	clusterID := config.ClusterID
 	if clusterID == "" {

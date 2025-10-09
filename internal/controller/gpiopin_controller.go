@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/dsyorkd/pi-controller/internal/services"
@@ -37,7 +36,7 @@ type GPIOPinReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { // nolint:dupl // Kubernetes controller pattern, extracting would require complex generics
 	logger := r.Logger.WithFields(logrus.Fields{
 		"gpiopin":   req.NamespacedName,
 		"namespace": req.Namespace,
@@ -123,38 +122,11 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // findTargetNode finds the node that matches the nodeSelector
 func (r *GPIOPinReconciler) findTargetNode(ctx context.Context, gpioPin *gpiov1.GPIOPin, logger *logrus.Entry) (*corev1.Node, error) {
-	// List all nodes
-	var nodeList corev1.NodeList
-	if err := r.List(ctx, &nodeList); err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %w", err)
-	}
-
-	// Convert nodeSelector to label selector
-	selector := labels.SelectorFromSet(gpioPin.Spec.NodeSelector)
-
-	// Find matching nodes
-	var matchingNodes []corev1.Node
-	for _, node := range nodeList.Items {
-		if selector.Matches(labels.Set(node.Labels)) {
-			matchingNodes = append(matchingNodes, node)
-		}
-	}
-
-	if len(matchingNodes) == 0 {
-		return nil, nil // No matching nodes found
-	}
-
-	// Return the first matching node (could be enhanced with more sophisticated selection)
-	logger.WithFields(logrus.Fields{
-		"selected_node":  matchingNodes[0].Name,
-		"matching_count": len(matchingNodes),
-	}).Info("Found matching node for GPIOPin")
-
-	return &matchingNodes[0], nil
+	return FindNodeBySelector(ctx, r, gpioPin.Spec.NodeSelector, "GPIOPin", logger)
 }
 
 // checkNodeReachability checks if the target node is reachable
-func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) {
+func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
 	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
@@ -173,7 +145,7 @@ func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *cor
 }
 
 // configureGPIOPin configures the GPIO pin on the target node via gRPC
-func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov1.GPIOPin, node *corev1.Node, logger *logrus.Entry) error {
+func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov1.GPIOPin, node *corev1.Node, logger *logrus.Entry) error { // nolint:unparam // error return reserved for gRPC communication implementation
 	_ = ctx // TODO: Use context for gRPC timeout and cancellation
 	// Convert GPIOPin spec to GPIO service request
 	// TODO: Fix GPIORequest struct definition
@@ -318,7 +290,7 @@ func (r *GPIOPinReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // mapNodeToGPIOPins maps Node changes to GPIOPin reconcile requests
-func (r *GPIOPinReconciler) mapNodeToGPIOPins(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *GPIOPinReconciler) mapNodeToGPIOPins(ctx context.Context, obj client.Object) []reconcile.Request { // nolint:dupl // Similar to other controller mapNode functions, type-specific
 	node, ok := obj.(*corev1.Node)
 	if !ok {
 		return nil

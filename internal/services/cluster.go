@@ -609,7 +609,7 @@ func (s *ClusterService) findAvailableNodes(count uint) ([]models.Node, error) {
 
 	// Find nodes that are discovered but not assigned to any cluster
 	err := s.store.DB().Where("status = ? AND cluster_id IS NULL", models.NodeStatusDiscovered).
-		Limit(int(count)).Find(&nodes).Error
+		Limit(int(count)).Find(&nodes).Error // #nosec G115 -- Node count is reasonable
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query available nodes")

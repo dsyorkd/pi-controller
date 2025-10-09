@@ -129,37 +129,11 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // findTargetNode finds the node that matches the nodeSelector
 func (r *I2CDeviceReconciler) findTargetNode(ctx context.Context, i2cDevice *gpiov1.I2CDevice, logger *logrus.Entry) (*corev1.Node, error) {
-	// List all nodes
-	var nodeList corev1.NodeList
-	if err := r.List(ctx, &nodeList); err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %w", err)
-	}
-
-	// Convert nodeSelector to label selector
-	selector := labels.SelectorFromSet(i2cDevice.Spec.NodeSelector)
-
-	// Find matching nodes
-	var matchingNodes []corev1.Node
-	for _, node := range nodeList.Items {
-		if selector.Matches(labels.Set(node.Labels)) {
-			matchingNodes = append(matchingNodes, node)
-		}
-	}
-
-	if len(matchingNodes) == 0 {
-		return nil, nil // No matching nodes found
-	}
-
-	logger.WithFields(logrus.Fields{
-		"selected_node":  matchingNodes[0].Name,
-		"matching_count": len(matchingNodes),
-	}).Info("Found matching node for I2CDevice")
-
-	return &matchingNodes[0], nil
+	return FindNodeBySelector(ctx, r, i2cDevice.Spec.NodeSelector, "I2CDevice", logger)
 }
 
 // checkNodeReachability checks if the target node is reachable
-func (r *I2CDeviceReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) {
+func (r *I2CDeviceReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
 	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
@@ -376,7 +350,7 @@ func (r *I2CDeviceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // mapNodeToI2CDevices maps Node changes to I2CDevice reconcile requests
-func (r *I2CDeviceReconciler) mapNodeToI2CDevices(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *I2CDeviceReconciler) mapNodeToI2CDevices(ctx context.Context, obj client.Object) []reconcile.Request { // nolint:dupl // Similar to other controller mapNode functions, type-specific
 	node, ok := obj.(*corev1.Node)
 	if !ok {
 		return nil

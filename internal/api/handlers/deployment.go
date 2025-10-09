@@ -206,7 +206,7 @@ func (h *DeploymentHandler) GetPodLogs(c *gin.Context) {
 }
 
 // handleServiceError handles service layer errors and maps them to appropriate HTTP responses
-func (h *DeploymentHandler) handleServiceError(c *gin.Context, err error, message string) {
+func (h *DeploymentHandler) handleServiceError(c *gin.Context, err error, message string) { // nolint:dupl // Common error handling pattern duplicated in test helpers
 	h.logger.WithError(err).Error(message)
 
 	if services.IsNotFound(err) {

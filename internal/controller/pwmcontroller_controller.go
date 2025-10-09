@@ -36,7 +36,7 @@ type PWMControllerReconciler struct {
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop
-func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { // nolint:dupl // Kubernetes controller pattern, extracting would require complex generics
 	logger := r.Logger.WithFields(logrus.Fields{
 		"pwmcontroller": req.NamespacedName,
 		"namespace":     req.Namespace,
@@ -122,37 +122,11 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 // findTargetNode finds the node that matches the nodeSelector
 func (r *PWMControllerReconciler) findTargetNode(ctx context.Context, pwmController *gpiov1.PWMController, logger *logrus.Entry) (*corev1.Node, error) {
-	// List all nodes
-	var nodeList corev1.NodeList
-	if err := r.List(ctx, &nodeList); err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %w", err)
-	}
-
-	// Convert nodeSelector to label selector
-	selector := labels.SelectorFromSet(pwmController.Spec.NodeSelector)
-
-	// Find matching nodes
-	var matchingNodes []corev1.Node
-	for _, node := range nodeList.Items {
-		if selector.Matches(labels.Set(node.Labels)) {
-			matchingNodes = append(matchingNodes, node)
-		}
-	}
-
-	if len(matchingNodes) == 0 {
-		return nil, nil // No matching nodes found
-	}
-
-	logger.WithFields(logrus.Fields{
-		"selected_node":  matchingNodes[0].Name,
-		"matching_count": len(matchingNodes),
-	}).Info("Found matching node for PWMController")
-
-	return &matchingNodes[0], nil
+	return FindNodeBySelector(ctx, r, pwmController.Spec.NodeSelector, "PWMController", logger)
 }
 
 // checkNodeReachability checks if the target node is reachable
-func (r *PWMControllerReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) {
+func (r *PWMControllerReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
 	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
@@ -337,7 +311,7 @@ func (r *PWMControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // mapNodeToPWMControllers maps Node changes to PWMController reconcile requests
-func (r *PWMControllerReconciler) mapNodeToPWMControllers(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *PWMControllerReconciler) mapNodeToPWMControllers(ctx context.Context, obj client.Object) []reconcile.Request { // nolint:dupl // Similar to other controller mapNode functions, type-specific
 	node, ok := obj.(*corev1.Node)
 	if !ok {
 		return nil

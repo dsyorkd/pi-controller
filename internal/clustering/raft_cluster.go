@@ -197,33 +197,30 @@ func (c *RaftCluster) setupRaft() error {
 
 // observeLeadership watches for leadership changes
 func (c *RaftCluster) observeLeadership() {
-	for {
-		select {
-		case isLeader := <-c.raft.LeaderCh():
-			c.leaderMu.Lock()
-			previousState := c.isLeader
-			c.isLeader = isLeader
-			c.leaderMu.Unlock()
+	for isLeader := range c.raft.LeaderCh() {
+		c.leaderMu.Lock()
+		previousState := c.isLeader
+		c.isLeader = isLeader
+		c.leaderMu.Unlock()
 
-			if isLeader && !previousState {
-				// Became leader
-				c.logger.WithField("controller_id", c.config.ControllerID).Info("Became cluster leader")
+		if isLeader && !previousState {
+			// Became leader
+			c.logger.WithField("controller_id", c.config.ControllerID).Info("Became cluster leader")
 
-				c.callbackMu.RLock()
-				if c.becomeLeaderCallback != nil {
-					go c.becomeLeaderCallback()
-				}
-				c.callbackMu.RUnlock()
-			} else if !isLeader && previousState {
-				// Lost leadership
-				c.logger.WithField("controller_id", c.config.ControllerID).Warn("Lost cluster leadership")
-
-				c.callbackMu.RLock()
-				if c.loseLeaderCallback != nil {
-					go c.loseLeaderCallback()
-				}
-				c.callbackMu.RUnlock()
+			c.callbackMu.RLock()
+			if c.becomeLeaderCallback != nil {
+				go c.becomeLeaderCallback()
 			}
+			c.callbackMu.RUnlock()
+		} else if !isLeader && previousState {
+			// Lost leadership
+			c.logger.WithField("controller_id", c.config.ControllerID).Warn("Lost cluster leadership")
+
+			c.callbackMu.RLock()
+			if c.loseLeaderCallback != nil {
+				go c.loseLeaderCallback()
+			}
+			c.callbackMu.RUnlock()
 		}
 	}
 }

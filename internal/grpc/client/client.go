@@ -190,13 +190,8 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.logger.Info("Attempting to connect to gRPC server",
 		"address", c.getServerAddress())
 
-	// Create connection with timeout
-	ctx, cancel := context.WithTimeout(ctx, c.config.ConnectionTimeout)
-	defer cancel()
-
 	// Configure dial options
 	opts := []grpc.DialOption{
-		grpc.WithBlock(),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(c.config.MaxMessageSize),
 			grpc.MaxCallSendMsgSize(c.config.MaxMessageSize),
@@ -214,8 +209,8 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 	// TODO: Add TLS credentials when TLS is configured
 
-	// Establish connection
-	conn, err := grpc.DialContext(ctx, c.getServerAddress(), opts...)
+	// Establish connection (NewClient creates lazy connection)
+	conn, err := grpc.NewClient(c.getServerAddress(), opts...)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}

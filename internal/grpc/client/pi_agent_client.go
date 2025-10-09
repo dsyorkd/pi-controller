@@ -96,13 +96,9 @@ func (m *PiAgentClientManager) createClient(node *models.Node) (*PiAgentClient, 
 		"address": address,
 	}).Debug("Creating new Pi Agent client")
 
-	// Create connection with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, address,
+	// Create connection (NewClient creates lazy connection)
+	conn, err := grpc.NewClient(address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Pi Agent at %s: %w", address, err)

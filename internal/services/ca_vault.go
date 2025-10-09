@@ -17,9 +17,9 @@ type VaultCABackend struct {
 	database *storage.Database
 	logger   logger.Interface
 
-	// Cached CA certificate and info
-	caInfo *models.CAInfo
-	caCert *x509.Certificate
+	// Cached CA certificate and info (reserved for future caching implementation)
+	caInfo *models.CAInfo    // nolint:unused
+	caCert *x509.Certificate // nolint:unused
 }
 
 // NewVaultCABackend creates a new VaultCABackend instance

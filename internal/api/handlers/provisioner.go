@@ -321,53 +321,15 @@ func (h *ProvisionerHandler) DeprovisionNode(c *gin.Context) {
 // @Failure 500 {object} gin.H
 // @Router /nodes/{id}/cluster-token [post]
 func (h *ProvisionerHandler) GetClusterToken(c *gin.Context) {
-	nodeIDStr := c.Param("id")
-	nodeID, err := strconv.ParseUint(nodeIDStr, 10, 32)
-	if err != nil {
-		h.logger.WithError(err).WithField("node_id", nodeIDStr).Error("Invalid node ID")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid node ID",
-			"code":  "INVALID_ID",
-		})
-		return
-	}
-
-	var sshConfig ProvisionerSSHConfig
-	if err := c.ShouldBindJSON(&sshConfig); err != nil {
-		h.logger.WithError(err).Error("Invalid request body")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid request body: " + err.Error(),
-			"code":  "INVALID_REQUEST",
-		})
-		return
-	}
-
-	h.logger.WithField("master_node_id", nodeID).Info("Received cluster token request")
-
-	token, err := h.provisionerService.GetClusterToken(c.Request.Context(), uint(nodeID), h.convertSSHConfig(sshConfig))
-	if err != nil {
-		h.logger.WithError(err).Error("Failed to retrieve cluster token")
-
-		if errors.Is(err, services.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": err.Error(),
-				"code":  "NOT_FOUND",
-			})
-			return
-		}
-
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to retrieve cluster token: " + err.Error(),
-			"code":  "TOKEN_RETRIEVAL_FAILED",
-		})
-		return
-	}
-
-	h.logger.WithField("master_node_id", nodeID).Info("Cluster token retrieved successfully")
-
-	c.JSON(http.StatusOK, map[string]string{
-		"cluster_token": token,
-	})
+	h.handleNodeConfigRetrieval(
+		c,
+		"cluster token",
+		func(nodeID uint, sshConfig provisioner.SSHClientConfig) (string, error) {
+			return h.provisionerService.GetClusterToken(c.Request.Context(), nodeID, sshConfig)
+		},
+		"cluster_token",
+		"TOKEN_RETRIEVAL_FAILED",
+	)
 }
 
 // GetKubeConfig retrieves the kubeconfig from a master node
@@ -384,6 +346,25 @@ func (h *ProvisionerHandler) GetClusterToken(c *gin.Context) {
 // @Failure 500 {object} gin.H
 // @Router /nodes/{id}/kubeconfig [post]
 func (h *ProvisionerHandler) GetKubeConfig(c *gin.Context) {
+	h.handleNodeConfigRetrieval(
+		c,
+		"kubeconfig",
+		func(nodeID uint, sshConfig provisioner.SSHClientConfig) (string, error) {
+			return h.provisionerService.GetKubeConfig(c.Request.Context(), nodeID, sshConfig)
+		},
+		"kubeconfig",
+		"KUBECONFIG_RETRIEVAL_FAILED",
+	)
+}
+
+// handleNodeConfigRetrieval is a helper to reduce duplication in GetClusterToken and GetKubeConfig
+func (h *ProvisionerHandler) handleNodeConfigRetrieval(
+	c *gin.Context,
+	requestName string,
+	retrievalFunc func(nodeID uint, sshConfig provisioner.SSHClientConfig) (string, error),
+	resultKey string,
+	errorCode string,
+) {
 	nodeIDStr := c.Param("id")
 	nodeID, err := strconv.ParseUint(nodeIDStr, 10, 32)
 	if err != nil {
@@ -405,11 +386,11 @@ func (h *ProvisionerHandler) GetKubeConfig(c *gin.Context) {
 		return
 	}
 
-	h.logger.WithField("master_node_id", nodeID).Info("Received kubeconfig request")
+	h.logger.WithField("master_node_id", nodeID).Infof("Received %s request", requestName)
 
-	kubeConfig, err := h.provisionerService.GetKubeConfig(c.Request.Context(), uint(nodeID), h.convertSSHConfig(sshConfig))
+	result, err := retrievalFunc(uint(nodeID), h.convertSSHConfig(sshConfig))
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to retrieve kubeconfig")
+		h.logger.WithError(err).Errorf("Failed to retrieve %s", requestName)
 
 		if errors.Is(err, services.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -420,16 +401,16 @@ func (h *ProvisionerHandler) GetKubeConfig(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to retrieve kubeconfig: " + err.Error(),
-			"code":  "KUBECONFIG_RETRIEVAL_FAILED",
+			"error": "failed to retrieve " + requestName + ": " + err.Error(),
+			"code":  errorCode,
 		})
 		return
 	}
 
-	h.logger.WithField("master_node_id", nodeID).Info("Kubeconfig retrieved successfully")
+	h.logger.WithField("master_node_id", nodeID).Infof("%s retrieved successfully", requestName)
 
 	c.JSON(http.StatusOK, map[string]string{
-		"kubeconfig": kubeConfig,
+		resultKey: result,
 	})
 }
 

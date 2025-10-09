@@ -351,7 +351,7 @@ func generateClusters(count int) []models.Cluster {
 	clusters := make([]models.Cluster, count)
 	for i := 0; i < count; i++ {
 		clusters[i] = models.Cluster{
-			ID:          uint(i + 1),
+			ID:          uint(i + 1), // #nosec G115 -- test fixture with small known values
 			Name:        fmt.Sprintf("perf-cluster-%d", i),
 			Description: fmt.Sprintf("Performance test cluster #%d", i),
 			Status:      models.ClusterStatusActive,

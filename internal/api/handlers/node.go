@@ -146,7 +146,7 @@ func (h *NodeHandler) Create(c *gin.Context) {
 }
 
 // Update updates a node
-func (h *NodeHandler) Update(c *gin.Context) {
+func (h *NodeHandler) Update(c *gin.Context) { // nolint:dupl // similar pattern to cluster.Update but operates on different types
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -222,7 +222,7 @@ func (h *NodeHandler) ListGPIO(c *gin.Context) {
 }
 
 // handleServiceError handles service layer errors and maps them to appropriate HTTP responses
-func (h *NodeHandler) handleServiceError(c *gin.Context, err error, message string) {
+func (h *NodeHandler) handleServiceError(c *gin.Context, err error, message string) { // nolint:dupl // Common error handling pattern duplicated in test helpers
 	h.logger.WithError(err).Error(message)
 
 	if services.IsNotFound(err) {

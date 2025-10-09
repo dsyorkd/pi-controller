@@ -409,7 +409,9 @@ func (c *Client) writePump() {
 				c.server.logger.WithError(err).Warn("Failed to set write deadline")
 			}
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+					c.server.logger.WithError(err).Debug("Failed to send close message")
+				}
 				return
 			}
 
@@ -493,7 +495,7 @@ func (c *Client) isSubscribedTo(topic string) bool {
 }
 
 // sendError sends an error message to the client
-func (c *Client) sendError(code int, message string) {
+func (c *Client) sendError(code int, message string) { // nolint:unparam // code parameter kept for flexibility
 	errMsg := ErrorMessage{
 		Code:    code,
 		Message: message,

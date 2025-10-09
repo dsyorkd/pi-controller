@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	// Connect to the Pi Agent
-	conn, err := grpc.Dial(*serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(*serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect to Pi Agent: %v", err)
 	}
@@ -130,9 +130,9 @@ func testPWM(ctx context.Context, client pb.PiAgentServiceClient, pin int, frequ
 	fmt.Printf("Setting PWM on pin %d (freq: %dHz, duty: %d%%)...\n", pin, frequency, dutyCycle)
 
 	resp, err := client.SetGPIOPWM(ctx, &pb.SetGPIOPWMRequest{
-		Pin:       int32(pin),
-		Frequency: int32(frequency),
-		DutyCycle: int32(dutyCycle),
+		Pin:       int32(pin),       // #nosec G115 -- GPIO pin numbers are small (0-40)
+		Frequency: int32(frequency), // #nosec G115 -- PWM frequency fits in int32
+		DutyCycle: int32(dutyCycle), // #nosec G115 -- Duty cycle is 0-100
 	})
 	if err != nil {
 		log.Printf("PWM failed: %v", err)

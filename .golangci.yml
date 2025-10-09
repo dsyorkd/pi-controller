@@ -111,6 +111,7 @@ linters:
           - dupl
           - gosec
           - unparam
+          - errcheck
 
       # Allow stub files to be duplicated
       - path: _stub\.go

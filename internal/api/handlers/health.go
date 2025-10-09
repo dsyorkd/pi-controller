@@ -112,7 +112,7 @@ func SystemInfo(c *gin.Context) {
 		"gc": gin.H{
 			"num_gc":      m.NumGC,
 			"pause_total": m.PauseTotalNs,
-			"last_gc":     time.Unix(0, int64(m.LastGC)).Format(time.RFC3339),
+			"last_gc":     time.Unix(0, int64(m.LastGC)).Format(time.RFC3339), // #nosec G115 -- GC timestamp fits in int64
 		},
 		"timestamp": time.Now(),
 		"uptime":    time.Since(startTime).String(),

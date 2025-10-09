@@ -166,7 +166,7 @@ func (h *ClusterHandler) Get(c *gin.Context) {
 }
 
 // Update updates a cluster
-func (h *ClusterHandler) Update(c *gin.Context) {
+func (h *ClusterHandler) Update(c *gin.Context) { // nolint:dupl // similar pattern to node.Update but operates on different types
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
