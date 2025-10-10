@@ -135,6 +135,7 @@ func (c *Controller) initializeSecureDefaults() {
 		// Allow more pins but still protect critical ones
 		if !c.securityConfig.AllowCriticalPins {
 			// Keep critical pins restricted even in permissive mode
+			// Future: Add specific pin restrictions here
 		}
 	}
 

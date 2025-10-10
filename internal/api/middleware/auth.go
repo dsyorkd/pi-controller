@@ -365,10 +365,7 @@ func (am *AuthManager) ValidateCSRFToken(c *gin.Context) bool {
 	headerToken := c.GetHeader(CSRFTokenHeader)
 	if headerToken == "" {
 		// Also check X-Requested-With header for AJAX requests
-		if c.GetHeader(CSRFHeaderName) == "XMLHttpRequest" {
-			return true
-		}
-		return false
+		return c.GetHeader(CSRFHeaderName) == "XMLHttpRequest"
 	}
 
 	// Get CSRF token from cookie

@@ -198,7 +198,8 @@ func (e *EtcdElector) observe(ctx context.Context) {
 
 			// Log leadership change
 			if previousLeaderID != leaderID {
-				// Leadership changed
+				// Leadership changed - future logging can be added here
+				_ = leaderID // Explicitly mark as intentionally unused for now
 			}
 		}
 	}
