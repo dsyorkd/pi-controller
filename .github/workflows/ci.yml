@@ -39,6 +39,15 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{ env.GOLANGCI_LINT_VERSION }}
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
+      - name: Install protoc
+        run: |
+          PROTOC_VERSION="28.3"
+          curl -Lo protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
+          sudo unzip -q protoc.zip -d /usr/local
+          sudo chmod +x /usr/local/bin/protoc
+          rm protoc.zip
+          protoc --version
+
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
