@@ -17,18 +17,28 @@ env:
   CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
-  # Quick validation job using optimized CI image
+  # Quick validation job
   validate:
     name: Code Validation
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/dsyorkd/ci-image/ci-go:v1.0
     timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --version
 
       - name: Cache Go modules
         uses: actions/cache@v4
