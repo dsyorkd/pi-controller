@@ -101,11 +101,8 @@ linters:
       require-explanation: false # don't require an explanation for nolint directives
       require-specific: false # don't require nolint directives to be specific about which linter is being skipped
 
-  exclusions:
-    warn-unused: true
-    generated: lax
-    
-    rules:
+issues:
+  exclude-rules:
       - path: _test\.go
         linters:
           - dupl
