@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"  # Use Go 1.24 for compatibility with golangci-lint v2.4.0
-  GOLANGCI_LINT_VERSION: "v2.4.0"
+  GO_VERSION: "1.24"  # Use Go 1.24 for stability
+  GOLANGCI_LINT_VERSION: "v1.62.2"  # Latest stable v1.x compatible with action v6
   CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
@@ -35,10 +35,9 @@ jobs:
           cache: true
 
       - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --version
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{ env.GOLANGCI_LINT_VERSION }}
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       - name: Cache Go modules
         uses: actions/cache@v4
