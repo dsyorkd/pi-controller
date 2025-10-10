@@ -103,52 +103,52 @@ linters:
 
 issues:
   exclude-rules:
-      - path: _test\.go
-        linters:
-          - dupl
-          - gosec
-          - unparam
-          - errcheck
-          - typecheck
+    - path: _test\.go
+      linters:
+        - dupl
+        - gosec
+        - unparam
+        - errcheck
+        - typecheck
 
-      # Allow stub files to be duplicated
-      - path: _stub\.go
-        linters:
-          - dupl
+    # Allow stub files to be duplicated
+    - path: _stub\.go
+      linters:
+        - dupl
 
-      # Ignore deprecated warnings in test files
-      - path: _test\.go
-        linters:
-          - staticcheck
-        text: "SA1019:"
-          
-      # Allow empty branches in security checks
-      - linters:
-          - staticcheck
-        text: "SA9003:"
-          
-      # Allow integer overflow conversions in gRPC code for now
-      - path: internal/grpc/
-        linters:
-          - gosec
-        text: "G115:"
+    # Ignore deprecated warnings in test files
+    - path: _test\.go
+      linters:
+        - staticcheck
+      text: "SA1019:"
 
-      # Exclude protobuf generated files
-      - path: ".*\\.pb\\.go$"
-        linters:
-          - all
+    # Allow empty branches in security checks
+    - linters:
+        - staticcheck
+      text: "SA9003:"
 
-      # Exclude entire proto directory (generated code)
-      - path: "proto/"
-        linters:
-          - all
-      
-      # Exclude mock files
-      - path: ".*_mock\\.go$"
-        linters:
-          - all
-    
-    paths:
-      - build
-      - vendor
-      - proto  # Exclude entire proto directory with generated code
+    # Allow integer overflow conversions in gRPC code for now
+    - path: internal/grpc/
+      linters:
+        - gosec
+      text: "G115:"
+
+    # Exclude protobuf generated files
+    - path: ".*\\.pb\\.go$"
+      linters:
+        - all
+
+    # Exclude entire proto directory (generated code)
+    - path: "proto/"
+      linters:
+        - all
+
+    # Exclude mock files
+    - path: ".*_mock\\.go$"
+      linters:
+        - all
+
+  exclude-dirs:
+    - build
+    - vendor
+    - proto  # Exclude entire proto directory with generated code
