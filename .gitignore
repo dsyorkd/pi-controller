@@ -37,10 +37,6 @@ go.work.sum
 /pi-agent
 /gpio-test-client
 
-# Root level binary artifacts
-pi-controller
-pi-agent
-
 # Build directory contents (but keep the directory structure)
 /build/*
 !/build/.gitkeep
