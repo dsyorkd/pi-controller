@@ -1,6 +1,8 @@
 module github.com/dsyorkd/pi-controller
 
-go 1.23
+go 1.24.0
+
+toolchain go1.24.8
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
