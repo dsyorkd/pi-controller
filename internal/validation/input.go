@@ -192,11 +192,7 @@ func containsSQLKeywordPattern(upperValue, keyword string) bool {
 	}
 
 	// Check if it's the entire value (standalone keyword)
-	if strings.TrimSpace(upperValue) == keyword {
-		return true
-	}
-
-	return false
+	return strings.TrimSpace(upperValue) == keyword
 }
 
 // checkScriptInjection checks for script injection patterns
