@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25.1"  # Use Go 1.25 with compatible golangci-lint v2.4.0
+  GO_VERSION: "1.24"  # Use Go 1.24 for compatibility with golangci-lint v2.4.0
   GOLANGCI_LINT_VERSION: "v2.4.0"
   CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
