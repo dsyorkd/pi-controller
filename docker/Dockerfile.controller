@@ -11,7 +11,11 @@ ARG COMMIT=unknown
 ARG DATE=unknown
 
 # Install build dependencies for cross-compilation
-RUN apk add --no-cache git make build-base
+RUN apk add --no-cache git make build-base protobuf protobuf-dev
+
+# Install protoc-gen-go and protoc-gen-go-grpc
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # Set working directory
 WORKDIR /app
@@ -24,6 +28,11 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Generate protobuf files
+RUN protoc --go_out=. --go_opt=paths=source_relative \
+    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+    proto/*.proto
 
 # Build the binary (no CGO needed since using bbolt instead of SQLite)
 RUN CGO_ENABLED=0 \
