@@ -20,12 +20,17 @@ func TestPiAgentClientManager_GetClient(t *testing.T) {
 		Status:    models.NodeStatusReady,
 	}
 
-	// This will fail to connect (no actual agent running), but we can test the creation logic
-	_, err := manager.GetClient(node)
+	// grpc.NewClient creates a lazy connection, so GetClient will succeed
+	// even though no actual agent is running. The connection will fail
+	// when the first RPC call is made.
+	client, err := manager.GetClient(node)
 
-	// We expect a connection error since no agent is actually running
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to connect to Pi Agent")
+	// Client creation should succeed (lazy connection)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	// Clean up
+	assert.NoError(t, manager.CloseAll())
 }
 
 func TestPiAgentClientManager_CloseAll(t *testing.T) {
