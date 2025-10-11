@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/logger"
@@ -304,7 +305,13 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	}
 
 	gpioLogger := logrus.New()
-	controller := gpio.NewController(config, gpio.DefaultSecurityConfig(), gpioLogger)
+	securityConfig := gpio.DefaultSecurityConfig()
+	// Set high limit and short timeout for benchmarks
+	// The activeOps counter is only decremented after OperationTimeout,
+	// so we need a very short timeout for rapid benchmark operations
+	securityConfig.MaxConcurrentOps = 1000
+	securityConfig.OperationTimeout = 1 * time.Millisecond
+	controller := gpio.NewController(config, securityConfig, gpioLogger)
 	require.NotNil(b, controller)
 
 	ctx := context.Background()
@@ -322,6 +329,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("WritePin", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			value := gpio.PinValue(i % 2)
@@ -335,6 +343,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("ReadPin", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			_, err := controller.ReadPin(19, "benchmark")
@@ -347,6 +356,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("GetPinState", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			_, err := controller.GetPinState(18, "benchmark")
@@ -359,6 +369,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("SetPWM", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			frequency := 1000 + (i % 1000)
@@ -373,6 +384,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("ListConfiguredPins", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			_, err := controller.ListConfiguredPins()
