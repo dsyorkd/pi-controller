@@ -700,8 +700,61 @@ func addNodeDiscoveryFields(db *gorm.DB) error {
 
 // dropNodeDiscoveryFields removes discovery tracking fields from nodes table
 func dropNodeDiscoveryFields(db *gorm.DB) error {
-	// SQLite doesn't support DROP COLUMN directly
-	// Would need to recreate table, which is complex
-	// For simplicity, this is a no-op
-	return nil
+	// SQLite doesn't support DROP COLUMN directly, so we need to recreate the table
+	sql := `
+	-- Create a new table without the discovery fields
+	CREATE TABLE IF NOT EXISTS nodes_new (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE,
+		ip_address TEXT NOT NULL,
+		mac_address TEXT UNIQUE,
+		status TEXT DEFAULT 'discovered' NOT NULL,
+		role TEXT DEFAULT 'worker' NOT NULL,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		deleted_at DATETIME,
+		architecture TEXT,
+		model TEXT,
+		serial_number TEXT,
+		cpu_cores INTEGER,
+		memory INTEGER,
+		cluster_id INTEGER,
+		kube_version TEXT,
+		node_name TEXT,
+		os_version TEXT,
+		kernel_version TEXT,
+		last_seen DATETIME,
+		FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE SET NULL
+	);
+
+	-- Copy data from old table to new table (excluding the discovery fields)
+	INSERT INTO nodes_new (
+		id, name, ip_address, mac_address, status, role, created_at, updated_at, deleted_at,
+		architecture, model, serial_number, cpu_cores, memory, cluster_id, kube_version,
+		node_name, os_version, kernel_version, last_seen
+	)
+	SELECT
+		id, name, ip_address, mac_address, status, role, created_at, updated_at, deleted_at,
+		architecture, model, serial_number, cpu_cores, memory, cluster_id, kube_version,
+		node_name, os_version, kernel_version, last_seen
+	FROM nodes;
+
+	-- Drop old table
+	DROP TABLE nodes;
+
+	-- Rename new table
+	ALTER TABLE nodes_new RENAME TO nodes;
+
+	-- Recreate indexes
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_name ON nodes(name);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_mac_address ON nodes(mac_address);
+	CREATE INDEX IF NOT EXISTS idx_nodes_deleted_at ON nodes(deleted_at);
+	CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
+	CREATE INDEX IF NOT EXISTS idx_nodes_cluster_id ON nodes(cluster_id);
+	CREATE INDEX IF NOT EXISTS idx_nodes_ip_address ON nodes(ip_address);
+	CREATE INDEX IF NOT EXISTS idx_nodes_last_seen ON nodes(last_seen);
+	CREATE INDEX IF NOT EXISTS idx_nodes_cluster_status ON nodes(cluster_id, status) WHERE deleted_at IS NULL;
+	`
+
+	return db.Exec(sql).Error
 }
