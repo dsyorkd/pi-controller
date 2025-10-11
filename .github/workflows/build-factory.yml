@@ -1,39 +1,21 @@
-name: Multi-Architecture Build
+name: Build Factory
 
 on:
-  push:
-    branches: [ main, develop, master ]
-    paths:
-      - 'cmd/**'
-      - 'internal/**'
-      - 'pkg/**'
-      - 'proto/**'
-      - 'go.mod'
-      - 'go.sum'
-      - 'Makefile'
-      - 'docker/**'
-  pull_request:
-    branches: [ main, develop, master ]
-    paths:
-      - 'cmd/**'
-      - 'internal/**'
-      - 'pkg/**'
-      - 'proto/**'
-      - 'go.mod'
-      - 'go.sum'
-      - 'Makefile'
-      - 'docker/**'
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      include_experimental:
-        description: 'Include experimental architectures (mips, ppc64le, s390x)'
+      tag:
         required: false
-        default: false
-        type: boolean
+        type: string
+      image_tag:
+        required: true
+        type: string
+      build_version:
+        required: true
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/v') && !startsWith(github.ref, 'refs/tags/v') }}
 
 permissions:
   contents: read
@@ -115,12 +97,6 @@ jobs:
 
 
     steps:
-      - name: Skip experimental builds
-        if: matrix.experimental == true && github.event.inputs.include_experimental != 'true'
-        run: |
-          echo "Skipping experimental architecture ${{ matrix.name }}"
-          exit 0
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -232,7 +208,7 @@ jobs:
         with:
           name: pi-controller-${{ matrix.name }}
           path: dist/${{ matrix.name }}/
-          retention-days: 7
+          
 
       - name: Create build manifest
         if: matrix.primary == true

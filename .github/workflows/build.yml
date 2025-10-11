@@ -1,114 +1,33 @@
-name: Build
-
+name: build
 on:
   push:
-    branches: [ main, develop, master ]
+    branches:
+    - master
+    - release-*
+    - v*
   pull_request:
-    branches: [ main, develop, master ]
-  workflow_call: # Allow this workflow to be called by others
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  GO_VERSION: "1.24"
-  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+  schedule:
+    - cron: "10 0,12 * * *"
 
 jobs:
-  build:
-    name: Build ${{ matrix.name }}
+  configure_input_vars:
     runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
-    timeout-minutes: 6
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            name: linux-amd64
-          - goos: linux
-            goarch: arm64
-            name: linux-arm64
-          - goos: linux
-            goarch: arm
-            name: linux-arm
-          - goos: darwin
-            goarch: amd64
-            name: darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            name: darwin-arm64
+    outputs:
+      sha_short: ${{ steps.set_vars.outputs.sha_short }}
+      branch: ${{ steps.set_vars.outputs.branch }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ matrix.name }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ matrix.name }}-
-            ${{ runner.os }}-go-
+    - name: Declare branch and sha_short
+      id: set_vars
+      run: |
+        echo "sha_short=$(git rev-parse --short=8 "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+        echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> "$GITHUB_OUTPUT"
 
-      - name: Generate protobuf code and install dependencies
-        run: |
-          make proto
-          make deps
-
-      - name: Build binaries
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
-        run: |
-          make build
-          # Rename binaries to include architecture
-          cd build
-          for binary in pi-controller-*; do
-            if [[ -f "$binary" ]]; then
-              base_name=${binary%-*}
-              mv "$binary" "${base_name}-${{ matrix.name }}"
-            fi
-          done
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: binaries-${{ matrix.name }}
-          path: build/*
-          retention-days: 7
-
-      - name: Post build summary
-        if: always()
-        run: |
-          echo "## 🔨 Build: ${{ matrix.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ job.status == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- OS: ${{ matrix.goos }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Arch: ${{ matrix.goarch }}" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ job.status }}" == "success" ]]; then
-            echo "- Artifacts: Uploaded to build/${{ matrix.name }}" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  build-summary:
-    name: Build Summary
-    runs-on: ubuntu-latest
-    needs: build
-    if: always()
-    steps:
-      - name: Check build status
-        run: |
-          echo "## 🏗️ Multi-Architecture Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ needs.build.result }}" == "success" ]]; then
-            echo "✅ All builds completed successfully" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Some builds failed - check individual jobs above" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
+  calling-build-factory:
+    needs: configure_input_vars
+    uses: ./.github/workflows/build-factory.yml
+    with:
+      image_tag: ${{ needs.configure_input_vars.outputs.branch }}-head
+      build_version: ${{ needs.configure_input_vars.outputs.branch }}-${{ needs.configure_input_vars.outputs.sha_short }}-head
