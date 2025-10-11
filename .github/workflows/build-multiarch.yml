@@ -156,15 +156,17 @@ jobs:
         run: |
           echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}"
           make build
-          
+
           # Create organized output directory
           mkdir -p dist/${{ matrix.name }}
-          
+
           # Move and rename binaries
           cd build
           for binary in pi-controller-*; do
             if [[ -f "$binary" ]]; then
-              base_name=${binary%-*}
+              # Extract base name (everything before the first hyphen pattern)
+              # pi-controller-linux-amd64 -> pi-controller
+              base_name=$(echo "$binary" | sed 's/-[^-]*-[^-]*$//')
               if [[ "${{ matrix.goos }}" == "windows" ]]; then
                 cp "$binary" "../dist/${{ matrix.name }}/${base_name}.exe"
               else
