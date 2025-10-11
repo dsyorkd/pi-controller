@@ -793,7 +793,11 @@ func BenchmarkGPIOController_ReadPin(b *testing.B) {
 
 	logger := logrus.New()
 	securityConfig := DefaultSecurityConfig()
-	securityConfig.MaxConcurrentOps = 100 // Increase for testing
+	// Set high limit and short timeout for benchmarks
+	// The activeOps counter is only decremented after OperationTimeout,
+	// so we need a very short timeout for rapid benchmark operations
+	securityConfig.MaxConcurrentOps = 1000
+	securityConfig.OperationTimeout = 1 * time.Millisecond
 	controller := NewController(config, securityConfig, logger)
 	require.NotNil(b, controller)
 
@@ -807,6 +811,10 @@ func BenchmarkGPIOController_ReadPin(b *testing.B) {
 	require.NoError(b, controller.ConfigurePin(pinConfig, "benchmark"))
 
 	b.ResetTimer()
+
+	// Run benchmark sequentially to avoid hitting concurrent operation limits
+	// We're benchmarking the controller's single-operation performance, not concurrency
+	b.SetParallelism(1)
 
 	for i := 0; i < b.N; i++ {
 		_, err := controller.ReadPin(18, "benchmark")

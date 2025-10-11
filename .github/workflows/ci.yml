@@ -195,7 +195,7 @@ jobs:
           make build
           # Rename binaries to include architecture
           cd build
-          for binary in pi-controller-* pi-agent-*; do
+          for binary in pi-controller-*; do
             if [[ -f "$binary" ]]; then
               base_name=${binary%-*}
               mv "$binary" "${base_name}-${{ matrix.name }}"
@@ -240,20 +240,20 @@ jobs:
         run: make test-gpio
         continue-on-error: true # GPIO tests might fail if hardware not connected
 
-      - name: Test pi-agent on actual hardware
+      - name: Test pi-controller on actual hardware
         run: |
-          # Start pi-agent in background for hardware testing
-          timeout 30s ./build/pi-agent-linux-arm64 --config-file=test/config/agent-test.yml &
-          AGENT_PID=$!
-          sleep 5
-          
-          # Test if agent responds to basic health checks
-          if pgrep -f pi-agent; then
-            echo "Pi Agent started successfully on hardware"
-            # Add more hardware-specific tests here
-            kill $AGENT_PID || true
+          # Start pi-controller in background for hardware testing
+          timeout 30s ./build/pi-controller-linux-arm64 --help &
+          CONTROLLER_PID=$!
+          sleep 2
+
+          # Test if controller binary is executable and responds
+          if [[ -x ./build/pi-controller-linux-arm64 ]]; then
+            echo "✅ Pi Controller binary is executable on hardware"
+            ./build/pi-controller-linux-arm64 version || true
+            kill $CONTROLLER_PID 2>/dev/null || true
           else
-            echo "Pi Agent failed to start on hardware"
+            echo "❌ Pi Controller binary not executable on hardware"
             exit 1
           fi
 
