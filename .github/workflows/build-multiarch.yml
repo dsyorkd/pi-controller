@@ -61,12 +61,12 @@ jobs:
             name: linux-arm64
             primary: true
             experimental: false
-          # - goos: linux
-          #   goarch: arm
-          #   goarm: "7"
-          #   name: linux-armv7
-          #   primary: true
-          #   experimental: false
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+            name: linux-armv7
+            primary: true
+            experimental: false
           # - goos: linux
           #   goarch: arm
           #   goarm: 6
@@ -74,24 +74,24 @@ jobs:
           #   primary: true
           
           # macOS builds
-          # - goos: darwin
-          #   goarch: amd64
-          #   name: darwin-amd64
-          #   primary: false
-          # - goos: darwin
-          #   goarch: arm64
-          #   name: darwin-arm64
-          #   primary: false
+          - goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+            primary: false
+          - goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+            primary: false
           
           # Windows builds
-          # - goos: windows
-          #   goarch: amd64
-          #   name: windows-amd64
-          #   primary: false
-          # - goos: windows
-          #   goarch: arm64
-          #   name: windows-arm64
-          #   primary: false
+          - goos: windows
+            goarch: amd64
+            name: windows-amd64
+            primary: false
+          - goos: windows
+            goarch: arm64
+            name: windows-arm64
+            primary: false
           
           # BSD variants
           # - goos: freebsd
@@ -162,7 +162,7 @@ jobs:
           
           # Move and rename binaries
           cd build
-          for binary in pi-controller-* pi-agent-*; do
+          for binary in pi-controller-*; do
             if [[ -f "$binary" ]]; then
               base_name=${binary%-*}
               if [[ "${{ matrix.goos }}" == "windows" ]]; then
@@ -180,19 +180,12 @@ jobs:
           
           # Test that binaries exist and are executable
           if [[ "${{ matrix.goos }}" != "windows" ]]; then
-            chmod +x pi-controller pi-agent
+            chmod +x pi-controller
             # Quick file test instead of timeout
             if [[ -x "./pi-controller" ]]; then
               echo "✅ pi-controller binary is executable"
             else
               echo "❌ pi-controller binary not found or not executable"
-              exit 1
-            fi
-            
-            if [[ -x "./pi-agent" ]]; then
-              echo "✅ pi-agent binary is executable"
-            else
-              echo "❌ pi-agent binary not found or not executable" 
               exit 1
             fi
           fi
@@ -282,16 +275,6 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Extract metadata for agent
-        id: meta-agent
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-agent
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push controller image
         uses: docker/build-push-action@v5
@@ -305,17 +288,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push agent image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile.agent
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta-agent.outputs.tags }}
-          labels: ${{ steps.meta-agent.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   # Test multi-arch binaries on actual hardware
   test-hardware-matrix:
@@ -339,14 +311,11 @@ jobs:
           cd test-${{ matrix.arch }}
           
           # Make binaries executable
-          chmod +x pi-controller pi-agent
-          
+          chmod +x pi-controller
+
           # Test version commands
           echo "Testing pi-controller..."
           timeout 10s ./pi-controller --version || echo "Controller version test completed"
-          
-          echo "Testing pi-agent..."
-          timeout 10s ./pi-agent --version || echo "Agent version test completed"
           
           # Test configuration parsing (if config exists)
           if [[ -f "../config/controller.example.yml" ]]; then

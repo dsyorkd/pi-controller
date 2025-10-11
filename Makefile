@@ -20,7 +20,6 @@ SCRIPTS_DIR = scripts
 
 # Binaries
 CONTROLLER_BINARY = pi-controller
-AGENT_BINARY = pi-agent
 WEB_BINARY = pi-web
 
 # Docker
@@ -47,7 +46,7 @@ deps: proto ## Install Go dependencies (generates proto first)
 # Protocol buffers
 proto: ## Generate protobuf code
 	@echo "Generating protobuf code..."
-	@if [ -f "$(PROTO_DIR)/pi_controller.pb.go" ] && [ -f "$(PROTO_DIR)/pi_agent.pb.go" ]; then \
+	@if [ -f "$(PROTO_DIR)/pi_controller.pb.go" ]; then \
 		echo "Proto files already exist, skipping generation..."; \
 	elif command -v protoc >/dev/null 2>&1; then \
 		command -v protoc-gen-go >/dev/null 2>&1 || go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; \
@@ -142,7 +141,7 @@ test-all: test-unit test-integration test-security test-gpio test-api ## Run all
 test-comprehensive: test-all test-benchmarks test-security-verbose ## Run comprehensive test suite including benchmarks
 
 # Build targets
-build: build-controller build-agent ## Build all binaries
+build: build-controller ## Build all binaries
 
 build-controller: ## Build pi-controller binary
 	@echo "Building pi-controller for $(GOOS)/$(GOARCH)..."
@@ -152,13 +151,6 @@ build-controller: ## Build pi-controller binary
 		-o $(BUILD_DIR)/$(CONTROLLER_BINARY)-$(GOOS)-$(GOARCH) \
 		./cmd/pi-controller
 
-build-agent: ## Build pi-agent binary
-	@echo "Building pi-agent for $(GOOS)/$(GOARCH)..."
-	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
-		-ldflags "$(LDFLAGS)" \
-		-o $(BUILD_DIR)/$(AGENT_BINARY)-$(GOOS)-$(GOARCH) \
-		./cmd/pi-agent
 
 # Cross-compilation targets
 build-linux-amd64: ## Build for Linux AMD64
@@ -189,13 +181,12 @@ build-all: ## Build for all supported platforms
 	@$(MAKE) build-windows-amd64
 
 # Installation
-install: build-controller build-agent ## Install binaries to GOPATH/bin
+install: build-controller ## Install binaries to GOPATH/bin
 	@echo "Installing binaries..."
 	go install -ldflags "$(LDFLAGS)" ./cmd/pi-controller
-	go install -ldflags "$(LDFLAGS)" ./cmd/pi-agent
 
 # Docker targets
-docker: docker-controller docker-agent ## Build all Docker images
+docker: docker-controller ## Build all Docker images
 
 docker-controller: ## Build pi-controller Docker image
 	@echo "Building pi-controller Docker image..."
@@ -205,13 +196,6 @@ docker-controller: ## Build pi-controller Docker image
 		--build-arg DATE=$(DATE) \
 		-f docker/Dockerfile.controller .
 
-docker-agent: ## Build pi-agent Docker image
-	@echo "Building pi-agent Docker image..."
-	docker build -t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG) \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg COMMIT=$(COMMIT) \
-		--build-arg DATE=$(DATE) \
-		-f docker/Dockerfile.agent .
 
 # Multi-architecture Docker build targets
 docker-buildx-setup: ## Set up Docker buildx for multi-arch builds
@@ -220,7 +204,7 @@ docker-buildx-setup: ## Set up Docker buildx for multi-arch builds
 		docker buildx create --name pi-controller-builder --driver docker-container --bootstrap
 	@docker buildx use pi-controller-builder
 
-docker-multiarch: docker-buildx-setup docker-multiarch-controller docker-multiarch-agent ## Build all Docker images for multiple architectures
+docker-multiarch: docker-buildx-setup docker-multiarch-controller ## Build all Docker images for multiple architectures
 
 docker-multiarch-test: docker-buildx-setup ## Test multi-arch Docker builds without pushing
 	@echo "Testing multi-architecture Docker builds..."
@@ -232,14 +216,6 @@ docker-multiarch-test: docker-buildx-setup ## Test multi-arch Docker builds with
 		--build-arg DATE=$(DATE) \
 		-t $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)-test \
 		-f docker/Dockerfile.controller .
-	@echo "Testing pi-agent for linux/amd64,linux/arm64,linux/arm/v7..."
-	docker buildx build \
-		--platform linux/amd64,linux/arm64,linux/arm/v7 \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg COMMIT=$(COMMIT) \
-		--build-arg DATE=$(DATE) \
-		-t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG)-test \
-		-f docker/Dockerfile.agent .
 	@echo "Multi-architecture Docker build test completed successfully!"
 
 docker-multiarch-controller: docker-buildx-setup ## Build pi-controller Docker image for multiple architectures
@@ -253,19 +229,9 @@ docker-multiarch-controller: docker-buildx-setup ## Build pi-controller Docker i
 		-f docker/Dockerfile.controller \
 		--push .
 
-docker-multiarch-agent: docker-buildx-setup ## Build pi-agent Docker image for multiple architectures
-	@echo "Building pi-agent Docker image for linux/amd64,linux/arm64,linux/arm/v7..."
-	docker buildx build \
-		--platform linux/amd64,linux/arm64,linux/arm/v7 \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg COMMIT=$(COMMIT) \
-		--build-arg DATE=$(DATE) \
-		-t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG) \
-		-f docker/Dockerfile.agent \
-		--push .
 
 # Architecture-specific build targets
-docker-amd64: docker-amd64-controller docker-amd64-agent ## Build Docker images for AMD64
+docker-amd64: docker-amd64-controller ## Build Docker images for AMD64
 
 docker-amd64-controller: ## Build pi-controller Docker image for AMD64
 	@echo "Building pi-controller Docker image for linux/amd64..."
@@ -278,20 +244,10 @@ docker-amd64-controller: ## Build pi-controller Docker image for AMD64
 		-f docker/Dockerfile.controller \
 		--load .
 
-docker-amd64-agent: ## Build pi-agent Docker image for AMD64
-	@echo "Building pi-agent Docker image for linux/amd64..."
-	docker buildx build \
-		--platform linux/amd64 \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg COMMIT=$(COMMIT) \
-		--build-arg DATE=$(DATE) \
-		-t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG)-amd64 \
-		-f docker/Dockerfile.agent \
-		--load .
 
-docker-arm64: docker-arm64-controller docker-arm64-agent ## Build Docker images for ARM64
+docker-arm64: docker-arm64-controller ## Build Docker images for ARM64
 
-docker-arm: docker-arm-controller docker-arm-agent ## Build Docker images for ARM32
+docker-arm: docker-arm-controller ## Build Docker images for ARM32
 
 docker-arm-controller: ## Build pi-controller Docker image for ARM32
 	@echo "Building pi-controller Docker image for linux/arm/v7..."
@@ -304,16 +260,6 @@ docker-arm-controller: ## Build pi-controller Docker image for ARM32
 		-f docker/Dockerfile.controller \
 		--load .
 
-docker-arm-agent: ## Build pi-agent Docker image for ARM32
-	@echo "Building pi-agent Docker image for linux/arm/v7..."
-	docker buildx build \
-		--platform linux/arm/v7 \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg COMMIT=$(COMMIT) \
-		--build-arg DATE=$(DATE) \
-		-t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG)-armv7 \
-		-f docker/Dockerfile.agent \
-		--load .
 
 docker-arm64-controller: ## Build pi-controller Docker image for ARM64
 	@echo "Building pi-controller Docker image for linux/arm64..."
@@ -326,16 +272,6 @@ docker-arm64-controller: ## Build pi-controller Docker image for ARM64
 		-f docker/Dockerfile.controller \
 		--load .
 
-docker-arm64-agent: ## Build pi-agent Docker image for ARM64
-	@echo "Building pi-agent Docker image for linux/arm64..."
-	docker buildx build \
-		--platform linux/arm64 \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg COMMIT=$(COMMIT) \
-		--build-arg DATE=$(DATE) \
-		-t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG)-arm64 \
-		-f docker/Dockerfile.agent \
-		--load .
 
 docker-ci-test: ## Test CI image functionality
 	@echo "Testing CI image functionality..."
@@ -358,16 +294,12 @@ docker-ci-test: ## Test CI image functionality
 docker-push: docker ## Push Docker images to registry
 	@echo "Pushing Docker images..."
 	docker push $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)
-	docker push $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG)
 
 # Development
 run-controller: ## Run pi-controller locally
 	@echo "Running pi-controller..."
 	go run -ldflags "$(LDFLAGS)" ./cmd/pi-controller
 
-run-agent: ## Run pi-agent locally
-	@echo "Running pi-agent..."
-	go run -ldflags "$(LDFLAGS)" ./cmd/pi-agent
 
 dev: ## Start development environment
 	@echo "Starting development environment..."
