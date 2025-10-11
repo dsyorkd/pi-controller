@@ -1,0 +1,160 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+  workflow_call: # Allow this workflow to be called by others
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.24"
+  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+
+jobs:
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+    timeout-minutes: 6
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Run integration tests
+        run: make test-integration
+
+      - name: Run API tests
+        run: make test-api
+
+      - name: Run security tests
+        run: make test-security
+
+      - name: Generate test coverage
+        run: make test-coverage
+
+      - name: Check coverage threshold
+        run: make test-coverage-threshold
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Post test summary
+        if: always()
+        run: |
+          echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Unit tests: ${{ job.status == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration tests: ${{ job.status == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- API tests: ${{ job.status == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security tests: ${{ job.status == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          if [[ -f coverage.out ]]; then
+            COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
+            echo "- Test coverage: ${COVERAGE}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  race-test:
+    name: Race Condition Tests
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
+
+      - name: Run race condition tests
+        run: make test-race
+
+      - name: Post race test summary
+        if: always()
+        run: |
+          echo "## 🏁 Race Condition Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Race detection: ${{ job.status == 'success' && '✅ No data races detected' || '❌ Data races found' }}" >> $GITHUB_STEP_SUMMARY
+
+  migration-test:
+    name: Database Migrations
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
+
+      - name: Test database migrations
+        run: make db-test-migrations
+
+      - name: Test migration up/down cycle
+        run: |
+          make db-migrate-up
+          make db-migrate-status
+          make db-migrate-down
+          make db-migrate-status
+          make db-migrate-up
+
+      - name: Post migration summary
+        if: always()
+        run: |
+          echo "## 🗄️ Database Migration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Migrations: ${{ job.status == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY

@@ -12,210 +12,68 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"  # Use Go 1.24 (required by k8s dependencies and go.mod toolchain)
-  GOLANGCI_LINT_VERSION: "v1.62.2"  # Latest stable v1.x compatible with action v6
+  GO_VERSION: "1.24"
   CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
-  # Quick validation job
-  validate:
-    name: Code Validation
+  # Main CI orchestrator - calls other modular workflows
+  info:
+    name: CI Info
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 1
+    outputs:
+      is_master: ${{ steps.check.outputs.is_master }}
+      run_performance: ${{ steps.check.outputs.run_performance }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Install golangci-lint
+      - name: Check branch and determine workflow strategy
+        id: check
         run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Event: ${{ github.event_name }}"
 
-      - name: Install protoc
-        run: |
-          PROTOC_VERSION="28.3"
-          curl -Lo protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
-          sudo unzip -q protoc.zip -d /usr/local
-          sudo chmod +x /usr/local/bin/protoc
-          rm protoc.zip
-          protoc --version
+          IS_MASTER="false"
+          RUN_PERFORMANCE="false"
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Generate protobuf code and install dependencies
-        run: |
-          make proto
-          make deps
-
-      - name: Format generated code
-        run: |
-          echo "Formatting any generated code..."
-          go fmt ./proto/...
-
-      - name: Format check
-        run: |
-          make fmt
-          # Exclude generated protobuf files from format check
-          git status --porcelain | grep -v "\.pb\.go$" > /tmp/format_changes || true
-          if [[ -s /tmp/format_changes ]]; then
-            echo "Code is not properly formatted. Run 'make fmt' locally."
-            echo "Changed files (excluding generated .pb.go files):"
-            cat /tmp/format_changes
-            git diff -- ':(exclude)*.pb.go'
-            exit 1
+          if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
+            IS_MASTER="true"
+            RUN_PERFORMANCE="true"
           fi
-          echo "✅ All non-generated code is properly formatted"
 
-      - name: Vet check
-        run: make vet
+          echo "is_master=${IS_MASTER}" >> $GITHUB_OUTPUT
+          echo "run_performance=${RUN_PERFORMANCE}" >> $GITHUB_OUTPUT
 
-      - name: Run golangci-lint
-        run: make lint
+          echo "## 🎯 CI Strategy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Event: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Master branch: ${IS_MASTER}" >> $GITHUB_STEP_SUMMARY
+          echo "- Run performance tests: ${RUN_PERFORMANCE}" >> $GITHUB_STEP_SUMMARY
 
-  # Unit and integration tests using optimized CI image
+  # Call modular workflow files
+  validate:
+    name: Validation
+    uses: ./.github/workflows/validate.yml
+    needs: info
+
   test:
     name: Tests
-    runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
-    needs: validate
-    timeout-minutes: 6
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    uses: ./.github/workflows/test.yml
+    needs: info
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Generate protobuf code and install dependencies
-        run: |
-          make proto
-          make deps
-
-      - name: Run unit tests
-        run: make test-unit
-
-      - name: Run integration tests
-        run: make test-integration
-
-      - name: Run API tests
-        run: make test-api
-
-      - name: Run security tests
-        run: make test-security
-
-      - name: Generate test coverage
-        run: make test-coverage
-
-      - name: Check coverage threshold
-        run: make test-coverage-threshold
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-
-  # Build job for multiple architectures using optimized CI image
   build:
-    name: Build Binaries
-    runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
-    needs: validate
-    timeout-minutes: 6
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            name: linux-amd64
-          - goos: linux
-            goarch: arm64
-            name: linux-arm64
-          - goos: linux
-            goarch: arm
-            name: linux-arm
-          - goos: darwin
-            goarch: amd64
-            name: darwin-amd64
-          - goos: darwin
-            goarch: arm64
-            name: darwin-arm64
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Generate protobuf code and install dependencies
-        run: |
-          make proto
-          make deps
-
-      - name: Build binaries
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
-        run: |
-          make build
-          # Rename binaries to include architecture
-          cd build
-          for binary in pi-controller-*; do
-            if [[ -f "$binary" ]]; then
-              base_name=${binary%-*}
-              mv "$binary" "${base_name}-${{ matrix.name }}"
-            fi
-          done
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: binaries-${{ matrix.name }}
-          path: build/*
-          retention-days: 7
-
-  # Hardware-in-the-loop testing on Raspberry Pi
-  hardware-test:
-    name: Hardware Tests (Pi)
-    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    name: Build
+    uses: ./.github/workflows/build.yml
     needs: [validate, test]
+
+  # Hardware tests - only on master or when labeled
+  hardware-test:
+    name: Hardware Tests
+    needs: [validate, test, info]
+    if: |
+      (needs.info.outputs.is_master == 'true' && github.event_name == 'push') ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'hw-test'))
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
     timeout-minutes: 10
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'hw-test')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -245,16 +103,14 @@ jobs:
 
       - name: Run GPIO hardware simulation tests
         run: make test-gpio
-        continue-on-error: true # GPIO tests might fail if hardware not connected
+        continue-on-error: true
 
       - name: Test pi-controller on actual hardware
         run: |
-          # Start pi-controller in background for hardware testing
           timeout 30s ./build/pi-controller-linux-arm64 --help &
           CONTROLLER_PID=$!
           sleep 2
 
-          # Test if controller binary is executable and responds
           if [[ -x ./build/pi-controller-linux-arm64 ]]; then
             echo "✅ Pi Controller binary is executable on hardware"
             ./build/pi-controller-linux-arm64 version || true
@@ -274,168 +130,36 @@ jobs:
             test/logs/
           retention-days: 3
 
-  # Database migration tests using optimized CI image
-  migration-test:
-    name: Database Migration Tests
+  # CI summary and status check
+  ci-status:
+    name: CI Status
     runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
-    needs: validate
-    timeout-minutes: 8
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Generate protobuf code and install dependencies
-        run: |
-          make proto
-          make deps
-
-      - name: Test database migrations
-        run: make db-test-migrations
-
-      - name: Test migration up/down cycle
-        run: |
-          make db-migrate-up
-          make db-migrate-status
-          make db-migrate-down
-          make db-migrate-status
-          make db-migrate-up
-
-  # Performance and race condition tests using optimized CI image
-  performance-test:
-    name: Performance & Race Tests
-    runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
-    needs: [validate, test]
-    timeout-minutes: 8
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Generate protobuf code and install dependencies
-        run: |
-          make proto
-          make deps
-
-      - name: Run race condition tests
-        run: make test-race
-
-      - name: Run benchmarks
-        run: make test-benchmarks
-
-      - name: Run fuzzing tests
-        run: timeout 5m make test-fuzz || true # Fuzzing may timeout
-
-  # Final comprehensive test suite using optimized CI image
-  comprehensive-test:
-    name: Comprehensive Test Suite
-    runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
-    needs: [test, build, migration-test, performance-test]
-    timeout-minutes: 12
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Generate protobuf code and install dependencies
-        run: |
-          make proto
-          make deps
-
-      - name: Run comprehensive test suite
-        run: make test-comprehensive
-
-      - name: Generate final coverage report
-        run: make test-coverage
-
-      - name: Upload comprehensive test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: comprehensive-test-results
-          path: |
-            coverage.out
-            coverage.html
-            test-results.xml
-            benchmark-results.txt
-          retention-days: 7
-
-  # Status check job - runs after all tests complete
-  status-check:
-    name: CI Status Check
-    runs-on: ubuntu-latest
-    needs: [validate, test, build, migration-test, performance-test, comprehensive-test, hardware-test]
+    needs: [info, validate, test, build, hardware-test]
     if: always()
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
       - name: Check job statuses
         run: |
-          echo "Validate: ${{ needs.validate.result }}"
-          echo "Test: ${{ needs.test.result }}"
-          echo "Build: ${{ needs.build.result }}"
-          echo "Migration Test: ${{ needs.migration-test.result }}"
-          echo "Performance Test: ${{ needs.performance-test.result }}"
-          echo "Comprehensive Test: ${{ needs.comprehensive-test.result }}"
-          
+          echo "## 📊 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Validation | ${{ needs.validate.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tests | ${{ needs.test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Hardware | ${{ needs.hardware-test.result == 'success' && '✅' || (needs.hardware-test.result == 'skipped' && '⏭️' || '⚠️') }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           # Check if any critical job failed
-          if [[ "${{ needs.validate.result }}" == "failure" || 
-                "${{ needs.test.result }}" == "failure" || 
+          if [[ "${{ needs.validate.result }}" == "failure" ||
+                "${{ needs.test.result }}" == "failure" ||
                 "${{ needs.build.result }}" == "failure" ]]; then
-            echo "Critical CI jobs failed!"
+            echo "❌ **Critical CI jobs failed!**" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-          
-          echo "CI pipeline completed successfully!"
 
-      - name: Post status to commit
-        if: github.event_name == 'push'
-        run: |
-          echo "## 🚀 Optimized CI Status: All checks passed ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Pipeline Performance Improvements:" >> $GITHUB_STEP_SUMMARY
-          echo "- ⚡ **5-10 minutes saved** per job using pre-built CI image" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔧 **Zero dependency installation** during pipeline execution" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 **Consistent tool versions** across all jobs" >> $GITHUB_STEP_SUMMARY
-          echo "- 🛡️ **Enhanced security** with pre-scanned base image" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Job Results:" >> $GITHUB_STEP_SUMMARY
-          echo "- Code validation: ✅ (5 min timeout vs 10 min)" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: ✅ (6 min timeout vs 8 min)" >> $GITHUB_STEP_SUMMARY
-          echo "- Builds: ✅ (6 min timeout vs 8 min)" >> $GITHUB_STEP_SUMMARY
-          echo "- Migration tests: ✅ (8 min timeout vs 10 min)" >> $GITHUB_STEP_SUMMARY
-          echo "- Performance tests: ✅ (8 min timeout vs 10 min)" >> $GITHUB_STEP_SUMMARY
-          echo "- Comprehensive tests: ✅ (12 min timeout vs 15 min)" >> $GITHUB_STEP_SUMMARY
-          echo "- Hardware tests: ${{ needs.hardware-test.result == 'success' && '✅' || (needs.hardware-test.result == 'skipped' && '⏭️' || '⚠️') }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.info.outputs.is_master }}" == "true" ]]; then
+            echo "ℹ️ **Note**: Performance tests run separately on master branch" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "✅ **CI pipeline completed successfully!**" >> $GITHUB_STEP_SUMMARY
