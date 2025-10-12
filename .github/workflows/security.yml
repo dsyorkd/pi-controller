@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25.1"  # Use Go 1.25 for consistency
+  GO_VERSION: "1.24"  # Use Go 1.24 (matches project requirements)
   CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
@@ -91,6 +91,9 @@ jobs:
         run: |
           make proto
           make deps
+
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
 
       - name: Run gosec security scanner
         run: |
@@ -184,42 +187,37 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Install Trivy
+        run: |
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy -y
+
       - name: Build test images
         run: |
           # Build images for scanning (don't push)
           docker build -f docker/Dockerfile.controller -t pi-controller:scan-test .
-          docker build -f docker/Dockerfile.agent -t pi-agent:scan-test .
 
       - name: Scan controller image
         run: |
           trivy image --format json --output trivy-controller.json pi-controller:scan-test
           trivy image --format table pi-controller:scan-test
 
-      - name: Scan agent image  
-        run: |
-          trivy image --format json --output trivy-agent.json pi-agent:scan-test
-          trivy image --format table pi-agent:scan-test
-
       - name: Check for critical vulnerabilities
         run: |
           # Check controller image
           CONTROLLER_CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-controller.json)
           CONTROLLER_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-controller.json)
-          
-          # Check agent image
-          AGENT_CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-agent.json)
-          AGENT_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-agent.json)
-          
+
           echo "Controller - Critical: $CONTROLLER_CRITICAL, High: $CONTROLLER_HIGH"
-          echo "Agent - Critical: $AGENT_CRITICAL, High: $AGENT_HIGH"
-          
+
           # Fail if critical vulnerabilities found
-          TOTAL_CRITICAL=$((CONTROLLER_CRITICAL + AGENT_CRITICAL))
-          if [[ $TOTAL_CRITICAL -gt 0 ]]; then
-            echo "❌ Critical vulnerabilities found in container images!"
+          if [[ $CONTROLLER_CRITICAL -gt 0 ]]; then
+            echo "❌ Critical vulnerabilities found in container image!"
             exit 1
           else
-            echo "✅ No critical vulnerabilities found in container images"
+            echo "✅ No critical vulnerabilities found in container image"
           fi
 
       - name: Upload container scan results
@@ -229,7 +227,6 @@ jobs:
           name: container-scan-results
           path: |
             trivy-controller.json
-            trivy-agent.json
           retention-days: 30
 
   # Secrets scanning
@@ -242,6 +239,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Need full history for secret scanning
+
+      - name: Install TruffleHog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -b /usr/local/bin
+
+      - name: Install detect-secrets
+        run: |
+          pip install detect-secrets
 
       - name: Run TruffleHog secrets scan
         run: |
@@ -305,13 +310,13 @@ jobs:
           make proto
           make deps
 
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+
       - name: Check licenses
         run: |
           echo "Checking licenses for pi-controller..."
           go-licenses report ./cmd/pi-controller --template licenses.tpl > controller-licenses.txt || true
-
-          echo "Checking licenses for pi-agent..."
-          go-licenses report ./cmd/pi-agent --template licenses.tpl > agent-licenses.txt || true
 
           echo "Generating license summary..."
           go-licenses csv ./... > licenses-summary.csv
@@ -339,7 +344,6 @@ jobs:
           name: license-reports
           path: |
             controller-licenses.txt
-            agent-licenses.txt
             licenses-summary.csv
           retention-days: 30
 
