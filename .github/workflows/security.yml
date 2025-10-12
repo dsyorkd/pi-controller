@@ -15,20 +15,22 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"  # Use Go 1.24 (matches project requirements)
-  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+  GO_VERSION: "1.25.1"  # Use Go 1.25.1 (matches release.yml and latest project version)
 
 jobs:
-  # Dependency vulnerability scanning using optimized CI image
+  # Dependency vulnerability scanning
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -39,6 +41,14 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
+      - name: Install security tools
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          curl -L "https://github.com/google/osv-scanner/releases/download/v1.9.0/osv-scanner_v1.9.0_linux_amd64" -o /tmp/osv-scanner
+          chmod +x /tmp/osv-scanner
+          sudo mv /tmp/osv-scanner /usr/local/bin/osv-scanner
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.17.0
 
       - name: Generate protobuf code and install dependencies
         run: |
@@ -66,16 +76,19 @@ jobs:
             sbom.txt
           retention-days: 30
 
-  # Static code analysis with multiple tools using optimized CI image
+  # Static code analysis with multiple tools
   static-analysis:
     name: Static Code Analysis
     runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     timeout-minutes: 6
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -92,8 +105,10 @@ jobs:
           make proto
           make deps
 
-      - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+      - name: Install security analysis tools
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
 
       - name: Run gosec security scanner
         run: |
@@ -159,7 +174,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
@@ -171,7 +186,7 @@ jobs:
           make build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
 
@@ -240,39 +255,21 @@ jobs:
         with:
           fetch-depth: 0 # Need full history for secret scanning
 
-      - name: Install TruffleHog
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -b /usr/local/bin
+      - name: Run TruffleHog secrets scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --json --only-verified=false
 
       - name: Install detect-secrets
         run: |
           pip install detect-secrets
 
-      - name: Run TruffleHog secrets scan
-        run: |
-          # Disable auto-updates to prevent binary move errors
-          export TRUFFLEHOG_NO_UPDATE=true
-          trufflehog git file://. --json > trufflehog-results.json || true
-          trufflehog git file://. --only-verified
-
       - name: Run detect-secrets
         run: |
           detect-secrets scan --all-files --baseline .secrets.baseline
-
-      - name: Check for verified secrets
-        run: |
-          if [[ -f trufflehog-results.json ]]; then
-            VERIFIED_SECRETS=$(jq '[.[] | select(.Verified == true)] | length' trufflehog-results.json)
-            echo "Verified secrets found: $VERIFIED_SECRETS"
-            
-            if [[ $VERIFIED_SECRETS -gt 0 ]]; then
-              echo "❌ Verified secrets detected in repository!"
-              jq -r '.[] | select(.Verified == true) | "- \(.DetectorName): \(.Raw) (\(.SourceMetadata.Data.Filesystem.file):\(.SourceMetadata.Data.Filesystem.line))"' trufflehog-results.json
-              exit 1
-            else
-              echo "✅ No verified secrets found"
-            fi
-          fi
 
       - name: Upload secrets scan results
         if: always()
@@ -280,20 +277,22 @@ jobs:
         with:
           name: secrets-scan-results
           path: |
-            trufflehog-results.json
             .secrets.baseline
           retention-days: 30
 
-  # License compliance check using optimized CI image
+  # License compliance check
   license-check:
     name: License Compliance
     runs-on: ubuntu-latest
-    container:
-      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
     timeout-minutes: 8
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Cache Go modules
         uses: actions/cache@v4
