@@ -1,6 +1,11 @@
 # TruffleHog ignore patterns for test/example files
 # These files contain example credentials and test data, not real secrets
 # NOTE: These are REGEX patterns, not glob patterns
+#
+# ⚠️  IMPORTANT: When adding documentation with example secrets/credentials,
+#     update this file to exclude those docs from secret scanning!
+#     Example: If you add docs/setup-guide.md with example passwords,
+#              add: docs/setup-guide\.md
 
 # Architecture documentation with example connection strings
 ARCHITECTURE\.md
