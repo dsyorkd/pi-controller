@@ -277,7 +277,7 @@ jobs:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --json --only-verified=false
+          extra_args: --json
 
       - name: Install detect-secrets
         run: |
