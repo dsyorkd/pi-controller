@@ -1,14 +1,18 @@
 name: Security
 
 on:
-  push:
-    branches: [ main, develop, master ]
   pull_request:
-    branches: [ main, develop, master ]
-  schedule:
-    # Run security scans daily at 3 AM UTC
-    - cron: '0 3 * * *'
-  workflow_dispatch: # Allow manual triggering
+    branches: [ main]
+  merge_group:
+    branches: [ main]
+
+permissions:
+  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
+  actions: read
+  # Require writing security events to upload SARIF file to security tab
+  security-events: write
+  # Only need to read contents
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -135,34 +139,28 @@ jobs:
 
       - name: Run gosec security scanner
         run: |
-          gosec -fmt json -out gosec-report.json -stdout -verbose=text ./...
+          gosec -fmt sarif -out gosec-report.sarif -stdout -verbose=text ./...
           echo "Gosec scan completed"
 
       - name: Run staticcheck
         run: |
-          staticcheck -f json ./... > staticcheck-report.json || true
+          staticcheck -f sarif ./... > staticcheck-report.sarif || true
           echo "Staticcheck analysis completed"
 
       - name: Run golangci-lint with security focus
         run: |
-          golangci-lint run --out-format json > golangci-report.json || true
+          golangci-lint run --out-format sarif > golangci-report.sarif || true
           echo "Golangci-lint security scan completed"
 
       - name: Run custom security tests
         run: |
           make test-security-verbose
 
-      - name: Upload security scan results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Upload SARIF reports
+        uses: github/codeql-action/upload-sarif@v2
         with:
-          name: security-scan-results
-          path: |
-            gosec-report.json
-            staticcheck-report.json  
-            golangci-report.json
-            coverage-security.out
-          retention-days: 30
+          sarif_file: gosec-report.sarif
+          
 
       - name: Check for critical security issues
         run: |

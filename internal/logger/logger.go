@@ -128,7 +128,7 @@ func New(config Config) (*Logger, error) {
 		output = os.Stderr
 	default:
 		// If it's not stdout/stderr, treat it as a file path
-		file, err := os.OpenFile(config.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(config.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) // #nosec G302 - secure file permissions
 		if err != nil {
 			return nil, fmt.Errorf("failed to open log file '%s': %w", config.Output, err)
 		}

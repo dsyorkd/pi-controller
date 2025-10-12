@@ -64,9 +64,9 @@ func SetupTestDBFile(t *testing.T) (*gorm.DB, func()) {
 	cleanup := func() {
 		sqlDB, _ := db.DB()
 		if sqlDB != nil {
-			sqlDB.Close()
+			_ = sqlDB.Close() // #nosec G104 - test cleanup, error not actionable
 		}
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) // #nosec G104 - test cleanup, error not actionable
 	}
 
 	return db, cleanup
@@ -76,7 +76,7 @@ func SetupTestDBFile(t *testing.T) (*gorm.DB, func()) {
 func (tdb *TestDB) Close(t *testing.T) {
 	sqlDB, err := tdb.DB.DB()
 	require.NoError(t, err)
-	sqlDB.Close()
+	_ = sqlDB.Close() // #nosec G104 - test cleanup, error checked via ExpectationsWereMet
 	require.NoError(t, tdb.Mock.ExpectationsWereMet())
 }
 

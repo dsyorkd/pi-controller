@@ -1,11 +1,19 @@
 name: trivy-scanning
 on:
+  schedule:
+    - cron: "30 12 * * 1"
   push:
     branches:
       - master
       - 'v*'
-  pull_request:
-
+permissions:
+  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
+  actions: read
+  # Require writing security events to upload SARIF file to security tab
+  security-events: write
+  # Only need to read contents
+  contents: read
+  
 jobs:
   build:
     name: Build

@@ -111,7 +111,7 @@ func (s *PiControllerServer) ListClusters(ctx context.Context, req *pb.ListClust
 
 	return &pb.ListClustersResponse{
 		Clusters:   pbClusters,
-		TotalCount: int32(totalCount),
+		TotalCount: mustSafeInt64ToInt32(totalCount), // #nosec G115 - safe conversion with overflow check
 	}, nil
 }
 
@@ -207,8 +207,8 @@ func (s *PiControllerServer) ReadGPIO(ctx context.Context, req *pb.ReadGPIOReque
 	}).Info("GPIO read operation performed")
 
 	return &pb.ReadGPIOResponse{
-		DeviceId:  uint32(device.ID),
-		Pin:       int32(device.PinNumber),
+		DeviceId:  mustSafeUintToUint32(device.ID), // #nosec G115 - safe conversion with overflow check
+		Pin:       mustSafeIntToInt32(device.PinNumber), // #nosec G115 - safe conversion with overflow check
 		Value:     float64(device.Value),
 		Timestamp: timestamppb.New(reading.Timestamp),
 	}, nil
@@ -273,8 +273,8 @@ func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIOReq
 	}).Info("GPIO write operation performed")
 
 	return &pb.WriteGPIOResponse{
-		DeviceId:  uint32(device.ID),
-		Pin:       int32(device.PinNumber),
+		DeviceId:  mustSafeUintToUint32(device.ID), // #nosec G115 - safe conversion with overflow check
+		Pin:       mustSafeIntToInt32(device.PinNumber), // #nosec G115 - safe conversion with overflow check
 		Value:     req.Value,
 		Timestamp: timestamppb.New(reading.Timestamp),
 	}, nil
@@ -284,7 +284,7 @@ func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIOReq
 
 func (s *PiControllerServer) clusterToProto(cluster *models.Cluster) *pb.Cluster {
 	pbCluster := &pb.Cluster{
-		Id:             uint32(cluster.ID),
+		Id:             mustSafeUintToUint32(cluster.ID), // #nosec G115 - safe conversion with overflow check
 		Name:           cluster.Name,
 		Description:    cluster.Description,
 		Version:        cluster.Version,
@@ -304,7 +304,7 @@ func (s *PiControllerServer) clusterToProto(cluster *models.Cluster) *pb.Cluster
 
 func (s *PiControllerServer) nodeToProto(node *models.Node) *pb.Node {
 	pbNode := &pb.Node{
-		Id:         uint32(node.ID),
+		Id:         mustSafeUintToUint32(node.ID), // #nosec G115 - safe conversion with overflow check
 		Name:       node.Name,
 		IpAddress:  node.IPAddress,
 		MacAddress: node.MACAddress,

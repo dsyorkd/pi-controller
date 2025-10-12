@@ -118,7 +118,7 @@ func (m *MockServer) Stop() {
 		m.server = nil
 	}
 	if m.listener != nil {
-		m.listener.Close()
+		_ = m.listener.Close() // #nosec G104 - test mock cleanup, error not actionable
 		m.listener = nil
 	}
 	m.logger.Info("Mock server stopped")
@@ -253,7 +253,7 @@ func (m *MockServer) ListNodes(ctx context.Context, req *pb.ListNodesRequest) (*
 
 	return &pb.ListNodesResponse{
 		Nodes:      nodes,
-		TotalCount: int32(len(nodes)),
+		TotalCount: mustSafeIntToInt32(len(nodes)), // #nosec G115 - safe conversion with overflow check
 	}, nil
 }
 

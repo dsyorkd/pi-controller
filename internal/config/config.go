@@ -585,7 +585,7 @@ func Load(configPath string) (*Config, error) {
 
 	// Read and parse config file if found
 	if configFile != "" {
-		data, err := os.ReadFile(configFile)
+		data, err := os.ReadFile(configFile) // #nosec G304 - configFile comes from CLI flag, admin-controlled
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config file %s: %w", configFile, err)
 		}
@@ -610,7 +610,7 @@ func Load(configPath string) (*Config, error) {
 func (c *Config) validate() error {
 	// Ensure data directory exists
 	if c.App.DataDir != "" {
-		if err := os.MkdirAll(c.App.DataDir, 0755); err != nil {
+		if err := os.MkdirAll(c.App.DataDir, 0750); err != nil { // #nosec G301 - secure directory permissions
 			return fmt.Errorf("failed to create data directory: %w", err)
 		}
 

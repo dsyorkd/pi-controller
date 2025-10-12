@@ -8,21 +8,21 @@ on:
     inputs:
       github_org:
         description: "GitHub organization"
-        default: "harvester"
+        default: "dsyorkd"
         required: true
       github_repo:
         description: "GitHub repository"
-        default: "harvester"
+        default: "pi-controller"
         required: true
       github_project:
         description: "GitHub project"
-        default: "Harvester Sprint"
+        default: "Pi Controller Sprint"
         required: true
 
 env:
-  GITHUB_ORG: harvester
-  GITHUB_REPO: harvester
-  GITHUB_PROJECT: "Harvester Sprint"
+  GITHUB_ORG: dsyorkd
+  GITHUB_REPO: pi-controller
+  GITHUB_PROJECT: "Pi Controller Sprint"
 
 jobs:
   scan_and_notify_testing_items:

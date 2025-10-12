@@ -272,7 +272,7 @@ func ensureDirExists(dir string) error {
 		return err
 	}
 
-	return os.MkdirAll(dir, 0755)
+	return os.MkdirAll(dir, 0750) // #nosec G301 - secure directory permissions
 }
 
 // gormSlogAdapter adapts our structured logger to GORM logger interface

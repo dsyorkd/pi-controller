@@ -172,15 +172,15 @@ func (c *PiAgentClient) IsConnected() bool {
 // ConfigureGPIOPin configures a GPIO pin on the agent
 func (c *PiAgentClient) ConfigureGPIOPin(ctx context.Context, device *models.GPIODevice) error {
 	req := &pb.ConfigureGPIOPinRequest{
-		Pin:       int32(device.PinNumber),
+		Pin:       mustSafeIntToInt32(device.PinNumber), // #nosec G115 - safe conversion with overflow check
 		Direction: modelDirectionToProto(device.Direction),
 		PullMode:  modelPullModeToProto(device.PullMode),
 	}
 
 	// Add PWM configuration if applicable
 	if device.DeviceType == models.GPIODeviceTypePWM {
-		req.PwmFrequency = int32(device.Config.Frequency)
-		req.PwmDutyCycle = int32(device.Config.DutyCycle)
+		req.PwmFrequency = mustSafeIntToInt32(device.Config.Frequency) // #nosec G115 - safe conversion with overflow check
+		req.PwmDutyCycle = mustSafeIntToInt32(device.Config.DutyCycle) // #nosec G115 - safe conversion with overflow check
 	}
 
 	resp, err := c.client.ConfigureGPIOPin(ctx, req)
@@ -204,7 +204,7 @@ func (c *PiAgentClient) ConfigureGPIOPin(ctx context.Context, device *models.GPI
 // ReadGPIOPin reads the current value of a GPIO pin
 func (c *PiAgentClient) ReadGPIOPin(ctx context.Context, pinNumber int) (int, error) {
 	req := &pb.ReadGPIOPinRequest{
-		Pin: int32(pinNumber),
+		Pin: mustSafeIntToInt32(pinNumber), // #nosec G115 - safe conversion with overflow check
 	}
 
 	resp, err := c.client.ReadGPIOPin(ctx, req)
@@ -223,8 +223,8 @@ func (c *PiAgentClient) ReadGPIOPin(ctx context.Context, pinNumber int) (int, er
 // WriteGPIOPin writes a value to a GPIO pin
 func (c *PiAgentClient) WriteGPIOPin(ctx context.Context, pinNumber int, value int) error {
 	req := &pb.WriteGPIOPinRequest{
-		Pin:   int32(pinNumber),
-		Value: int32(value),
+		Pin:   mustSafeIntToInt32(pinNumber), // #nosec G115 - safe conversion with overflow check
+		Value: mustSafeIntToInt32(value), // #nosec G115 - safe conversion with overflow check
 	}
 
 	resp, err := c.client.WriteGPIOPin(ctx, req)

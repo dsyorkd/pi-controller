@@ -164,7 +164,7 @@ func generateSelfSignedCert(cfg Config, log logger.Interface) (string, string, e
 	}
 
 	// Write certificate to file
-	certOut, err := os.Create(certFile)
+	certOut, err := os.Create(certFile) // #nosec G304 - certFile path from config, admin-controlled
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create cert file: %w", err)
 	}
@@ -175,7 +175,7 @@ func generateSelfSignedCert(cfg Config, log logger.Interface) (string, string, e
 	}
 
 	// Write private key to file
-	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600) // #nosec G304 - keyFile path from config, admin-controlled
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create key file: %w", err)
 	}
@@ -202,7 +202,7 @@ func generateSelfSignedCert(cfg Config, log logger.Interface) (string, string, e
 
 // isCertValid checks if a certificate file is valid and not expired
 func isCertValid(certFile string, log logger.Interface) bool {
-	certPEM, err := os.ReadFile(certFile)
+	certPEM, err := os.ReadFile(certFile) // #nosec G304 - certFile path from config, admin-controlled
 	if err != nil {
 		return false
 	}
@@ -263,7 +263,7 @@ func GetTLSConfigForClient(insecure bool, caCertFile string) (*tls.Config, error
 	}
 
 	if caCertFile != "" {
-		caCert, err := os.ReadFile(caCertFile)
+		caCert, err := os.ReadFile(caCertFile) // #nosec G304 - caCertFile path from config, admin-controlled
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CA cert: %w", err)
 		}

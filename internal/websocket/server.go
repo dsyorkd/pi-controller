@@ -169,7 +169,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	// Close all client connections
 	s.clientsMux.RLock()
 	for client := range s.clients {
-		client.conn.Close()
+		_ = client.conn.Close() // #nosec G104 - cleanup path, error not actionable
 	}
 	s.clientsMux.RUnlock()
 
@@ -361,7 +361,7 @@ func (s *Server) BroadcastSystemMetrics(metrics SystemMetricsMessage) {
 func (c *Client) readPump() {
 	defer func() {
 		c.server.unregister <- c
-		c.conn.Close()
+		_ = c.conn.Close() // #nosec G104 - cleanup path, error not actionable
 	}()
 
 	// Set read deadline and pong handler
@@ -399,7 +399,7 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(54 * time.Second)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		_ = c.conn.Close() // #nosec G104 - cleanup path, error not actionable
 	}()
 
 	for {

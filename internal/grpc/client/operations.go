@@ -327,7 +327,7 @@ func CollectNodeInfo(nodeID, nodeName string) (*NodeInfo, error) {
 		MACAddress:   macAddress,
 		Architecture: runtime.GOARCH,
 		OSVersion:    runtime.GOOS,
-		CPUCores:     int32(runtime.NumCPU()),
+		CPUCores:     mustSafeIntToInt32(runtime.NumCPU()), // #nosec G115 - safe conversion with overflow check
 	}
 
 	// Try to detect Raspberry Pi model
