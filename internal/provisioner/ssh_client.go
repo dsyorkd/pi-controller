@@ -629,7 +629,7 @@ func (c *SSHClient) UploadDirectory(ctx context.Context, localDir, remoteDir str
 			}
 
 			_, err = io.Copy(remoteFile, localFile)
-			_ = localFile.Close() // #nosec G104 - defer handles primary error
+			_ = localFile.Close()  // #nosec G104 - defer handles primary error
 			_ = remoteFile.Close() // #nosec G104 - defer handles primary error
 
 			if err != nil {

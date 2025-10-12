@@ -224,7 +224,7 @@ func (c *PiAgentClient) ReadGPIOPin(ctx context.Context, pinNumber int) (int, er
 func (c *PiAgentClient) WriteGPIOPin(ctx context.Context, pinNumber int, value int) error {
 	req := &pb.WriteGPIOPinRequest{
 		Pin:   mustSafeIntToInt32(pinNumber), // #nosec G115 - safe conversion with overflow check
-		Value: mustSafeIntToInt32(value), // #nosec G115 - safe conversion with overflow check
+		Value: mustSafeIntToInt32(value),     // #nosec G115 - safe conversion with overflow check
 	}
 
 	resp, err := c.client.WriteGPIOPin(ctx, req)

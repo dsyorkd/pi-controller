@@ -207,7 +207,7 @@ func (s *PiControllerServer) ReadGPIO(ctx context.Context, req *pb.ReadGPIOReque
 	}).Info("GPIO read operation performed")
 
 	return &pb.ReadGPIOResponse{
-		DeviceId:  mustSafeUintToUint32(device.ID), // #nosec G115 - safe conversion with overflow check
+		DeviceId:  mustSafeUintToUint32(device.ID),      // #nosec G115 - safe conversion with overflow check
 		Pin:       mustSafeIntToInt32(device.PinNumber), // #nosec G115 - safe conversion with overflow check
 		Value:     float64(device.Value),
 		Timestamp: timestamppb.New(reading.Timestamp),
@@ -273,7 +273,7 @@ func (s *PiControllerServer) WriteGPIO(ctx context.Context, req *pb.WriteGPIOReq
 	}).Info("GPIO write operation performed")
 
 	return &pb.WriteGPIOResponse{
-		DeviceId:  mustSafeUintToUint32(device.ID), // #nosec G115 - safe conversion with overflow check
+		DeviceId:  mustSafeUintToUint32(device.ID),      // #nosec G115 - safe conversion with overflow check
 		Pin:       mustSafeIntToInt32(device.PinNumber), // #nosec G115 - safe conversion with overflow check
 		Value:     req.Value,
 		Timestamp: timestamppb.New(reading.Timestamp),
