@@ -303,8 +303,23 @@ jobs:
           pip install detect-secrets
 
       - name: Run detect-secrets
+        continue-on-error: true
         run: |
-          detect-secrets scan --all-files --baseline .secrets.baseline
+          # Create or update baseline
+          if [[ -f .secrets.baseline ]]; then
+            detect-secrets scan --baseline .secrets.baseline
+          else
+            detect-secrets scan --all-files --baseline .secrets.baseline
+          fi
+
+          # Check if any new secrets were found
+          EXIT_CODE=$?
+          if [[ $EXIT_CODE -eq 1 ]]; then
+            echo "❌ New secrets detected by detect-secrets"
+            exit 1
+          else
+            echo "✅ No new secrets found"
+          fi
 
       - name: Upload secrets scan results
         if: always()

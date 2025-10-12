@@ -1,27 +1,26 @@
 # TruffleHog ignore patterns for test/example files
 # These files contain example credentials and test data, not real secrets
+# NOTE: These are REGEX patterns, not glob patterns
 
 # Architecture documentation with example connection strings
-ARCHITECTURE.md
-ARCHITECTURE_OLD.md
+ARCHITECTURE\.md
+ARCHITECTURE_OLD\.md
 
 # Test certificates and keys
-domain.key
-domain.crt
-*.test.key
-*.test.crt
-test/fixtures/**
-test/testdata/**
+domain\.(key|crt)
+.*\.test\.(key|crt)
+test/fixtures/.*
+test/testdata/.*
 
 # Example configuration files
-*.example
-*.sample
-.env.example
-config.example.*
+.*\.example
+.*\.sample
+\.env\.example
+config\.example\..*
 
 # Generated/temporary files
-*.log
-*.tmp
-coverage.out
-*.db
-*.db-journal
+.*\.log
+.*\.tmp
+coverage\.out
+.*\.db
+.*\.db-journal
