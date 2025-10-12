@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 	"unicode"
@@ -247,11 +248,9 @@ func ValidateIPAddress(fieldName, value string) error {
 		}
 	}
 
-	// Simple validation - could use net.ParseIP for more robust checking
-	ipv4Pattern := regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
-	ipv6Pattern := regexp.MustCompile(`^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$`)
-
-	if !ipv4Pattern.MatchString(value) && !ipv6Pattern.MatchString(value) {
+	// Use net.ParseIP for robust IP validation - this prevents command injection
+	// as it only accepts valid IP address formats
+	if net.ParseIP(value) == nil {
 		return &ValidationError{
 			Field:   fieldName,
 			Message: "not a valid IP address",

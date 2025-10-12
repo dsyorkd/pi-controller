@@ -7,6 +7,7 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/validation"
 	"gorm.io/gorm"
 )
 
@@ -192,6 +193,16 @@ func (s *NodeService) GetByIPAddress(ipAddress string) (*models.Node, error) {
 
 // Create creates a new node
 func (s *NodeService) Create(req CreateNodeRequest) (*models.Node, error) {
+	// Validate IP address format to prevent command injection
+	if err := validation.ValidateIPAddress("ip_address", req.IPAddress); err != nil {
+		return nil, errors.Wrapf(ErrInvalidInput, "invalid IP address: %v", err)
+	}
+
+	// Validate name format to prevent injection attacks
+	if err := validation.ValidateResourceName("name", req.Name, 100); err != nil {
+		return nil, errors.Wrapf(ErrInvalidInput, "invalid node name: %v", err)
+	}
+
 	// Check if node with same name already exists
 	if _, err := s.GetByName(req.Name); err != ErrNotFound {
 		if err == nil {
