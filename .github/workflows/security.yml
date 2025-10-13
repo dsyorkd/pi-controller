@@ -135,10 +135,10 @@ jobs:
 
       - name: Run gosec security scanner
         run: |
-          # Generate SARIF for GitHub Security tab
-          gosec -fmt sarif -out gosec-report.sarif -stdout -verbose=text ./...
-          # Generate JSON for immediate critical issue check
-          gosec -fmt json -out gosec-report.json ./...
+          # Generate SARIF for GitHub Security tab (exclude generated files)
+          gosec -fmt sarif -out gosec-report.sarif -stdout -verbose=text -exclude-generated ./...
+          # Generate JSON for immediate critical issue check (exclude generated files)
+          gosec -fmt json -out gosec-report.json -exclude-generated ./...
           echo "Gosec scan completed"
 
       - name: Run staticcheck
