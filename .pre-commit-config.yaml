@@ -1,0 +1,147 @@
+# Pre-commit hooks configuration for pi-controller
+# See https://pre-commit.com for more information
+
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+default_language_version:
+  python: python3
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom YAML tags in GitHub Actions
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+
+  # Go formatting
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        args: [-w]
+      - id: go-imports
+        args: [-w]
+      - id: go-mod-tidy
+      - id: go-vet
+      - id: go-build
+        args: [./cmd/...]
+
+  # Go linting with golangci-lint
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.62.2
+    hooks:
+      - id: golangci-lint
+        args:
+          - --timeout=5m
+          - --config=.golangci.yml
+
+  # Security scanning with gosec
+  - repo: https://github.com/securego/gosec
+    rev: v2.22.9
+    hooks:
+      - id: gosec
+        args:
+          - -quiet
+          - -exclude-generated
+          - ./...
+
+  # Secret scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args:
+          - --baseline
+          - .secrets.baseline
+        exclude: package.lock.json
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        args: [--fix]
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yml]
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: [--ignore, DL3008, --ignore, DL3009]
+
+  # Protobuf linting
+  - repo: https://github.com/bufbuild/buf
+    rev: v1.48.0
+    hooks:
+      - id: buf-lint
+        files: \.proto$
+      - id: buf-format
+        args: [-w]
+        files: \.proto$
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+# Local hooks for custom checks
+  - repo: local
+    hooks:
+      # Run Go tests on changed packages
+      - id: go-test-changed
+        name: Run Go tests on changed packages
+        entry: bash -c 'go test -short -race $(git diff --cached --name-only --diff-filter=ACM | grep "\.go$" | xargs -I {} dirname {} | sort -u | grep -v "^vendor" | xargs -I {} echo "./{}/..." | xargs)'
+        language: system
+        pass_filenames: false
+        files: \.go$
+
+      # Check for forbidden patterns
+      - id: check-forbidden-patterns
+        name: Check for forbidden code patterns
+        entry: bash -c 'if git diff --cached --name-only --diff-filter=ACM | grep "\.go$" | xargs grep -n "fmt.Print[f|ln]*\|panic(\|//.*TODO.*SECURITY\|//.*FIXME.*SECURITY" 2>/dev/null; then echo "Found forbidden patterns in Go files"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        files: \.go$
+
+      # Verify protobuf files are generated
+      - id: proto-generated
+        name: Verify protobuf files are generated
+        entry: bash -c 'if git diff --cached --name-only | grep "\.proto$" >/dev/null; then make proto; fi'
+        language: system
+        pass_filenames: false
+        files: \.proto$
+
+      # Run security tests
+      - id: security-tests
+        name: Run security tests
+        entry: bash -c 'make test-security || true'
+        language: system
+        pass_filenames: false
+        files: \.go$
+        stages: [manual]  # Only run when explicitly requested
+
+# Configure which hooks run at different stages
+stages:
+  - commit
+  - push

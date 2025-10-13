@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: "10 0,12 * * *"
 
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
 jobs:
   configure_input_vars:
     runs-on: ubuntu-latest
