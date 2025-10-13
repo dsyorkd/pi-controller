@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -276,13 +277,15 @@ func testRoleBasedAuthorization(t *testing.T, server *api.Server, testUsers []st
 			endpoint:     "/api/v1/nodes",
 			requiredRole: "operator",
 			payload: map[string]interface{}{
-				"name":         "test-node",
-				"ip_address":   "192.168.1.100",
-				"mac_address":  "00:11:22:33:44:55",
-				"role":         "worker",
-				"cpu_cores":    4,
-				"memory":       4096,
-				"architecture": "arm64",
+				"name":             "test-node",
+				"ip_address":       "192.168.1.100",
+				"mac_address":      "00:11:22:33:44:55",
+				"role":             "worker",
+				"discovery_method": "api",
+				"node_type":        "generic",
+				"cpu_cores":        4,
+				"memory":           4096,
+				"architecture":     "arm64",
 			},
 			expectedStatus: map[string]int{
 				"admin":    http.StatusCreated,
@@ -336,9 +339,20 @@ func testRoleBasedAuthorization(t *testing.T, server *api.Server, testUsers []st
 				if tc.payload != nil {
 					// Make payload unique per role to avoid conflicts
 					payload := make(map[string]interface{})
+					roleIndex := map[string]int{"admin": 1, "operator": 2, "viewer": 3}
 					for k, v := range tc.payload {
-						if k == "name" || k == "ip_address" || k == "mac_address" {
+						if k == "name" || k == "mac_address" {
 							payload[k] = fmt.Sprintf("%v-%s", v, role)
+						} else if k == "ip_address" {
+							// Increment the last octet to keep IP address valid
+							ipStr := v.(string)
+							lastDot := strings.LastIndex(ipStr, ".")
+							if lastDot > 0 {
+								baseIP := ipStr[:lastDot]
+								payload[k] = fmt.Sprintf("%s.%d", baseIP, 100+roleIndex[role])
+							} else {
+								payload[k] = v
+							}
 						} else {
 							payload[k] = v
 						}

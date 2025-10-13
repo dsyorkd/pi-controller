@@ -64,7 +64,7 @@ func TestNodeService_Create(t *testing.T) {
 				IPAddress:  "192.168.1.101",
 				MACAddress: "aa:bb:cc:dd:ee:02",
 			},
-			wantErr: false, // Service allows empty names
+			wantErr: true, // Service validates that names cannot be empty
 		},
 		{
 			name: "missing ip address",
@@ -73,7 +73,7 @@ func TestNodeService_Create(t *testing.T) {
 				IPAddress:  "",
 				MACAddress: "aa:bb:cc:dd:ee:03",
 			},
-			wantErr: false, // Service allows empty IP addresses
+			wantErr: true, // Service validates that IP addresses cannot be empty
 		},
 	}
 
