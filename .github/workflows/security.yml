@@ -413,9 +413,14 @@ jobs:
                 "${{ needs.container-scan.result }}" == "success" &&
                 "${{ needs.secrets-scan.result }}" == "success" ]]; then
             echo "### ✅ All security scans passed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📁 Detailed reports available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+            exit 0
           else
             echo "### ⚠️ Some security scans failed - please review the results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📁 Detailed reports available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **WORKFLOW FAILED - Security issues must be resolved before merging**" >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📁 Detailed reports available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
