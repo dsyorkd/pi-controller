@@ -105,7 +105,7 @@ repos:
         language: system
         pass_filenames: false
         files: \.go$
-        stages: [commit]  # Only run on commit, not push
+        stages: [pre-commit]  # Only run on commit, not push
 
       # Check for forbidden patterns (commit-time only)
       - id: check-forbidden-patterns
@@ -114,7 +114,7 @@ repos:
         language: system
         pass_filenames: false
         files: \.go$
-        stages: [commit]  # Only run on commit, not push
+        stages: [pre-commit]  # Only run on commit, not push
 
       # Verify protobuf files are generated (commit-time only)
       - id: proto-generated
@@ -123,7 +123,7 @@ repos:
         language: system
         pass_filenames: false
         files: \.proto$
-        stages: [commit]  # Only run on commit, not push
+        stages: [pre-commit]  # Only run on commit, not push
 
       # Run security tests
       - id: security-tests
