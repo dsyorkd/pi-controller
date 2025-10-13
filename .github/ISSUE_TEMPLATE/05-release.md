@@ -8,7 +8,7 @@ assignees: ''
 
 ---
 
-## What's the task? Please describe.
+## What's the task? Please describe
 
 Action items for releasing v
 
@@ -17,7 +17,7 @@ Action items for releasing v
     - Release captain:  <!--responsible for RD efforts of release development and coordinating with QA captain-->
     - QA captain:  <!--responsible for coordinating QA efforts of release testing tasks-->
 
-## Describe the sub-tasks.
+## Describe the sub-tasks
 
 ### Pre-Release
 
@@ -34,7 +34,7 @@ Action items for releasing v
 
 <!--
 - [ ] Run security testing of container images for pre-GA milestones
-- [ ] Create security issues at upstream for unresolved CVEs in CSI sidecar images 
+- [ ] Create security issues at upstream for unresolved CVEs in CSI sidecar images
 -->
 
 ### Release
@@ -43,12 +43,12 @@ Action items for releasing v
 
 - [ ] Release build [[doc](https://github.com/dsyorkd/pi-controller/wiki/Create-a-Pi-Controller-release)].
 - [ ] Release note - Work with @harvester/doc
-  - [ ] Create a release note in https://github.com/dsyorkd/release-notes
+  - [ ] Create a release note in <https://github.com/dsyorkd/release-notes>
     - PR:
   - [ ] Deprecation note
   - [ ] Upgrade notes including highlighted notes, deprecation, compatible changes, and others impacting the current users
 - Doc
-  - [ ] Publish the new version of doc and add the next patch version of the dev doc. @harvester/doc 
+  - [ ] Publish the new version of doc and add the next patch version of the dev doc. @harvester/doc
   - [ ] Create an upgrade page for this version.
     - PR:
     - Doc:
@@ -62,7 +62,7 @@ Action items for releasing v
 
 - [ ] Update [support-versions](https://github.com/dsyorkd/pi-controller/blob/master/misc/support-versions.txt). You can only keep the latest patch release here.
 - [ ] Update upgrade responder 1 week after the release [doc].
-  - For the first stable release, we need to consider several factors and reach a consensus among maintainers before claiming it stable. 
+  - For the first stable release, we need to consider several factors and reach a consensus among maintainers before claiming it stable.
   - For any patch release after a stable release, we need to wait 1-2 weeks for user feedback.
 - [ ] Create `isv:rancher:Harvester:OS:v<next minor>` and `isv:Rancher:Harvester:ExtraPackages:v<next minor>` projects on BS and link them to the corresponding dev project, and unlink the previous minor from dev.
 

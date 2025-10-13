@@ -20,18 +20,21 @@ const (
 ### Type Characteristics
 
 **Controller Nodes:**
+
 - Run the full pi-controller binary
 - Can join the Raft cluster for high availability
 - Support both cluster management and workload execution
 - Typically deployed on 3-5 nodes for production HA
 
 **Agent Nodes:**
+
 - Run only the lightweight pi-agent binary
 - Managed by controller nodes
 - Execute workloads and provide hardware access (GPIO, sensors)
 - Unlimited scaling potential
 
 **Generic Nodes:**
+
 - Raspberry Pi detected on the network
 - No pi-controller or pi-agent installed yet
 - Available for provisioning
@@ -229,6 +232,7 @@ Content-Type: application/json
 ```
 
 Response:
+
 ```json
 {
   "data": {
@@ -292,6 +296,7 @@ Filter by Status: [ All | Active | Discovered | Failed ]
 ### Actions by Node Type
 
 **Controller Nodes:**
+
 - View cluster status
 - Join to Raft cluster
 - Remove from cluster
@@ -299,12 +304,14 @@ Filter by Status: [ All | Active | Discovered | Failed ]
 - SSH access
 
 **Agent Nodes:**
+
 - View GPIO devices
 - Assign to K8s cluster
 - View workloads
 - Configure
 
 **Generic Nodes:**
+
 - Provision pi-agent
 - Provision pi-controller
 - Test connectivity
@@ -391,6 +398,7 @@ Setup:
 ### Step-by-Step
 
 **Step 1: Install pi-controller on Pi-1**
+
 ```bash
 # On Pi-1
 wget https://github.com/your/pi-controller/releases/download/v1.0.0/pi-controller
@@ -399,6 +407,7 @@ chmod +x pi-controller
 ```
 
 **Step 2: Access Web UI**
+
 ```
 Open browser: https://192.168.1.10:3000
 
@@ -406,6 +415,7 @@ View: Empty node list (only local controller visible)
 ```
 
 **Step 3: Install pi-controller on Pi-2**
+
 ```bash
 # On Pi-2
 wget https://github.com/your/pi-controller/releases/download/v1.0.0/pi-controller
@@ -414,6 +424,7 @@ chmod +x pi-controller
 ```
 
 **Step 4: Pi-1 discovers Pi-2 via mDNS**
+
 ```
 Pi-1 Web UI now shows:
 - pi-1 (local, controller, status: active)
@@ -421,6 +432,7 @@ Pi-1 Web UI now shows:
 ```
 
 **Step 5: Create Raft Cluster**
+
 ```
 In Web UI on Pi-1:
 1. Click "Create Cluster"
@@ -434,6 +446,7 @@ Result:
 ```
 
 **Step 6: Pi-3 with pi-agent auto-discovered**
+
 ```bash
 # On Pi-3
 wget https://github.com/your/pi-controller/releases/download/v1.0.0/pi-agent
@@ -449,6 +462,7 @@ Pi-1 Web UI now shows:
 ```
 
 **Step 7: Pi-4 generic node auto-discovered**
+
 ```
 Pi-4 boots with standard Raspberry Pi OS
 
@@ -458,6 +472,7 @@ Pi-1 Web UI automatically shows:
 ```
 
 **Step 8: Manually add Pi-5**
+
 ```
 In Web UI on Pi-1:
 1. Click "Add Node Manually"
@@ -472,6 +487,7 @@ Result:
 ```
 
 **Final State in Web UI:**
+
 ```
 5 Total Nodes:
 - 2 Controllers (pi-1 leader, pi-2 follower)

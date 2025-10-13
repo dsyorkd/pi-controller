@@ -202,25 +202,28 @@ kubectl apply -f automation-config.yaml -n automation
 ### Common Issues
 
 1. **CRD Not Recognized**
+
    ```bash
    # Ensure CRDs are properly installed
    kubectl get crd | grep pi-controller
    ```
 
 2. **Resource Stuck in Pending**
+
    ```bash
    # Check if Pi Controller is running on target node
    kubectl get pods -l app=pi-controller
-   
+
    # Verify node labels match selectors
    kubectl get nodes --show-labels
    ```
 
 3. **I2C Device Connection Issues**
+
    ```bash
    # Check device status and error messages
    kubectl describe i2cdevice device-name
-   
+
    # Verify I2C bus availability on node
    kubectl exec -it pi-agent-pod -- i2cdetect -y 1
    ```

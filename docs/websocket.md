@@ -10,9 +10,9 @@ Clients can establish a WebSocket connection to the `/ws` endpoint of the Pi-Con
 
 All messages sent from the server to the client are JSON objects with a consistent structure:
 
-*   `type` (string): A dot-separated string indicating the event category and action (e.g., `cluster.node.added`).
-*   `timestamp` (string): An ISO 8601 timestamp indicating when the event occurred.
-*   `data` (object): A JSON object containing the payload specific to the event type.
+* `type` (string): A dot-separated string indicating the event category and action (e.g., `cluster.node.added`).
+* `timestamp` (string): An ISO 8601 timestamp indicating when the event occurred.
+* `data` (object): A JSON object containing the payload specific to the event type.
 
 ---
 

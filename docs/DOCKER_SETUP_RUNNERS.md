@@ -83,6 +83,7 @@ sudo systemctl restart actions-runner
 If you can't install Docker immediately, use the fallback workflows:
 
 1. **Rename current workflows** (add `.disabled` extension):
+
 ```bash
 cd .github/workflows
 mv ci.yml ci.yml.disabled
@@ -91,6 +92,7 @@ mv build-multiarch.yml build-multiarch.yml.disabled
 ```
 
 2. **Activate fallback workflow**:
+
 ```bash
 mv ci-fallback.yml ci.yml
 ```

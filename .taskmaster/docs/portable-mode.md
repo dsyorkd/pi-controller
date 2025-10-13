@@ -19,6 +19,7 @@ pi-controller
 ```
 
 The environment variable automatically:
+
 - Sets `cluster.portable = true`
 - Disables Raft participation (`cluster.enabled = false`)
 - Allows all API operations as a client
@@ -224,12 +225,14 @@ Portable mode requires network access to cluster nodes:
 ### Best Practices
 
 1. **Use HTTPS**: Always use TLS for production clusters
+
    ```bash
    export PI_CONTROLLER_API_TLS_CERT=/path/to/cert.pem
    export PI_CONTROLLER_API_TLS_KEY=/path/to/key.pem
    ```
 
 2. **Limit Permissions**: Use viewer/operator roles, not admin
+
    ```bash
    pi-controller user create \
        --username=ci-bot \
@@ -237,11 +240,13 @@ Portable mode requires network access to cluster nodes:
    ```
 
 3. **Token Rotation**: Regularly rotate access tokens
+
    ```bash
    pi-controller token rotate
    ```
 
 4. **Network Isolation**: Use VPN or bastion host for remote access
+
    ```bash
    ssh -L 8080:localhost:8080 pi@bastion
    export PI_CONTROLLER_API_HOST=localhost

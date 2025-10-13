@@ -29,7 +29,7 @@
         "codeExample": "HostKeyCallback: ssh.FixedHostKey(knownHostKey) // Replace insecure callback"
       },
       {
-        "id": "SEC-002", 
+        "id": "SEC-002",
         "title": "Insufficient Input Validation in Certificate Requests",
         "severity": "HIGH",
         "category": "Input Validation",
@@ -54,7 +54,7 @@
       },
       {
         "id": "SEC-003",
-        "title": "Hardcoded RSA Key Size and Weak Cryptographic Standards", 
+        "title": "Hardcoded RSA Key Size and Weak Cryptographic Standards",
         "severity": "HIGH",
         "category": "Cryptographic Security",
         "location": "/internal/services/ca_local.go:292, /internal/config/config.go:526",
@@ -64,7 +64,7 @@
         "remediation": {
           "immediate": [
             "Increase default RSA key size to 4096 bits minimum",
-            "Add support for ECDSA P-256/P-384 algorithms", 
+            "Add support for ECDSA P-256/P-384 algorithms",
             "Make key algorithm configurable per certificate type",
             "Implement key strength validation"
           ],
@@ -79,7 +79,7 @@
       {
         "id": "SEC-004",
         "title": "Insecure Random Serial Number Generation",
-        "severity": "HIGH", 
+        "severity": "HIGH",
         "category": "Cryptographic Security",
         "location": "/internal/services/ca_local.go:331-334",
         "description": "Certificate serial numbers rely on OpenSSL's default generation which may not provide cryptographically secure randomness.",
@@ -104,7 +104,7 @@
         "id": "SEC-005",
         "title": "Vault Authentication Credentials in Configuration",
         "severity": "HIGH",
-        "category": "Credential Management", 
+        "category": "Credential Management",
         "location": "/internal/config/config.go:225-227",
         "description": "Vault AppRole credentials and admin tokens stored directly in configuration with inadequate protection.",
         "impact": "Configuration file compromise leads to complete Vault access, potentially exposing all PKI secrets and certificate operations.",
@@ -129,7 +129,7 @@
         "title": "Missing Certificate Chain Validation",
         "severity": "MEDIUM",
         "category": "Certificate Validation",
-        "location": "/internal/services/ca_local.go:484-510", 
+        "location": "/internal/services/ca_local.go:484-510",
         "description": "Certificate validation only checks against direct CA certificate, missing intermediate certificate chain validation.",
         "impact": "Compromised intermediate certificates could be used to issue valid certificates without detection.",
         "exploitScenario": "Attacker compromises intermediate CA, issues certificates that appear valid but bypass revocation checking.",
@@ -160,7 +160,7 @@
         "remediation": {
           "immediate": [
             "Use parameterized command construction instead of string formatting",
-            "Implement strict input sanitization for all SSH command parameters", 
+            "Implement strict input sanitization for all SSH command parameters",
             "Add shell escaping for all user-provided data",
             "Validate all certificate parameters against safe character sets"
           ],
@@ -199,7 +199,7 @@
       {
         "id": "SEC-009",
         "title": "Insufficient Rate Limiting and DoS Protection",
-        "severity": "MEDIUM", 
+        "severity": "MEDIUM",
         "category": "Availability Security",
         "location": "/internal/api/middleware/auth.go:61",
         "description": "Basic rate limiting in authentication but no comprehensive DoS protection for certificate operations.",
@@ -297,19 +297,19 @@
       "totalFindings": 12,
       "severityBreakdown": {
         "critical": 1,
-        "high": 4, 
+        "high": 4,
         "medium": 7,
         "low": 0
       },
       "categoriesAffected": [
         "SSH Security",
-        "Input Validation", 
+        "Input Validation",
         "Cryptographic Security",
         "Credential Management",
         "Certificate Validation",
         "Command Injection",
         "Authentication Security",
-        "Availability Security", 
+        "Availability Security",
         "Audit and Monitoring",
         "Key Management",
         "Certificate Lifecycle"
@@ -318,7 +318,7 @@
       "overallSecurityPosture": "The Certificate Authority implementation has several significant security vulnerabilities that need immediate attention. The most critical issue is the insecure SSH host key validation which could allow man-in-the-middle attacks. Multiple high-severity cryptographic and key management issues also pose substantial risks to the PKI security.",
       "prioritizedRemediation": [
         "1. Implement proper SSH host key validation (SEC-001) - CRITICAL",
-        "2. Fix private key storage and protection (SEC-011) - HIGH", 
+        "2. Fix private key storage and protection (SEC-011) - HIGH",
         "3. Improve cryptographic standards and key sizes (SEC-003) - HIGH",
         "4. Secure Vault credential management (SEC-005) - HIGH",
         "5. Implement comprehensive input validation (SEC-002) - HIGH",
@@ -330,7 +330,7 @@
     "complianceAssessment": {
       "standards": {
         "NIST_SP_800-57": "PARTIAL - Key management practices need improvement",
-        "RFC_5280": "PARTIAL - Certificate profiles and CRL missing", 
+        "RFC_5280": "PARTIAL - Certificate profiles and CRL missing",
         "FIPS_140-2": "NON-COMPLIANT - No HSM integration or validated crypto",
         "Common_Criteria": "NOT_EVALUATED",
         "WebTrust_CA": "NON-COMPLIANT - Multiple baseline requirements not met"
@@ -367,7 +367,7 @@
     },
     "testingRecommendations": [
       "Perform penetration testing focusing on SSH command injection",
-      "Test certificate validation with malicious certificate requests", 
+      "Test certificate validation with malicious certificate requests",
       "Conduct load testing to verify DoS protection mechanisms",
       "Test private key extraction scenarios",
       "Verify host key validation bypass attempts",

@@ -11,7 +11,7 @@ class Action(abc.ABC):
     @abc.abstractmethod
     def isMatched(self, actionRequest):
         raise NotImplementedError
-    
+
     @abc.abstractmethod
     def action(self, request):
         raise NotImplementedError
@@ -21,7 +21,7 @@ class LabelAction(abc.ABC):
     @abc.abstractmethod
     def isMatched(self, request):
         raise NotImplementedError
-    
+
     @abc.abstractmethod
     def action(self, request):
         raise NotImplementedError

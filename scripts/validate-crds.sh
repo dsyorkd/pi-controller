@@ -41,9 +41,9 @@ for crd_file in "$CRD_DIR"/*.yaml; do
     if [[ "$(basename "$crd_file")" == "kustomization.yaml" ]] || [[ "$(basename "$crd_file")" == "README.md" ]]; then
         continue
     fi
-    
+
     echo -n "  - $(basename "$crd_file"): "
-    
+
     if kubectl apply --dry-run=client -f "$crd_file" &> /dev/null; then
         echo -e "${GREEN}✅ Valid${NC}"
     else
@@ -57,25 +57,25 @@ done
 if [[ "$OFFLINE_ONLY" != "true" ]]; then
     echo ""
     echo "🚀 Testing CRD deployment..."
-    
+
     # Apply CRDs
     echo -n "  - Applying CRDs: "
     if kubectl apply -k "$CRD_DIR" &> /dev/null; then
         echo -e "${GREEN}✅ Applied${NC}"
-        
+
         # Wait for CRDs to be ready
         echo "  - Waiting for CRDs to be established..."
         kubectl wait --for condition=established --timeout=30s crd/gpiopins.gpio.pi-controller.io
         kubectl wait --for condition=established --timeout=30s crd/pwmcontrollers.gpio.pi-controller.io
         kubectl wait --for condition=established --timeout=30s crd/i2cdevices.gpio.pi-controller.io
-        
+
         echo ""
         echo "📝 Testing example manifests..."
-        
+
         # Test each example file
         for example_file in "$EXAMPLES_DIR"/*.yaml; do
             echo -n "  - $(basename "$example_file"): "
-            
+
             if kubectl apply --dry-run=server -f "$example_file" &> /dev/null; then
                 echo -e "${GREEN}✅ Valid${NC}"
             else
@@ -84,11 +84,11 @@ if [[ "$OFFLINE_ONLY" != "true" ]]; then
                 ERRORS=$((ERRORS + 1))
             fi
         done
-        
+
         echo ""
         echo "🧹 Cleaning up test resources..."
         kubectl delete -k "$CRD_DIR" --ignore-not-found=true &> /dev/null || true
-        
+
     else
         echo -e "${RED}❌ Failed${NC}"
         kubectl apply -k "$CRD_DIR"
@@ -97,11 +97,11 @@ if [[ "$OFFLINE_ONLY" != "true" ]]; then
 else
     echo ""
     echo "📝 Validating example manifests (offline)..."
-    
+
     # Test example syntax only
     for example_file in "$EXAMPLES_DIR"/*.yaml; do
         echo -n "  - $(basename "$example_file"): "
-        
+
         if kubectl apply --dry-run=client -f "$example_file" &> /dev/null; then
             echo -e "${GREEN}✅ Valid syntax${NC}"
         else
@@ -120,7 +120,7 @@ check_crd_field() {
     local file=$1
     local field=$2
     local description=$3
-    
+
     if grep -q "$field" "$file"; then
         echo -e "  - $description: ${GREEN}✅ Present${NC}"
     else
@@ -135,7 +135,7 @@ check_crd_field "$CRD_DIR/gpiopin-crd.yaml" "additionalPrinterColumns" "Custom c
 check_crd_field "$CRD_DIR/gpiopin-crd.yaml" "shortNames" "Short names"
 check_crd_field "$CRD_DIR/gpiopin-crd.yaml" "categories" "Categories"
 
-# Check PWMController CRD  
+# Check PWMController CRD
 echo "  PWMController CRD:"
 check_crd_field "$CRD_DIR/pwmcontroller-crd.yaml" "additionalPrinterColumns" "Custom columns"
 check_crd_field "$CRD_DIR/pwmcontroller-crd.yaml" "shortNames" "Short names"

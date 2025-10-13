@@ -35,6 +35,7 @@ sequenceDiagram
 This service is exposed by the `pi-agent` binary running on every node in the cluster. It allows the Control Plane to directly interact with the node's hardware and system.
 
 **Protobuf Definition:**
+
 ```protobuf
 service NodeAgent {
     // Fetches real-time system metrics from the node.
@@ -59,6 +60,7 @@ service NodeAgent {
 This service is used for internal communication between Control Plane instances in a high-availability setup and for nodes to register themselves.
 
 **Protobuf Definition:**
+
 ```protobuf
 service ControlPlane {
     // Allows a new node to register itself with the control plane.

@@ -103,7 +103,7 @@ func createClustersTable(db *gorm.DB) error {
 		kube_config TEXT,
 		master_endpoint TEXT
 	);
-	
+
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_clusters_name ON clusters(name);
 	CREATE INDEX IF NOT EXISTS idx_clusters_deleted_at ON clusters(deleted_at);
 	CREATE INDEX IF NOT EXISTS idx_clusters_status ON clusters(status);
@@ -150,7 +150,7 @@ func createNodesTable(db *gorm.DB) error {
 		last_seen DATETIME,
 		FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE SET NULL
 	);
-	
+
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_name ON nodes(name);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_mac_address ON nodes(mac_address);
 	CREATE INDEX IF NOT EXISTS idx_nodes_deleted_at ON nodes(deleted_at);
@@ -208,7 +208,7 @@ func createGPIODevicesTable(db *gorm.DB) error {
 		sample_rate INTEGER,
 		FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 	);
-	
+
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_node_id ON gpio_devices(node_id);
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_pin_number ON gpio_devices(pin_number);
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_status ON gpio_devices(status);
@@ -243,7 +243,7 @@ func createGPIOReadingsTable(db *gorm.DB) error {
 		timestamp DATETIME NOT NULL,
 		FOREIGN KEY (device_id) REFERENCES gpio_devices(id) ON DELETE CASCADE
 	);
-	
+
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_device_id ON gpio_readings(device_id);
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_timestamp ON gpio_readings(timestamp);
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_device_timestamp ON gpio_readings(device_id, timestamp);
@@ -270,11 +270,11 @@ func addPerformanceIndexes(db *gorm.DB) error {
 	-- Composite indexes for common queries
 	CREATE INDEX IF NOT EXISTS idx_nodes_cluster_status ON nodes(cluster_id, status) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_node_status ON gpio_devices(node_id, status) WHERE deleted_at IS NULL;
-	
+
 	-- Indexes for time-series queries
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_timestamp_desc ON gpio_readings(timestamp DESC);
 	CREATE INDEX IF NOT EXISTS idx_gpio_readings_device_time_desc ON gpio_readings(device_id, timestamp DESC);
-	
+
 	-- Index for active clusters with ready nodes
 	CREATE INDEX IF NOT EXISTS idx_clusters_active ON clusters(status) WHERE status = 'active' AND deleted_at IS NULL;
 	`
@@ -302,12 +302,12 @@ func addGPIOReservationFields(db *gorm.DB) error {
 	ALTER TABLE gpio_devices ADD COLUMN reserved_by TEXT;
 	ALTER TABLE gpio_devices ADD COLUMN reserved_at DATETIME;
 	ALTER TABLE gpio_devices ADD COLUMN reservation_ttl DATETIME;
-	
+
 	-- Add index for reserved_by field for efficient queries
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reserved_by ON gpio_devices(reserved_by);
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reserved_at ON gpio_devices(reserved_at);
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reservation_ttl ON gpio_devices(reservation_ttl);
-	
+
 	-- Composite index for reservation queries
 	CREATE INDEX IF NOT EXISTS idx_gpio_devices_reservation_status ON gpio_devices(reserved_by, reservation_ttl) WHERE reserved_by IS NOT NULL;
 	`
@@ -323,7 +323,7 @@ func dropGPIOReservationFields(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_gpio_devices_reservation_ttl;
 	DROP INDEX IF EXISTS idx_gpio_devices_reserved_at;
 	DROP INDEX IF EXISTS idx_gpio_devices_reserved_by;
-	
+
 	-- Remove reservation fields (Note: SQLite doesn't support DROP COLUMN directly)
 	-- For SQLite, we would need to recreate the table, but this is a rollback scenario
 	-- so we'll use a pragmatic approach and just set them to NULL
@@ -460,20 +460,20 @@ func addCertificateIndexes(db *gorm.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_certificates_cluster_id ON certificates(cluster_id) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificates_not_after ON certificates(not_after);
 	CREATE INDEX IF NOT EXISTS idx_certificates_auto_renew ON certificates(auto_renew, not_after) WHERE auto_renew = 1 AND status = 'active';
-	
+
 	-- Certificate requests table indexes
 	CREATE INDEX IF NOT EXISTS idx_certificate_requests_status ON certificate_requests(status) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificate_requests_type ON certificate_requests(type) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificate_requests_node_id ON certificate_requests(node_id) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificate_requests_cluster_id ON certificate_requests(cluster_id) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificate_requests_created_at ON certificate_requests(created_at DESC);
-	
+
 	-- CA info table indexes
 	CREATE INDEX IF NOT EXISTS idx_ca_info_name ON ca_info(name);
 	CREATE INDEX IF NOT EXISTS idx_ca_info_type ON ca_info(type) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_ca_info_backend ON ca_info(backend) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_ca_info_status ON ca_info(status) WHERE deleted_at IS NULL;
-	
+
 	-- Composite indexes for common queries
 	CREATE INDEX IF NOT EXISTS idx_certificates_node_status ON certificates(node_id, status) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificates_cluster_status ON certificates(cluster_id, status) WHERE deleted_at IS NULL;
@@ -490,20 +490,20 @@ func dropCertificateIndexes(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_certificates_expiring_soon;
 	DROP INDEX IF EXISTS idx_certificates_cluster_status;
 	DROP INDEX IF EXISTS idx_certificates_node_status;
-	
+
 	-- Drop CA info indexes
 	DROP INDEX IF EXISTS idx_ca_info_status;
 	DROP INDEX IF EXISTS idx_ca_info_backend;
 	DROP INDEX IF EXISTS idx_ca_info_type;
 	DROP INDEX IF EXISTS idx_ca_info_name;
-	
+
 	-- Drop certificate requests indexes
 	DROP INDEX IF EXISTS idx_certificate_requests_created_at;
 	DROP INDEX IF EXISTS idx_certificate_requests_cluster_id;
 	DROP INDEX IF EXISTS idx_certificate_requests_node_id;
 	DROP INDEX IF EXISTS idx_certificate_requests_type;
 	DROP INDEX IF EXISTS idx_certificate_requests_status;
-	
+
 	-- Drop certificates indexes
 	DROP INDEX IF EXISTS idx_certificates_auto_renew;
 	DROP INDEX IF EXISTS idx_certificates_not_after;
@@ -542,7 +542,7 @@ func createUsersTable(db *gorm.DB) error {
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		deleted_at DATETIME
 	);
-	
+
 	-- Create indexes for performance and security
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE deleted_at IS NULL;
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE deleted_at IS NULL;
@@ -551,13 +551,13 @@ func createUsersTable(db *gorm.DB) error {
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key) WHERE api_key IS NOT NULL;
 	CREATE INDEX IF NOT EXISTS idx_users_locked_until ON users(locked_until) WHERE locked_until IS NOT NULL;
 	CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
-	
+
 	-- Composite indexes for common queries
 	CREATE INDEX IF NOT EXISTS idx_users_active_role ON users(is_active, role) WHERE deleted_at IS NULL;
-	
+
 	-- Insert default admin user with password "admin123" (bcrypt hash)
 	-- $2a$10$zgl1xM6oW1wR6YaxKa/m/.Cuhvd.kNNdZX1yDqMj7BwymVWwDHtdW
-	INSERT OR IGNORE INTO users (username, email, password_hash, role, first_name, last_name, is_active) 
+	INSERT OR IGNORE INTO users (username, email, password_hash, role, first_name, last_name, is_active)
 	VALUES ('admin', 'admin@pi-controller.local', '$2a$10$zgl1xM6oW1wR6YaxKa/m/.Cuhvd.kNNdZX1yDqMj7BwymVWwDHtdW', 'admin', 'System', 'Administrator', 1);
 	`
 
@@ -576,7 +576,7 @@ func dropUsersTable(db *gorm.DB) error {
 	DROP INDEX IF EXISTS idx_users_role;
 	DROP INDEX IF EXISTS idx_users_email;
 	DROP INDEX IF EXISTS idx_users_username;
-	
+
 	-- Drop table
 	DROP TABLE IF EXISTS users;
 	`

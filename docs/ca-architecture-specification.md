@@ -5,6 +5,7 @@
 This technical specification defines a comprehensive Certificate Authority (CA) architecture for the Pi-Controller Kubernetes management platform. The system provides flexible certificate management supporting both self-signed development environments and enterprise-grade HashiCorp Vault PKI integration, with critical zero-trust security requirements ensuring cryptographic operations occur exclusively on server nodes.
 
 **Key Business Value:**
+
 - **Operational Security**: Zero-trust model with no keys stored on control machines
 - **Deployment Flexibility**: Seamless transition from development to production environments
 - **Compliance Ready**: Enterprise PKI standards with audit trails and key rotation
@@ -25,18 +26,21 @@ This technical specification defines a comprehensive Certificate Authority (CA) 
 ### 1.2 Decision Criteria Analysis
 
 **Local Self-Signed CA Advantages:**
+
 - Zero external dependencies
 - Immediate deployment capability
 - No recurring costs
 - Full control over certificate lifecycle
 
 **Local Self-Signed CA Disadvantages:**
+
 - Manual key rotation processes
 - Limited audit capabilities
 - No cross-cluster trust by default
 - Compliance challenges in regulated environments
 
 **Vault PKI Integration Advantages:**
+
 - Automated certificate rotation
 - Comprehensive audit logging
 - Cross-environment certificate trust
@@ -44,6 +48,7 @@ This technical specification defines a comprehensive Certificate Authority (CA) 
 - Compliance framework compatibility
 
 **Vault PKI Integration Disadvantages:**
+
 - Additional infrastructure requirements
 - Higher operational complexity
 - Vault licensing costs for enterprise features
@@ -52,6 +57,7 @@ This technical specification defines a comprehensive Certificate Authority (CA) 
 ### 1.3 Recommended Strategy
 
 **Primary Recommendation: Hybrid Architecture**
+
 - Default to Local Self-Signed CA for immediate operational capability
 - Provide seamless upgrade path to Vault PKI integration
 - Support both approaches simultaneously in multi-cluster environments
@@ -62,6 +68,7 @@ This technical specification defines a comprehensive Certificate Authority (CA) 
 ### 2.1 Two-Flow AppRole Authentication Architecture
 
 #### Flow 1: Existing AppRole Configuration
+
 **Use Case**: Pre-configured Vault environments with existing AppRole policies
 
 ```mermaid
@@ -69,7 +76,7 @@ sequenceDiagram
     participant Controller as Pi-Controller
     participant Vault as HashiCorp Vault
     participant Node as Pi Node
-    
+
     Controller->>Vault: Authenticate with Role ID + Secret ID
     Vault-->>Controller: Return Auth Token
     Controller->>Vault: Request Certificate Signing
@@ -79,6 +86,7 @@ sequenceDiagram
 ```
 
 **Configuration Parameters:**
+
 ```yaml
 vault:
   address: "https://vault.example.com:8200"
@@ -90,6 +98,7 @@ vault:
 ```
 
 #### Flow 2: Admin Token Bootstrap
+
 **Use Case**: New Vault deployments requiring initial AppRole creation
 
 ```mermaid
@@ -97,7 +106,7 @@ sequenceDiagram
     participant Admin as Admin User
     participant Controller as Pi-Controller
     participant Vault as HashiCorp Vault
-    
+
     Admin->>Controller: Configure Admin Token
     Controller->>Vault: Authenticate with Admin Token
     Controller->>Vault: Create AppRole Policy
@@ -108,6 +117,7 @@ sequenceDiagram
 ```
 
 **Bootstrap Configuration:**
+
 ```yaml
 vault:
   address: "https://vault.example.com:8200"
@@ -123,6 +133,7 @@ vault:
 ### 2.2 Vault PKI Engine Configuration
 
 #### PKI Mount Structure
+
 ```bash
 # Root CA (Long-lived, 10 years)
 vault secrets enable -path=pki pki
@@ -142,6 +153,7 @@ vault write pki_int/roles/pi-controller \
 ```
 
 #### Role-Based Certificate Policies
+
 ```hcl
 # pi-controller-pki.hcl
 path "pki_int/issue/pi-controller" {
@@ -160,6 +172,7 @@ path "pki_int/cert/*" {
 ### 2.3 Security Model for Vault Integration
 
 #### AppRole Security Best Practices
+
 1. **Role ID Distribution**: Store in configuration, treat as identifier
 2. **Secret ID Handling**: Environment variable only, never persisted
 3. **Token Rotation**: 24-hour token TTL with automatic renewal
@@ -167,6 +180,7 @@ path "pki_int/cert/*" {
 5. **Audit Integration**: Forward Vault audit logs to central logging
 
 #### Unsafe Development Mode
+
 ```yaml
 vault:
   address: "http://vault.dev.local:8200"
@@ -184,6 +198,7 @@ vault:
 K3s generates default self-signed certificates during installation. The Pi-Controller will replace these with CA-signed certificates during the provisioning process.
 
 #### Default K3s Certificate Locations
+
 ```bash
 /var/lib/rancher/k3s/server/tls/
 ├── server-ca.crt              # Replace with CA root
@@ -200,13 +215,14 @@ K3s generates default self-signed certificates during installation. The Pi-Contr
 ```
 
 #### Certificate Replacement Workflow
+
 ```mermaid
 sequenceDiagram
     participant Controller as Pi-Controller
     participant Node as Pi Node
     participant K3s as K3s Service
     participant Vault as Vault (Optional)
-    
+
     Controller->>Controller: Generate/Retrieve CA Certificates
     Controller->>Node: SSH Connect for Provisioning
     Node->>K3s: Stop K3s Service
@@ -229,6 +245,7 @@ sequenceDiagram
 ### 3.2 Certificate Template Specifications
 
 #### API Server Certificate Template
+
 ```yaml
 # api-server-cert-template.yaml
 common_name: "{{ .NodeName }}.pi-controller.local"
@@ -256,6 +273,7 @@ ttl: "8760h"  # 1 year
 ```
 
 #### etcd Certificate Template
+
 ```yaml
 # etcd-cert-template.yaml
 common_name: "{{ .NodeName }}-etcd"
@@ -280,6 +298,7 @@ ttl: "8760h"  # 1 year
 ### 3.3 K3s Configuration Integration
 
 #### Custom K3s Server Configuration
+
 ```yaml
 # /etc/rancher/k3s/config.yaml
 tls-san:
@@ -301,6 +320,7 @@ datastore-keyfile: "/var/lib/rancher/k3s/server/tls/etcd/server-client.key"
 The existing SSH client implementation will be enhanced to support Vault SSH certificate authentication, providing short-lived SSH certificates for secure node access.
 
 #### Vault SSH Engine Configuration
+
 ```bash
 # Enable SSH secrets engine
 vault secrets enable -path=ssh ssh
@@ -327,13 +347,14 @@ EOF
 ```
 
 #### SSH Certificate Authentication Flow
+
 ```mermaid
 sequenceDiagram
     participant Controller as Pi-Controller
     participant Vault as HashiCorp Vault
     participant SSH as SSH Client
     participant Node as Pi Node
-    
+
     Controller->>Vault: Request SSH Certificate
     Note over Controller: Include: Public Key, Username, Hostname
     Vault-->>Controller: Return Signed SSH Certificate
@@ -346,17 +367,18 @@ sequenceDiagram
 ### 4.2 SSH Client Configuration Enhancement
 
 #### Enhanced SSH Client Config Structure
+
 ```go
 // Enhanced SSHClientConfig with certificate support
 type SSHClientConfig struct {
     // Existing fields...
-    
+
     // Certificate authentication
     CertificateAuth    bool
     VaultSSHEngine     string
     VaultSSHRole       string
     CertificateTTL     time.Duration
-    
+
     // Certificate caching
     CertificateCache   string
     CacheMaxAge        time.Duration
@@ -367,25 +389,25 @@ func (c *SSHClient) setupCertificateAuth() (ssh.AuthMethod, error) {
     if !c.config.CertificateAuth {
         return nil, nil
     }
-    
+
     // Request certificate from Vault
     cert, err := c.requestSSHCertificate()
     if err != nil {
         return nil, err
     }
-    
+
     // Create signer with certificate
     signer, err := ssh.ParsePrivateKey(cert.PrivateKey)
     if err != nil {
         return nil, err
     }
-    
+
     // Add certificate to signer
     certSigner, err := ssh.NewCertSigner(cert.Certificate, signer)
     if err != nil {
         return nil, err
     }
-    
+
     return ssh.PublicKeys(certSigner), nil
 }
 ```
@@ -393,6 +415,7 @@ func (c *SSHClient) setupCertificateAuth() (ssh.AuthMethod, error) {
 ### 4.3 Certificate Lifecycle Management
 
 #### Automatic Certificate Renewal
+
 ```go
 type CertificateManager struct {
     vault          *VaultClient
@@ -403,7 +426,7 @@ type CertificateManager struct {
 
 func (cm *CertificateManager) startRenewalLoop() {
     cm.ticker = time.NewTicker(time.Hour)
-    
+
     go func() {
         for range cm.ticker.C {
             cm.checkAndRenewCertificates()
@@ -413,14 +436,14 @@ func (cm *CertificateManager) startRenewalLoop() {
 
 func (cm *CertificateManager) checkAndRenewCertificates() {
     certificates := cm.cache.GetExpiringCertificates(cm.renewalBuffer)
-    
+
     for _, cert := range certificates {
         newCert, err := cm.vault.RenewSSHCertificate(cert)
         if err != nil {
             cm.logger.WithError(err).Error("Failed to renew SSH certificate")
             continue
         }
-        
+
         cm.cache.StoreCertificate(cert.ID, newCert)
     }
 }
@@ -433,6 +456,7 @@ func (cm *CertificateManager) checkAndRenewCertificates() {
 **Fundamental Principle**: The control machine (Pi-Controller) must NEVER store, access, or operate with cryptographic private keys.
 
 #### Key Security Boundaries
+
 1. **Certificate Generation**: All private keys generated exclusively on target nodes
 2. **CSR Processing**: Control plane handles only Certificate Signing Requests
 3. **Certificate Distribution**: Signed certificates deployed via secure channels
@@ -441,6 +465,7 @@ func (cm *CertificateManager) checkAndRenewCertificates() {
 ### 5.2 Node-Based Cryptographic Operations
 
 #### Certificate Generation Workflow
+
 ```bash
 #!/bin/bash
 # On-node certificate generation script
@@ -472,6 +497,7 @@ curl -X POST \
 ### 5.3 Audit and Compliance Framework
 
 #### Certificate Authority Audit Trail
+
 ```go
 type CertificateAuditEvent struct {
     EventID       string    `json:"event_id"`
@@ -496,6 +522,7 @@ type AuditLogger interface {
 ```
 
 #### Compliance Integration Points
+
 - **FIPS 140-2**: Cryptographic module validation support
 - **Common Criteria**: Security evaluation standards compliance
 - **SOC 2 Type II**: Audit trail and access control requirements
@@ -506,6 +533,7 @@ type AuditLogger interface {
 ### 6.1 Multi-Cluster Certificate Management
 
 #### Cluster Certificate Hierarchy
+
 ```
 Root CA (10 year)
 ├── Cluster A Intermediate CA (1 year)
@@ -522,20 +550,21 @@ Root CA (10 year)
 ```
 
 #### Distributed Certificate Distribution
+
 ```mermaid
 graph TD
     A[Root CA Controller] --> B[Cluster A Controller]
     A --> C[Cluster B Controller]
     A --> D[Cluster N Controller]
-    
+
     B --> E[Node A1]
     B --> F[Node A2]
     B --> G[Node AN]
-    
+
     C --> H[Node B1]
     C --> I[Node B2]
     C --> J[Node BN]
-    
+
     D --> K[Node N1]
     D --> L[Node N2]
     D --> M[Node NN]
@@ -544,6 +573,7 @@ graph TD
 ### 6.2 Performance Optimization
 
 #### Certificate Caching Strategy
+
 ```go
 type CertificateCache struct {
     entries    map[string]*CachedCertificate
@@ -566,7 +596,7 @@ type CachedCertificate struct {
 func (cc *CertificateCache) GetCacheStats() CacheStats {
     cc.mutex.RLock()
     defer cc.mutex.RUnlock()
-    
+
     return CacheStats{
         Size:        len(cc.entries),
         MaxSize:     cc.maxSize,
@@ -577,6 +607,7 @@ func (cc *CertificateCache) GetCacheStats() CacheStats {
 ```
 
 #### Batch Certificate Operations
+
 ```go
 type BatchCertificateRequest struct {
     Requests []CertificateRequest `json:"requests"`
@@ -593,22 +624,22 @@ type BatchCertificateResponse struct {
 
 // Process multiple certificate requests in parallel
 func (ca *CertificateAuthority) ProcessBatchRequest(
-    ctx context.Context, 
+    ctx context.Context,
     batch BatchCertificateRequest,
 ) (*BatchCertificateResponse, error) {
-    
+
     semaphore := make(chan struct{}, 10) // Limit concurrent operations
     var wg sync.WaitGroup
     results := make(chan SignedCertificate, len(batch.Requests))
     errors := make(chan BatchError, len(batch.Requests))
-    
+
     for i, req := range batch.Requests {
         wg.Add(1)
         go func(index int, request CertificateRequest) {
             defer wg.Done()
             semaphore <- struct{}{} // Acquire
             defer func() { <-semaphore }() // Release
-            
+
             cert, err := ca.SignCertificate(ctx, request)
             if err != nil {
                 errors <- BatchError{Index: index, Error: err.Error()}
@@ -617,26 +648,26 @@ func (ca *CertificateAuthority) ProcessBatchRequest(
             results <- cert
         }(i, req)
     }
-    
+
     wg.Wait()
     close(results)
     close(errors)
-    
+
     // Collect results
     response := &BatchCertificateResponse{
         BatchID: batch.BatchID,
     }
-    
+
     for cert := range results {
         response.Certificates = append(response.Certificates, cert)
         response.SuccessCount++
     }
-    
+
     for err := range errors {
         response.Errors = append(response.Errors, err)
         response.ErrorCount++
     }
-    
+
     return response, nil
 }
 ```
@@ -646,6 +677,7 @@ func (ca *CertificateAuthority) ProcessBatchRequest(
 ### 7.1 Configuration Hierarchy
 
 #### Configuration Priority Order (Highest to Lowest)
+
 1. Command-line flags
 2. Environment variables
 3. Configuration file (YAML)
@@ -654,6 +686,7 @@ func (ca *CertificateAuthority) ProcessBatchRequest(
 #### Environment-Specific Configuration Templates
 
 **Development Environment**
+
 ```yaml
 # config/development.yaml
 certificate_authority:
@@ -663,20 +696,21 @@ certificate_authority:
   key_algorithm: "RSA"
   key_size: 2048
   organization: "Pi-Controller Development"
-  
+
 vault:
   enabled: false
-  
+
 tls:
   skip_verify: true       # Development only
   min_version: "1.2"
-  
+
 ssh:
   certificate_auth: false
   allow_password_auth: true
 ```
 
 **Staging Environment**
+
 ```yaml
 # config/staging.yaml  
 certificate_authority:
@@ -686,24 +720,25 @@ certificate_authority:
   key_algorithm: "ECDSA"
   key_size: 256
   organization: "Pi-Controller Staging"
-  
+
 vault:
   enabled: true
   address: "https://vault-staging.example.com:8200"
   pki_mount: "pki_staging"
   role_name: "pi-controller-staging"
   tls_skip_verify: false
-  
+
 tls:
   skip_verify: false
   min_version: "1.3"
-  
+
 ssh:
   certificate_auth: true
   certificate_ttl: "1h"
 ```
 
 **Production Environment**
+
 ```yaml
 # config/production.yaml
 certificate_authority:
@@ -713,7 +748,7 @@ certificate_authority:
   key_algorithm: "ECDSA"
   key_size: 384
   organization: "Pi-Controller Production"
-  
+
 vault:
   enabled: true
   address: "https://vault.example.com:8200"
@@ -722,7 +757,7 @@ vault:
   tls_skip_verify: false
   ha_enabled: true
   retry_attempts: 5
-  
+
 tls:
   skip_verify: false
   min_version: "1.3"
@@ -730,7 +765,7 @@ tls:
     - "TLS_AES_256_GCM_SHA384"
     - "TLS_CHACHA20_POLY1305_SHA256"
     - "TLS_AES_128_GCM_SHA256"
-  
+
 ssh:
   certificate_auth: true
   certificate_ttl: "30m"
@@ -740,6 +775,7 @@ ssh:
 ### 7.2 Configuration Validation
 
 #### Environment Validation Rules
+
 ```go
 type ConfigValidator struct {
     environment string
@@ -755,32 +791,32 @@ type ValidationRule struct {
 
 func (cv *ConfigValidator) ValidateConfig(config *Config) error {
     var errors []error
-    
+
     for _, rule := range cv.rules {
         if !cv.appliesToEnvironment(rule) {
             continue
         }
-        
+
         value := cv.getFieldValue(config, rule.Field)
-        
+
         if rule.Required && cv.isEmpty(value) {
-            errors = append(errors, fmt.Errorf("field %s is required in %s environment", 
+            errors = append(errors, fmt.Errorf("field %s is required in %s environment",
                 rule.Field, cv.environment))
             continue
         }
-        
+
         if rule.Validator != nil {
             if err := rule.Validator(value); err != nil {
-                errors = append(errors, fmt.Errorf("validation failed for %s: %w", 
+                errors = append(errors, fmt.Errorf("validation failed for %s: %w",
                     rule.Field, err))
             }
         }
     }
-    
+
     if len(errors) > 0 {
         return fmt.Errorf("configuration validation failed: %v", errors)
     }
-    
+
     return nil
 }
 
@@ -820,18 +856,19 @@ var productionRules = []ValidationRule{
 Let's Encrypt integration is designed exclusively for external-facing services, particularly ingress controllers and public APIs, while maintaining the internal CA for cluster-internal communication.
 
 #### Integration Architecture
+
 ```mermaid
 graph TD
     A[Ingress Controller] --> B[cert-manager]
     B --> C[Let's Encrypt ACME]
     B --> D[DNS Challenge Provider]
-    
+
     E[Internal Services] --> F[Internal CA]
     F --> G[Vault PKI / Local CA]
-    
+
     C --> H[External Certificate]
     G --> I[Internal Certificate]
-    
+
     H --> J[Public Traffic]
     I --> K[Cluster Traffic]
 ```
@@ -839,6 +876,7 @@ graph TD
 ### 8.2 cert-manager Integration
 
 #### cert-manager ClusterIssuer Configuration
+
 ```yaml
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -866,6 +904,7 @@ spec:
 ```
 
 #### Internal CA ClusterIssuer
+
 ```yaml
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -879,6 +918,7 @@ spec:
 ### 8.3 Dual Certificate Strategy
 
 #### Certificate Separation Policy
+
 ```yaml
 # External ingress with Let's Encrypt
 apiVersion: networking.k8s.io/v1
@@ -924,6 +964,7 @@ spec:
 ```
 
 #### Certificate Renewal Automation
+
 ```go
 type CertificateRenewalManager struct {
     certManager  *CertManagerClient
@@ -935,7 +976,7 @@ type CertificateRenewalManager struct {
 func (crm *CertificateRenewalManager) StartRenewalLoop(ctx context.Context) {
     ticker := time.NewTicker(12 * time.Hour) // Check twice daily
     defer ticker.Stop()
-    
+
     for {
         select {
         case <-ctx.Done():
@@ -953,7 +994,7 @@ func (crm *CertificateRenewalManager) checkAndRenewCertificates(ctx context.Cont
         crm.logger.WithError(err).Error("Failed to check external certificates")
         crm.metrics.RenewalErrors.WithLabelValues("external").Inc()
     }
-    
+
     for _, cert := range externalCerts {
         if err := crm.renewExternalCertificate(ctx, cert); err != nil {
             crm.logger.WithError(err).
@@ -964,14 +1005,14 @@ func (crm *CertificateRenewalManager) checkAndRenewCertificates(ctx context.Cont
             crm.metrics.RenewalSuccess.WithLabelValues("external").Inc()
         }
     }
-    
+
     // Check internal CA certificates
     internalCerts, err := crm.internalCA.GetExpiringCertificates(ctx, 72*time.Hour)
     if err != nil {
         crm.logger.WithError(err).Error("Failed to check internal certificates")
         crm.metrics.RenewalErrors.WithLabelValues("internal").Inc()
     }
-    
+
     for _, cert := range internalCerts {
         if err := crm.renewInternalCertificate(ctx, cert); err != nil {
             crm.logger.WithError(err).
@@ -988,30 +1029,35 @@ func (crm *CertificateRenewalManager) checkAndRenewCertificates(ctx context.Cont
 ## 9. Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-2)
+
 - Local Self-Signed CA implementation
 - Basic certificate generation and signing
 - CSR processing endpoints
 - Node certificate deployment via SSH
 
 ### Phase 2: Vault Integration (Weeks 3-4)  
+
 - Vault PKI engine integration
 - AppRole authentication flows
 - SSH certificate support
 - Configuration management
 
 ### Phase 3: K3s Integration (Weeks 5-6)
+
 - K3s certificate replacement workflows
 - Certificate template system
 - Cluster provisioning integration
 - Certificate lifecycle management
 
 ### Phase 4: Advanced Features (Weeks 7-8)
+
 - cert-manager integration
 - Let's Encrypt external certificates
 - Multi-cluster certificate management
 - Performance optimization
 
 ### Phase 5: Production Hardening (Weeks 9-10)
+
 - Security audit and compliance
 - Performance testing and optimization
 - Documentation and operational runbooks
@@ -1020,17 +1066,20 @@ func (crm *CertificateRenewalManager) checkAndRenewCertificates(ctx context.Cont
 ## 10. Risk Assessment and Mitigation
 
 ### High-Risk Items
+
 1. **Certificate Key Exposure**: Mitigated by zero-trust node-only key generation
 2. **Vault Connectivity Failure**: Mitigated by local CA fallback capability
 3. **Certificate Expiration**: Mitigated by automated renewal and monitoring
 4. **CA Compromise**: Mitigated by intermediate CA strategy and key rotation
 
 ### Medium-Risk Items
+
 1. **Performance Impact**: Mitigated by certificate caching and batch operations
 2. **Configuration Complexity**: Mitigated by environment-specific templates
 3. **Cross-Cluster Trust**: Mitigated by hierarchical CA architecture
 
 ### Low-Risk Items
+
 1. **Let's Encrypt Rate Limits**: Mitigated by staging environment testing
 2. **cert-manager Dependencies**: Mitigated by optional integration design
 
@@ -1039,6 +1088,7 @@ func (crm *CertificateRenewalManager) checkAndRenewCertificates(ctx context.Cont
 This comprehensive CA architecture provides a robust, scalable, and secure foundation for certificate management in the Pi-Controller ecosystem. The hybrid approach ensures immediate operational capability while providing clear upgrade paths to enterprise-grade security standards.
 
 **Key Success Metrics:**
+
 - Zero cryptographic key exposure on control machines
 - Sub-5-minute certificate provisioning times
 - 99.9% certificate availability uptime
@@ -1046,6 +1096,7 @@ This comprehensive CA architecture provides a robust, scalable, and secure found
 - Full audit compliance for regulated environments
 
 **Business Impact:**
+
 - Reduced operational security risks through zero-trust design
 - Lowered total cost of ownership through flexible deployment options
 - Enhanced compliance posture for enterprise adoption

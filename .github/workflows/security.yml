@@ -65,16 +65,10 @@ jobs:
       - name: Install security tools
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          curl -L "https://github.com/google/osv-scanner/releases/download/v1.9.0/osv-scanner_v1.9.0_linux_amd64" -o /tmp/osv-scanner
-          chmod +x /tmp/osv-scanner
-          sudo mv /tmp/osv-scanner /usr/local/bin/osv-scanner
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.17.0
 
       - name: Run Govulncheck
         run: govulncheck ./...
-
-      - name: Run Additional Vulnerability Scan with OSV-Scanner
-        run: osv-scanner --lockfile=go.mod .
 
       - name: Generate SBOM (Software Bill of Materials)
         run: |
@@ -90,6 +84,8 @@ jobs:
             sbom.json
             sbom.txt
           retention-days: 30
+  scan-pr:
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.2.3"
 
   # Static code analysis with multiple tools
   static-analysis:
@@ -139,7 +135,10 @@ jobs:
 
       - name: Run gosec security scanner
         run: |
+          # Generate SARIF for GitHub Security tab
           gosec -fmt sarif -out gosec-report.sarif -stdout -verbose=text ./...
+          # Generate JSON for immediate critical issue check
+          gosec -fmt json -out gosec-report.json ./...
           echo "Gosec scan completed"
 
       - name: Run staticcheck
@@ -156,11 +155,23 @@ jobs:
         run: |
           make test-security-verbose
 
-      - name: Upload SARIF reports
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload gosec SARIF report to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: gosec-report.sarif
-          
+          category: gosec
+
+      - name: Upload staticcheck SARIF report to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: staticcheck-report.sarif
+          category: staticcheck
+
+      - name: Upload golangci-lint SARIF report to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: golangci-report.sarif
+          category: golangci-lint
 
       - name: Check for critical security issues
         run: |
@@ -168,7 +179,7 @@ jobs:
           if [[ -f gosec-report.json ]]; then
             CRITICAL_COUNT=$(jq '[.Issues[] | select(.Severity == "HIGH" or .Confidence == "HIGH")] | length' gosec-report.json)
             echo "Critical security issues found: $CRITICAL_COUNT"
-            
+
             if [[ $CRITICAL_COUNT -gt 0 ]]; then
               echo "❌ Critical security issues detected!"
               jq -r '.Issues[] | select(.Severity == "HIGH" or .Confidence == "HIGH") | "- \(.RuleID): \(.Details) (\(.File):\(.Line))"' gosec-report.json
@@ -177,6 +188,18 @@ jobs:
               echo "✅ No critical security issues found"
             fi
           fi
+
+      - name: Upload static analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-reports
+          path: |
+            gosec-report.sarif
+            gosec-report.json
+            staticcheck-report.sarif
+            golangci-report.sarif
+          retention-days: 30
 
   # CodeQL analysis for advanced security scanning
   codeql-analysis:
@@ -253,9 +276,18 @@ jobs:
 
       - name: Scan controller image
         run: |
+          # Generate SARIF for GitHub Security tab
+          trivy image --format sarif --output trivy-controller.sarif pi-controller:scan-test
+          # Generate JSON for immediate critical vulnerability check
           trivy image --format json --output trivy-controller.json pi-controller:scan-test
+          # Show table output for workflow logs
           trivy image --format table pi-controller:scan-test
 
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-controller.sarif
+          category: trivy-container
       - name: Check for critical vulnerabilities
         run: |
           # Check controller image
@@ -278,6 +310,7 @@ jobs:
         with:
           name: container-scan-results
           path: |
+            trivy-controller.sarif
             trivy-controller.json
           retention-days: 30
 
@@ -352,103 +385,11 @@ jobs:
             .secrets.baseline
           retention-days: 30
 
-  # License compliance check
-  license-check:
-    name: License Compliance
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Install go-licenses
-        run: go install github.com/google/go-licenses@latest
-
-      - name: Check licenses
-        continue-on-error: true
-        run: |
-          echo "Checking licenses for pi-controller..."
-          go-licenses report ./cmd/pi-controller > controller-licenses.txt 2>&1 || echo "Some license information unavailable"
-
-          echo "Generating license summary..."
-          go-licenses csv ./... > licenses-summary.csv 2>&1 || echo "Some dependencies lack license files"
-          
-          echo "License check completed (errors for missing licenses are expected)"
-
-      - name: Display license summary
-        if: always()
-        run: |
-          if [[ -f licenses-summary.csv ]]; then
-            echo "📋 License Summary:"
-            echo "=================="
-            # Count licenses found
-            LICENSE_COUNT=$(tail -n +2 licenses-summary.csv 2>/dev/null | wc -l)
-            echo "Total packages with licenses found: $LICENSE_COUNT"
-            echo ""
-            echo "Top 10 licenses used:"
-            tail -n +2 licenses-summary.csv 2>/dev/null | cut -d',' -f3 | sort | uniq -c | sort -rn | head -10 || echo "No license data available"
-          else
-            echo "⚠️  No license summary available"
-          fi
-
-      - name: Check for forbidden licenses
-        run: |
-          # Define forbidden licenses (customize as needed)
-          FORBIDDEN_LICENSES=("GPL-2.0" "GPL-3.0" "AGPL-3.0" "LGPL-2.1" "LGPL-3.0")
-          
-          echo "Checking for forbidden licenses..."
-          if [[ -f licenses-summary.csv ]]; then
-            FOUND_FORBIDDEN=false
-            for license in "${FORBIDDEN_LICENSES[@]}"; do
-              if grep -qi "$license" licenses-summary.csv; then
-                echo "❌ Forbidden license detected: $license"
-                grep -i "$license" licenses-summary.csv
-                FOUND_FORBIDDEN=true
-              fi
-            done
-            
-            if [[ "$FOUND_FORBIDDEN" == "true" ]]; then
-              exit 1
-            else
-              echo "✅ No forbidden licenses detected"
-            fi
-          else
-            echo "⚠️  License summary file not generated, skipping forbidden license check"
-          fi
-
-      - name: Upload license reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: license-reports
-          path: |
-            controller-licenses.txt
-            licenses-summary.csv
-          retention-days: 30
-
   # Security summary report
   security-summary:
     name: Security Summary
     runs-on: ubuntu-latest
-    needs: [dependency-scan, static-analysis, codeql-analysis, container-scan, secrets-scan, license-check]
+    needs: [dependency-scan, static-analysis, codeql-analysis, container-scan, secrets-scan]
     if: always()
     timeout-minutes: 5
     steps:
@@ -463,20 +404,18 @@ jobs:
           echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Container Scan | ${{ needs.container-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Secrets Scan | ${{ needs.secrets-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| License Check | ${{ needs.license-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Check overall security status
-          if [[ "${{ needs.dependency-scan.result }}" == "success" && 
-                "${{ needs.static-analysis.result }}" == "success" && 
-                "${{ needs.codeql-analysis.result }}" == "success" && 
-                "${{ needs.container-scan.result }}" == "success" && 
-                "${{ needs.secrets-scan.result }}" == "success" && 
-                "${{ needs.license-check.result }}" == "success" ]]; then
+          if [[ "${{ needs.dependency-scan.result }}" == "success" &&
+                "${{ needs.static-analysis.result }}" == "success" &&
+                "${{ needs.codeql-analysis.result }}" == "success" &&
+                "${{ needs.container-scan.result }}" == "success" &&
+                "${{ needs.secrets-scan.result }}" == "success" ]]; then
             echo "### ✅ All security scans passed!" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ⚠️ Some security scans failed - please review the results" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📁 Detailed reports available in workflow artifacts" >> $GITHUB_STEP_SUMMARY

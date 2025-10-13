@@ -44,6 +44,7 @@ pi-controller-mcp/
 ### 2.1 Cluster Management Tools
 
 #### `create_cluster`
+
 Create a new cluster definition.
 
 ```typescript
@@ -65,6 +66,7 @@ Create a new cluster definition.
 **API Mapping:** `POST /api/v1/clusters`
 
 #### `list_clusters`
+
 List all clusters with optional filtering.
 
 ```typescript
@@ -84,6 +86,7 @@ List all clusters with optional filtering.
 **API Mapping:** `GET /api/v1/clusters`
 
 #### `get_cluster_status`
+
 Get detailed cluster status including nodes and health.
 
 ```typescript
@@ -103,6 +106,7 @@ Get detailed cluster status including nodes and health.
 **API Mapping:** `GET /api/v1/clusters/{id}/status`
 
 #### `provision_cluster`
+
 Provision a K3s cluster on physical nodes.
 
 ```typescript
@@ -134,6 +138,7 @@ Provision a K3s cluster on physical nodes.
 **API Mapping:** `POST /api/v1/clusters/{id}/provision`
 
 #### `scale_cluster`
+
 Scale cluster to specified node count.
 
 ```typescript
@@ -155,6 +160,7 @@ Scale cluster to specified node count.
 **API Mapping:** `POST /api/v1/clusters/{id}/scale`
 
 #### `delete_cluster`
+
 Delete a cluster definition.
 
 ```typescript
@@ -176,6 +182,7 @@ Delete a cluster definition.
 ### 2.2 Node Management Tools
 
 #### `discover_nodes`
+
 List all discovered nodes with filtering.
 
 ```typescript
@@ -197,6 +204,7 @@ List all discovered nodes with filtering.
 **API Mapping:** `GET /api/v1/nodes`
 
 #### `get_node_info`
+
 Get detailed node information.
 
 ```typescript
@@ -217,6 +225,7 @@ Get detailed node information.
 **API Mapping:** `GET /api/v1/nodes/{id}`
 
 #### `register_node`
+
 Manually register a node.
 
 ```typescript
@@ -240,6 +249,7 @@ Manually register a node.
 **API Mapping:** `POST /api/v1/nodes`
 
 #### `provision_node`
+
 Provision K3s on a single node.
 
 ```typescript
@@ -262,6 +272,7 @@ Provision K3s on a single node.
 **API Mapping:** `POST /api/v1/nodes/{id}/provision`
 
 #### `deprovision_node`
+
 Remove K3s from a node.
 
 ```typescript
@@ -284,6 +295,7 @@ Remove K3s from a node.
 ### 2.3 GPIO Control Tools
 
 #### `list_gpio_devices`
+
 List all GPIO devices.
 
 ```typescript
@@ -304,6 +316,7 @@ List all GPIO devices.
 **API Mapping:** `GET /api/v1/gpio`
 
 #### `create_gpio_device`
+
 Register a new GPIO device.
 
 ```typescript
@@ -327,6 +340,7 @@ Register a new GPIO device.
 **API Mapping:** `POST /api/v1/gpio`
 
 #### `read_gpio_pin`
+
 Read current GPIO pin value.
 
 ```typescript
@@ -346,6 +360,7 @@ Read current GPIO pin value.
 **API Mapping:** `POST /api/v1/gpio/{id}/read`
 
 #### `write_gpio_pin`
+
 Write value to GPIO pin.
 
 ```typescript
@@ -366,6 +381,7 @@ Write value to GPIO pin.
 **API Mapping:** `POST /api/v1/gpio/{id}/write`
 
 #### `reserve_gpio_pin`
+
 Reserve GPIO pin for exclusive use.
 
 ```typescript
@@ -387,6 +403,7 @@ Reserve GPIO pin for exclusive use.
 **API Mapping:** `POST /api/v1/gpio/{id}/reserve`
 
 #### `release_gpio_pin`
+
 Release GPIO pin reservation.
 
 ```typescript
@@ -407,6 +424,7 @@ Release GPIO pin reservation.
 **API Mapping:** `POST /api/v1/gpio/{id}/release`
 
 #### `get_gpio_readings`
+
 Get historical GPIO readings.
 
 ```typescript
@@ -430,6 +448,7 @@ Get historical GPIO readings.
 ### 2.4 Deployment Tools
 
 #### `deploy_pod`
+
 Deploy a Kubernetes pod.
 
 ```typescript
@@ -453,6 +472,7 @@ Deploy a Kubernetes pod.
 **API Mapping:** `POST /api/v1/deployments/pods`
 
 #### `get_pod`
+
 Get pod information.
 
 ```typescript
@@ -473,6 +493,7 @@ Get pod information.
 **API Mapping:** `GET /api/v1/deployments/clusters/{cluster_id}/pods/{name}`
 
 #### `delete_pod`
+
 Delete a pod.
 
 ```typescript
@@ -495,6 +516,7 @@ Delete a pod.
 ### 2.5 Certificate Authority Tools
 
 #### `initialize_ca`
+
 Initialize the Certificate Authority.
 
 ```typescript
@@ -516,6 +538,7 @@ Initialize the Certificate Authority.
 **API Mapping:** `POST /api/v1/ca/initialize`
 
 #### `issue_certificate`
+
 Issue a new certificate.
 
 ```typescript
@@ -539,6 +562,7 @@ Issue a new certificate.
 **API Mapping:** `POST /api/v1/ca/certificates`
 
 #### `list_certificates`
+
 List all certificates.
 
 ```typescript
@@ -557,6 +581,7 @@ List all certificates.
 **API Mapping:** `GET /api/v1/ca/certificates`
 
 #### `revoke_certificate`
+
 Revoke a certificate.
 
 ```typescript
@@ -583,6 +608,7 @@ Resources provide read-only context about cluster state.
 ### 3.1 Cluster Resources
 
 #### `cluster://{cluster_id}/status`
+
 Real-time cluster status and health.
 
 ```typescript
@@ -595,6 +621,7 @@ Real-time cluster status and health.
 ```
 
 **Response:**
+
 ```json
 {
   "cluster_id": 1,
@@ -616,6 +643,7 @@ Real-time cluster status and health.
 ```
 
 #### `cluster://{cluster_id}/nodes`
+
 List of nodes in cluster with health.
 
 ```typescript
@@ -630,6 +658,7 @@ List of nodes in cluster with health.
 ### 3.2 Node Resources
 
 #### `node://{node_id}/info`
+
 Detailed node information.
 
 ```typescript
@@ -642,6 +671,7 @@ Detailed node information.
 ```
 
 **Response:**
+
 ```json
 {
   "id": 1,
@@ -660,6 +690,7 @@ Detailed node information.
 ```
 
 #### `node://{node_id}/metrics`
+
 Real-time node metrics.
 
 ```typescript
@@ -672,6 +703,7 @@ Real-time node metrics.
 ```
 
 **Response:**
+
 ```json
 {
   "cpu_usage_percent": 35.2,
@@ -687,6 +719,7 @@ Real-time node metrics.
 ```
 
 #### `node://{node_id}/gpio`
+
 GPIO device list and states.
 
 ```typescript
@@ -701,6 +734,7 @@ GPIO device list and states.
 ### 3.3 GPIO Resources
 
 #### `gpio://{gpio_id}/state`
+
 Current GPIO device state.
 
 ```typescript
@@ -713,6 +747,7 @@ Current GPIO device state.
 ```
 
 **Response:**
+
 ```json
 {
   "id": 15,
@@ -729,6 +764,7 @@ Current GPIO device state.
 ### 3.4 System Resources
 
 #### `system://health`
+
 Overall system health.
 
 ```typescript
@@ -741,6 +777,7 @@ Overall system health.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -868,6 +905,7 @@ interface MCPError {
 ### 6.3 User-Friendly Error Messages
 
 Examples:
+
 - ❌ `HTTP 401 Unauthorized`
 - ✅ `Authentication failed. Please check your PI_CONTROLLER_USERNAME and PI_CONTROLLER_PASSWORD in .mcp.json`
 
@@ -914,18 +952,21 @@ tool "create_gpio_device" {
 ## 8. Testing Strategy
 
 ### 8.1 Unit Tests
+
 - Test each tool's API client calls
 - Mock pi-controller responses
 - Test error handling paths
 - Validate input schemas
 
 ### 8.2 Integration Tests
+
 - Test against real pi-controller instance
 - Verify authentication flows
 - Test RBAC enforcement
 - Validate resource URIs
 
 ### 8.3 E2E Tests (with AI)
+
 - Claude Code creates cluster
 - AI provisions nodes
 - AI controls GPIO
@@ -978,6 +1019,7 @@ MCP server for managing Raspberry Pi K3s clusters via AI.
 ## 10. Implementation Phases
 
 ### Phase 1: Core Infrastructure (Week 1)
+
 - [ ] Project scaffolding
 - [ ] API client with authentication
 - [ ] Basic cluster tools (list, get, create)
@@ -985,24 +1027,28 @@ MCP server for managing Raspberry Pi K3s clusters via AI.
 - [ ] Error handling
 
 ### Phase 2: Node & Provisioning (Week 2)
+
 - [ ] Node management tools
 - [ ] Provisioning tools
 - [ ] Node resources
 - [ ] SSH configuration handling
 
 ### Phase 3: GPIO Control (Week 3)
+
 - [ ] GPIO management tools
 - [ ] GPIO read/write operations
 - [ ] GPIO resources
 - [ ] Pin reservation system
 
 ### Phase 4: Advanced Features (Week 4)
+
 - [ ] Deployment tools
 - [ ] CA management tools
 - [ ] Batch operations
 - [ ] Enhanced error messages
 
 ### Phase 5: Polish & Release
+
 - [ ] Comprehensive testing
 - [ ] Documentation
 - [ ] npm package publishing
@@ -1011,16 +1057,19 @@ MCP server for managing Raspberry Pi K3s clusters via AI.
 ## 11. Success Metrics
 
 ### Developer Experience
+
 - Time to first cluster: < 5 minutes
 - Command success rate: > 95%
 - Error message clarity: User can fix without docs
 
 ### AI Experience
+
 - Tool discovery: AI can find right tool for task
 - Resource context: AI can access cluster state
 - Error recovery: AI can retry with corrections
 
 ### System Performance
+
 - Tool response time: < 2 seconds (90th percentile)
 - Resource fetch time: < 1 second (90th percentile)
 - Token refresh: Transparent to user
@@ -1066,6 +1115,7 @@ MIT License - Same as pi-controller
 ## Appendix A: Complete Tool List
 
 ### Cluster Management (6 tools)
+
 - `create_cluster` - Create cluster definition
 - `list_clusters` - List all clusters
 - `get_cluster_status` - Get cluster details
@@ -1074,6 +1124,7 @@ MIT License - Same as pi-controller
 - `delete_cluster` - Delete cluster
 
 ### Node Management (5 tools)
+
 - `discover_nodes` - List discovered nodes
 - `get_node_info` - Get node details
 - `register_node` - Manually register node
@@ -1081,6 +1132,7 @@ MIT License - Same as pi-controller
 - `deprovision_node` - Remove K3s from node
 
 ### GPIO Control (8 tools)
+
 - `list_gpio_devices` - List GPIO devices
 - `create_gpio_device` - Register GPIO device
 - `read_gpio_pin` - Read pin value
@@ -1091,11 +1143,13 @@ MIT License - Same as pi-controller
 - `delete_gpio_device` - Remove GPIO device
 
 ### Deployment (3 tools)
+
 - `deploy_pod` - Deploy Kubernetes pod
 - `get_pod` - Get pod info
 - `delete_pod` - Delete pod
 
 ### Certificate Authority (4 tools)
+
 - `initialize_ca` - Initialize CA
 - `issue_certificate` - Issue new cert
 - `list_certificates` - List all certs
@@ -1106,18 +1160,22 @@ MIT License - Same as pi-controller
 ## Appendix B: Complete Resource List
 
 ### Cluster Resources (2 resources)
+
 - `cluster://{cluster_id}/status` - Cluster status
 - `cluster://{cluster_id}/nodes` - Cluster nodes
 
 ### Node Resources (3 resources)
+
 - `node://{node_id}/info` - Node information
 - `node://{node_id}/metrics` - Node metrics
 - `node://{node_id}/gpio` - GPIO devices
 
 ### GPIO Resources (1 resource)
+
 - `gpio://{gpio_id}/state` - GPIO state
 
 ### System Resources (1 resource)
+
 - `system://health` - System health
 
 **Total: 7 resources**

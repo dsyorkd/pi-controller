@@ -59,7 +59,7 @@ jobs:
           #   goarm: 6
           #   name: linux-armv6
           #   primary: true
-          
+
           # macOS builds
           - goos: darwin
             goarch: amd64
@@ -69,7 +69,7 @@ jobs:
             goarch: arm64
             name: darwin-arm64
             primary: false
-          
+
           # Windows builds
           - goos: windows
             goarch: amd64
@@ -79,7 +79,7 @@ jobs:
             goarch: arm64
             name: windows-arm64
             primary: false
-          
+
           # BSD variants
           # - goos: freebsd
           #   goarch: amd64
@@ -93,7 +93,7 @@ jobs:
           #   goarch: amd64
           #   name: netbsd-amd64
           #   primary: false
-          
+
 
 
     steps:
@@ -160,7 +160,7 @@ jobs:
         if: matrix.primary == true
         run: |
           cd dist/${{ matrix.name }}
-          
+
           # Test that binaries exist and are executable
           if [[ "${{ matrix.goos }}" != "windows" ]]; then
             chmod +x pi-controller
@@ -176,11 +176,11 @@ jobs:
       - name: Generate build info
         run: |
           cd dist/${{ matrix.name }}
-          
+
           cat > BUILD_INFO.txt << EOF
           Pi Controller Build Information
           ==============================
-          
+
           Platform: ${{ matrix.goos }}/${{ matrix.goarch }}
           Go Version: ${{ env.GO_VERSION }}
           Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
@@ -188,7 +188,7 @@ jobs:
           Git Tag: $(git describe --tags --always --dirty)
           Workflow: ${{ github.workflow }}
           Run ID: ${{ github.run_id }}
-          
+
           Files in this build:
           $(ls -la)
           EOF
@@ -196,7 +196,7 @@ jobs:
       - name: Create checksums
         run: |
           cd dist/${{ matrix.name }}
-          
+
           if command -v sha256sum > /dev/null; then
             sha256sum * > SHA256SUMS
           elif command -v shasum > /dev/null; then
@@ -208,7 +208,7 @@ jobs:
         with:
           name: pi-controller-${{ matrix.name }}
           path: dist/${{ matrix.name }}/
-          
+
 
       - name: Create build manifest
         if: matrix.primary == true
@@ -295,20 +295,20 @@ jobs:
       - name: Test binaries on hardware
         run: |
           cd test-${{ matrix.arch }}
-          
+
           # Make binaries executable
           chmod +x pi-controller
 
           # Test version commands
           echo "Testing pi-controller..."
           timeout 10s ./pi-controller --version || echo "Controller version test completed"
-          
+
           # Test configuration parsing (if config exists)
           if [[ -f "../config/controller.example.yml" ]]; then
             echo "Testing configuration parsing..."
             timeout 5s ./pi-controller --config-file=../config/controller.example.yml --dry-run || echo "Config test completed"
           fi
-          
+
           echo "Hardware testing completed successfully for ${{ matrix.arch }}"
 
   # Generate build summary report
@@ -329,11 +329,11 @@ jobs:
         run: |
           echo "# 🏗️ Multi-Architecture Build Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Count successful builds
           SUCCESSFUL_BUILDS=0
           TOTAL_BUILDS=0
-          
+
           if [[ -d "./manifests" ]]; then
             for manifest in ./manifests/*/successful_builds.txt; do
               if [[ -f "$manifest" ]]; then
@@ -344,7 +344,7 @@ jobs:
               fi
             done
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Successful Builds**: $SUCCESSFUL_BUILDS" >> $GITHUB_STEP_SUMMARY
@@ -357,7 +357,7 @@ jobs:
         run: |
           # Define minimum required successful builds (primary platforms)
           MIN_REQUIRED=3  # linux-amd64, linux-arm64, linux-armv7
-          
+
           # Count successful primary builds
           PRIMARY_SUCCESS=0
           if [[ -d "./manifests" ]]; then
@@ -371,9 +371,9 @@ jobs:
               fi
             done
           fi
-          
+
           echo "Primary platform builds successful: $PRIMARY_SUCCESS / $MIN_REQUIRED"
-          
+
           if [[ $PRIMARY_SUCCESS -ge $MIN_REQUIRED ]]; then
             echo "✅ Multi-architecture build succeeded!"
             exit 0

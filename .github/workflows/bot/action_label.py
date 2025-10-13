@@ -14,25 +14,25 @@ ALL_LABEL_ACTIONS = [
 class ActionLabel(Action):
     def __init__(self):
         pass
-    
+
     def isMatched(self, actionRequest):
         if actionRequest.event_type not in ['issue']:
             return False
         if actionRequest.action not in ['labeled']:
             return False
         return True
-    
+
     def action(self, request):
         matched = False
-        
+
         for label_action in ALL_LABEL_ACTIONS:
             __label_action = label_action()
             if __label_action.isMatched(request):
                 matched = True
-                time.sleep(1 + random.uniform(0.5, 1.5)) # jitter 
+                time.sleep(1 + random.uniform(0.5, 1.5)) # jitter
                 __label_action.action(request)
 
         if not matched:
             return "No label action matched"
-        
+
         return "labeled related actions succeed"

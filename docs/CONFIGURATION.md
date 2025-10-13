@@ -13,17 +13,20 @@ This guide covers the unified configuration system supporting binary, Docker, an
 ## Quick Start
 
 ### Binary Deployment
+
 ```bash
 pi-controller -c config.yaml --webui-enabled --webui-port 3000
 ```
 
 ### Environment Variables
+
 ```bash
 export PI_CONTROLLER_WEBUI_PORT=3000
 export PI_CONTROLLER_WEBUI_BACKEND_API_URL=http://localhost:8080
 ```
 
 ### Kubernetes
+
 ```bash
 kubectl apply -f config/crd/picontrollerwebui-crd.yaml
 kubectl apply -f config/examples/picontrollerwebui-example.yaml

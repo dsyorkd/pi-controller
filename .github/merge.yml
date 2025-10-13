@@ -25,7 +25,7 @@ pull_request_rules:
   actions:
     comment:
       message: This pull request is now in conflict. Could you fix it @{{author}}? 🙏
-  
+
 - name: Ask for review from code owners
   conditions:
   - check-failure="Build binaries (x64)"

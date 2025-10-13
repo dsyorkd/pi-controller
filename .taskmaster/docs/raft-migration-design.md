@@ -21,6 +21,7 @@ When Kubernetes (K3s) is installed on a cluster running pi-controller via system
    - Record current Raft cluster configuration (members, leader)
 
 2. **Deploy DaemonSet (Different Ports)**
+
    ```yaml
    # DaemonSet configuration
    ports:
@@ -52,6 +53,7 @@ When Kubernetes (K3s) is installed on a cluster running pi-controller via system
 ### Phase 3: Traffic Cutover
 
 1. **Update Load Balancer / Service**
+
    ```yaml
    # K8s Service for pi-controller
    apiVersion: v1
@@ -81,6 +83,7 @@ When Kubernetes (K3s) is installed on a cluster running pi-controller via system
 ### Phase 4: Systemd Shutdown
 
 1. **Stop systemd Services**
+
    ```bash
    # On each node
    sudo systemctl stop pi-controller
@@ -93,6 +96,7 @@ When Kubernetes (K3s) is installed on a cluster running pi-controller via system
 ### Phase 5: Port Migration
 
 1. **Update DaemonSet to Standard Ports**
+
    ```yaml
    # Update DaemonSet configuration
    ports:
@@ -106,6 +110,7 @@ When Kubernetes (K3s) is installed on a cluster running pi-controller via system
    - Raft cluster maintains quorum during rolling update
 
 3. **Update Service**
+
    ```yaml
    # Update Service to point to standard ports
    ports:
@@ -123,12 +128,14 @@ When Kubernetes (K3s) is installed on a cluster running pi-controller via system
 ### Phase 6: Cleanup
 
 1. **Remove systemd Service Files**
+
    ```bash
    sudo rm /etc/systemd/system/pi-controller.service
    sudo systemctl daemon-reload
    ```
 
 2. **Archive Old Data**
+
    ```bash
    # Move old data to archive location
    sudo mv /var/lib/pi-controller /var/lib/pi-controller.systemd.backup
@@ -226,6 +233,7 @@ pi-controller migrate complete \
    - Keep systemd services stopped but not removed
    - Preserve systemd data in archive
    - Can restart systemd cluster if DaemonSet fails
+
    ```bash
    # Emergency rollback
    pi-controller migrate rollback \

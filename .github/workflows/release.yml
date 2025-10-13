@@ -149,10 +149,10 @@ jobs:
           VERSION: ${{ needs.validate-release.outputs.version }}
         run: |
           make build
-          
+
           # Create release directory structure
           mkdir -p release/${{ matrix.name }}
-          
+
           # Copy binaries with proper naming
           cd build
           for binary in pi-controller-* pi-agent-*; do
@@ -169,11 +169,11 @@ jobs:
       - name: Create release package
         run: |
           cd release/${{ matrix.name }}
-          
+
           # Add README and LICENSE
           cp ../../README.md . || echo "# Pi Controller" > README.md
           cp ../../LICENSE . || echo "MIT License" > LICENSE
-          
+
           # Create example configs
           mkdir -p config
           if [[ -f "../../config/controller.example.yml" ]]; then
@@ -182,7 +182,7 @@ jobs:
           if [[ -f "../../config/agent.example.yml" ]]; then
             cp ../../config/agent.example.yml config/
           fi
-          
+
           # Create systemd service files for Linux builds
           if [[ "${{ matrix.goos }}" == "linux" ]]; then
             mkdir -p systemd
@@ -190,65 +190,65 @@ jobs:
           [Unit]
           Description=Pi Controller Service
           After=network.target
-          
+
           [Service]
           Type=simple
           User=pi-controller
           ExecStart=/usr/local/bin/pi-controller
           Restart=always
           RestartSec=5
-          
+
           [Install]
           WantedBy=multi-user.target
           EOF
-          
+
             cat > systemd/pi-agent.service << 'EOF'
           [Unit]
           Description=Pi Agent Service
           After=network.target
-          
+
           [Service]
           Type=simple
           User=pi-agent
           ExecStart=/usr/local/bin/pi-agent
           Restart=always
           RestartSec=5
-          
+
           [Install]
           WantedBy=multi-user.target
           EOF
           fi
-          
+
           # Create installation script
           cat > install.sh << 'EOF'
           #!/bin/bash
           set -e
-          
+
           PREFIX=${PREFIX:-/usr/local}
           SUDO=${SUDO:-sudo}
-          
+
           echo "Installing Pi Controller binaries to ${PREFIX}/bin/"
           $SUDO mkdir -p ${PREFIX}/bin
           $SUDO cp pi-controller pi-agent ${PREFIX}/bin/
           $SUDO chmod +x ${PREFIX}/bin/pi-controller ${PREFIX}/bin/pi-agent
-          
+
           echo "Installing configuration files to /etc/pi-controller/"
           $SUDO mkdir -p /etc/pi-controller
           if [[ -d "config" ]]; then
             $SUDO cp -r config/* /etc/pi-controller/
           fi
-          
+
           if [[ -d "systemd" && -d "/etc/systemd/system" ]]; then
             echo "Installing systemd service files..."
             $SUDO cp systemd/*.service /etc/systemd/system/
             $SUDO systemctl daemon-reload
             echo "Enable services with: sudo systemctl enable pi-controller pi-agent"
           fi
-          
+
           echo "Installation complete!"
           EOF
           chmod +x install.sh
-          
+
           # Create archive
           if [[ "${{ matrix.goos }}" == "windows" ]]; then
             zip -r "../pi-controller-${{ needs.validate-release.outputs.version }}-${{ matrix.name }}.zip" .
@@ -338,14 +338,14 @@ jobs:
           cd release-test
           tar -xzf pi-controller-*.tar.gz
           cd pi-controller-*/
-          
+
           # Test binaries run without errors
           ./pi-controller --version
           ./pi-agent --version
-          
+
           # Test installation script
           bash install.sh --dry-run || echo "Install script validation complete"
-          
+
           echo "Release artifacts tested successfully on Raspberry Pi hardware!"
 
   # Create GitHub release
@@ -384,33 +384,33 @@ jobs:
             echo "No previous tags found, generating changelog from initial commit..."
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
           fi
-          
+
           cat > release-notes.md << EOF
           ## Pi Controller ${{ needs.validate-release.outputs.version }}
-          
+
           ### Changes
           ${CHANGELOG}
-          
+
           ### Installation
-          
+
           1. Download the appropriate binary for your platform
           2. Extract the archive: \`tar -xzf pi-controller-*.tar.gz\`
           3. Run the installation script: \`sudo ./install.sh\`
           4. Enable and start services: \`sudo systemctl enable --now pi-controller pi-agent\`
-          
+
           ### Docker Images
-          
+
           - Controller: \`ghcr.io/${{ github.repository }}:${{ needs.validate-release.outputs.version }}-controller\`
           - Agent: \`ghcr.io/${{ github.repository }}:${{ needs.validate-release.outputs.version }}-agent\`
-          
+
           ### Supported Platforms
-          
+
           - Linux (amd64, arm64, armv7)
           - macOS (Intel & Apple Silicon)
           - Windows (amd64)
-          
+
           ### Hardware Tested
-          
+
           - Raspberry Pi 5 Model B ✅
           - Generic Linux ARM64 ✅
           EOF
@@ -432,7 +432,7 @@ jobs:
           echo "🚀 **Release ${{ needs.validate-release.outputs.version }} Published!**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Artifacts Created:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Multi-platform binaries" >> $GITHUB_STEP_SUMMARY  
+          echo "- ✅ Multi-platform binaries" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Docker images" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Installation scripts" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Hardware tested on Raspberry Pi" >> $GITHUB_STEP_SUMMARY

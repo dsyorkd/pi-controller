@@ -10,7 +10,7 @@ body:
   attributes:
     value: |
       Thanks for stopping by to let us know something could be better!
-      
+
       For general questions or discussions, please use the [Discussions](https://github.com/dsyorkd/pi-controller/discussions) tab.
 
 - type: textarea
@@ -47,7 +47,7 @@ body:
 - type: textarea
   attributes:
     label: Environment
-    description: Please provide the environment setup and problematic resources. 
+    description: Please provide the environment setup and problematic resources.
     value: |
       - Pi Controller version:
       - Impacted Component:
@@ -59,7 +59,7 @@ body:
       - Storage Size:
       - Network Setup (e.g., Ethernet, Wi-Fi):
       - Underlying Infrastructure (e.g., Baremetal, 5-Model-B, 4-Model-B, Virtual Machine, AWS, GCP, Azure):
-      
+
   validations:
     required: true
 

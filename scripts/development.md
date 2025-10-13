@@ -5,22 +5,26 @@ This document outlines the development workflow for completing the Pi Controller
 ## Prerequisites
 
 1. **Install Task Master AI globally:**
+
    ```bash
    npm install -g task-master-ai
    ```
 
 2. **Initialize Task Master in project root:**
+
    ```bash
    cd /path/to/pi-controller
    task-master init
    ```
 
 3. **Parse the PRD to generate tasks:**
+
    ```bash
    task-master parse-prd .taskmaster/docs/prd.txt --research
    ```
 
 4. **Analyze task complexity and expand where needed:**
+
    ```bash
    task-master analyze-complexity --research
    task-master expand --all --research
@@ -31,16 +35,19 @@ This document outlines the development workflow for completing the Pi Controller
 ### Daily Startup
 
 1. **Check next available tasks:**
+
    ```bash
    task-master next
    ```
 
 2. **View detailed task information:**
+
    ```bash
    task-master show <task-id>
    ```
 
 3. **Start working on a task:**
+
    ```bash
    task-master set-status --id=<task-id> --status=in-progress
    ```
@@ -48,16 +55,19 @@ This document outlines the development workflow for completing the Pi Controller
 ### During Implementation
 
 1. **Log progress and implementation notes:**
+
    ```bash
    task-master update-subtask --id=<subtask-id> --prompt="Implementation progress: added GPIO pin control logic, tested with mock hardware"
    ```
 
 2. **Update task with discoveries/blockers:**
+
    ```bash
    task-master update-task --id=<task-id> --prompt="Discovered need for hardware abstraction layer, added to architecture"
    ```
 
 3. **Add new tasks discovered during development:**
+
    ```bash
    task-master add-task --prompt="Implement hardware safety checks for GPIO operations" --research
    ```
@@ -67,6 +77,7 @@ This document outlines the development workflow for completing the Pi Controller
 Before marking any task as complete, ensure code quality standards:
 
 1. **Run linting and fix issues:**
+
    ```bash
    make install-lint # First time only
    make lint
@@ -75,6 +86,7 @@ Before marking any task as complete, ensure code quality standards:
    ```
 
 2. **Run relevant tests:**
+
    ```bash
    make test-unit # For service layer changes
    make test-gpio # For GPIO-related changes
@@ -83,11 +95,13 @@ Before marking any task as complete, ensure code quality standards:
    ```
 
 3. **Check build success:**
+
    ```bash
    make build
    ```
 
 4. **Only after all checks pass, mark task complete:**
+
    ```bash
    task-master set-status --id=<task-id> --status=done
    ```
@@ -97,11 +111,13 @@ Before marking any task as complete, ensure code quality standards:
 For each file that needs implementation:
 
 1. **Create comprehensive task covering all changes needed:**
+
    ```bash
    task-master add-task --prompt="Complete pi-agent GPIO implementation in cmd/pi-agent/main.go - add hardware interface, gRPC communication, system monitoring, configuration handling, graceful shutdown" --research
    ```
 
 2. **Expand into specific subtasks:**
+
    ```bash
    task-master expand --id=<task-id> --research --force
    ```
@@ -114,6 +130,7 @@ For each file that needs implementation:
    - Verify build success
 
 4. **Log detailed progress:**
+
    ```bash
    task-master update-subtask --id=<subtask-id> --prompt="Implemented gRPC client connection with retry logic and health checking"
    ```
@@ -150,16 +167,19 @@ task-master list --status=pending | grep -i "discovery\|mdns\|network"
 For each implemented component:
 
 1. **Write tests first (TDD approach):**
+
    ```bash
    task-master add-task --prompt="Write comprehensive unit tests for GPIO service methods"
    ```
 
 2. **Run tests during development:**
+
    ```bash
    make test-unit
    ```
 
 3. **Achieve coverage targets:**
+
    ```bash
    make test-coverage-threshold # Must be >80%
    ```
@@ -169,11 +189,13 @@ For each implemented component:
 For cross-component functionality:
 
 1. **Create integration test tasks:**
+
    ```bash
    task-master add-task --prompt="Integration test for pi-agent to controller GPIO communication via gRPC"
    ```
 
 2. **Run integration tests:**
+
    ```bash
    make test-integration
    ```
@@ -183,11 +205,13 @@ For cross-component functionality:
 For security-sensitive components:
 
 1. **Run security tests:**
+
    ```bash
    make test-security-verbose
    ```
 
 2. **Address any vulnerabilities immediately:**
+
    ```bash
    task-master add-task --prompt="Fix security vulnerability identified in authentication middleware"
    ```
@@ -197,26 +221,31 @@ For security-sensitive components:
 No task should be marked as `done` until:
 
 1. **All linting passes:**
+
    ```bash
    make lint # Must exit with code 0
    ```
 
 2. **No vet errors:**
+
    ```bash
    make vet # Must exit with code 0
    ```
 
 3. **Tests pass:**
+
    ```bash
    make test-unit # All tests green
    ```
 
 4. **Build succeeds:**
+
    ```bash
    make build # Must build without errors
    ```
 
 5. **Coverage maintained:**
+
    ```bash
    make test-coverage-threshold # Must be >80%
    ```

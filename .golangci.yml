@@ -14,17 +14,17 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    
+
     # Code formatting
     - gofmt
     - goimports
     - gci
     - misspell
     - whitespace
-    
+
     # Security (reduced set)
     - gosec
-    
+
     # Code quality (reduced set)
     - dupl
     - unconvert
@@ -33,22 +33,22 @@ linters:
   settings:
     dupl:
       threshold: 100
-    
+
     funlen:
       lines: 100
       statements: 50
-    
+
     gci:
       sections:
         - standard
         - default
         - prefix(github.com/dsyorkd/pi-controller)
-    
+
     goconst:
       min-len: 3
       min-occurrences: 3
       ignore-tests: true
-    
+
     gocritic:
       settings:
         enabled-tags:
@@ -61,17 +61,17 @@ linters:
           - whyNoLint
           - wrapperFunc
           - hugeParam # Allow large structs to be passed by value for now
-          - rangeValCopy # Allow copying in loops for readability  
+          - rangeValCopy # Allow copying in loops for readability
           - paramTypeCombine # Allow separate parameters for readability
           - stringXbytes # Allow string/byte comparisons
           - unnamedResult # Allow unnamed results
-    
+
     gocyclo:
       min-complexity: 15
-    
+
     goimports:
       local-prefixes: github.com/dsyorkd/pi-controller
-    
+
     govet:
       settings:
         shadow:
@@ -82,19 +82,19 @@ linters:
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
             - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
-    
+
     lll:
       line-length: 160  # Increased for long security headers
-    
+
     mnd:
       settings:
         mnd:
           # don't include the "operation" and "assign"
           checks: argument,case,condition,return
-    
+
     misspell:
       locale: US
-    
+
     nolintlint:
       allow-leading-space: true # don't require machine-readable nolint directives (i.e. with no leading space)
       allow-unused: false # report any unused nolint directives

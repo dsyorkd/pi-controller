@@ -15,12 +15,14 @@ This document describes the high-availability clustering architecture for pi-con
 ## Clustering Modes
 
 ### 1. Active-Passive (Recommended for Start)
+
 - One active controller, others standby
 - Fast failover with leader election
 - Simple state management
 - Lower resource usage
 
 ### 2. Active-Active (Future Enhancement)
+
 - All controllers serve requests
 - Distributed state synchronization
 - Higher throughput
@@ -63,6 +65,7 @@ This document describes the high-availability clustering architecture for pi-con
 **Purpose**: Ensure only one controller is active (leader)
 
 **Implementation Options**:
+
 - **Option A**: etcd-based (recommended)
   - Leverages existing K3s embedded etcd
   - Battle-tested in production
@@ -74,6 +77,7 @@ This document describes the high-availability clustering architecture for pi-con
   - Requires custom integration
 
 **Features**:
+
 - Automatic leader election on startup
 - Leader lease with TTL (30 seconds default)
 - Automatic failover on leader failure
@@ -105,6 +109,7 @@ type LeaderElector interface {
 **Strategies**:
 
 **Option A: WAL Shipping (Recommended for SQLite)**
+
 ```
 Leader Controller (192.168.1.10)
 ├── SQLite DB with WAL mode enabled
@@ -118,12 +123,14 @@ Follower Controllers (192.168.1.11, 192.168.1.12)
 ```
 
 **Features**:
+
 - Near real-time replication
 - Minimal overhead
 - Transaction-level consistency
 - No schema changes required
 
 **Implementation**:
+
 ```go
 type StateReplicator interface {
     // Start begins replication process
@@ -141,6 +148,7 @@ type StateReplicator interface {
 ```
 
 **Option B: Snapshot + Incremental Sync**
+
 - Full database snapshot periodically
 - Incremental changes via gRPC streaming
 - Higher network overhead
@@ -151,6 +159,7 @@ type StateReplicator interface {
 **Purpose**: Detect controller failures and trigger failover
 
 **Components**:
+
 ```go
 type HealthChecker interface {
     // Check performs health check on this controller
@@ -175,6 +184,7 @@ type HealthStatus struct {
 ```
 
 **Health Checks**:
+
 1. **Leader Election Participation**: Can acquire/renew lease
 2. **API Server**: HTTP endpoint responding
 3. **Database**: SQLite queries succeeding
@@ -182,6 +192,7 @@ type HealthStatus struct {
 5. **System Resources**: CPU, memory, disk within limits
 
 **Check Intervals**:
+
 - Self health check: Every 5 seconds
 - Peer health check: Every 10 seconds
 - Leader lease renewal: Every 10 seconds (30s TTL)
@@ -345,10 +356,12 @@ cluster:
 ### Scenario 1: 3-Node Cluster (Recommended)
 
 **Hardware**:
+
 - 3x Raspberry Pi 4 (4GB+ RAM)
 - Each running pi-controller + K3s server
 
 **Setup**:
+
 ```bash
 # Node 1 (Bootstrap)
 pi-controller server \
@@ -370,6 +383,7 @@ pi-controller server \
 ```
 
 **Benefits**:
+
 - Survives 1 node failure
 - Maintains quorum with 2/3 nodes
 - Optimal for small deployments
@@ -377,6 +391,7 @@ pi-controller server \
 ### Scenario 2: 5-Node Cluster (High Availability)
 
 **Hardware**:
+
 - 5x Raspberry Pi 4
 - Can survive 2 node failures
 - Better load distribution
@@ -386,10 +401,12 @@ pi-controller server \
 ### Scenario 3: 2-Node Cluster + Witness (Budget)
 
 **Hardware**:
+
 - 2x Raspberry Pi 4 (controllers)
 - 1x Raspberry Pi Zero (witness node, no storage)
 
 **Features**:
+
 - Witness node only participates in leader election
 - Cheaper than full 3-node cluster
 - Can survive 1 controller failure
@@ -403,6 +420,7 @@ GET /api/v1/cluster/status
 ```
 
 **Response**:
+
 ```json
 {
   "clusterId": "pi-controller-cluster",
@@ -448,6 +466,7 @@ POST /api/v1/cluster/leader/transfer
 ```
 
 **Request**:
+
 ```json
 {
   "targetController": "controller-02"
@@ -517,6 +536,7 @@ vrrp_instance PI_CONTROLLER {
 ### Scenario 1: Leader Crashes
 
 **Timeline**:
+
 1. Leader process crashes (t=0s)
 2. Lease expires (t=30s)
 3. Followers detect leader loss (t=30s)
@@ -532,6 +552,7 @@ vrrp_instance PI_CONTROLLER {
 **Partition**: Controller 1 isolated from Controllers 2 & 3
 
 **Behavior**:
+
 1. Controller 1 loses majority (1/3)
 2. Controller 1 steps down as leader
 3. Controllers 2 & 3 maintain quorum (2/3)
@@ -539,6 +560,7 @@ vrrp_instance PI_CONTROLLER {
 5. System continues with 2 controllers
 
 **When partition heals**:
+
 - Controller 1 rejoins as follower
 - Syncs state from current leader
 - Becomes available for failover
@@ -548,6 +570,7 @@ vrrp_instance PI_CONTROLLER {
 **Situation**: Two controllers both think they're leader
 
 **Prevention**:
+
 - Lease-based leadership (only one valid lease)
 - Quorum requirement (majority must agree)
 - Term-based leadership (higher term wins)
@@ -556,27 +579,32 @@ vrrp_instance PI_CONTROLLER {
 ## Implementation Phases
 
 ### Phase 1: Leader Election (MVP)
+
 - Implement etcd-based leader election
 - Add leader/follower roles
 - Follower redirects to leader for writes
 - Basic health checking
 
 **Deliverables**:
+
 - `internal/clustering/election/` package
 - Leader election integration in main server
 - `/api/v1/cluster/status` endpoint
 
 ### Phase 2: State Replication
+
 - Implement WAL shipping for SQLite
 - Add replication monitoring
 - Automatic catchup for lagging followers
 
 **Deliverables**:
+
 - `internal/clustering/replication/` package
 - WAL shipper and receiver
 - Replication lag metrics
 
 ### Phase 3: Advanced Features
+
 - Graceful leader transfer
 - Witness node support
 - Automatic member removal
@@ -632,6 +660,7 @@ pi_controller_health_status{component="replication"} 1
 ### From Single Controller to Clustered
 
 1. **Backup existing data**:
+
    ```bash
    sqlite3 /var/lib/pi-controller/data.db ".backup /backup/data.db"
    ```
@@ -641,6 +670,7 @@ pi_controller_health_status{component="replication"} 1
    - Copy TLS certificates to all nodes
 
 3. **Enable clustering**:
+
    ```yaml
    cluster:
      enabled: true
@@ -651,11 +681,13 @@ pi_controller_health_status{component="replication"} 1
    ```
 
 4. **Restart controllers**:
+
    ```bash
    systemctl restart pi-controller
    ```
 
 5. **Verify cluster status**:
+
    ```bash
    curl https://localhost:8080/api/v1/cluster/status
    ```
@@ -684,18 +716,21 @@ pi_controller_health_status{component="replication"} 1
 ## Testing Strategy
 
 ### Unit Tests
+
 - Leader election logic
 - WAL shipping/receiving
 - Health check conditions
 - Membership management
 
 ### Integration Tests
+
 - 3-node cluster formation
 - Leader failover
 - State synchronization
 - Network partition handling
 
 ### Chaos Testing
+
 - Random controller kills
 - Network latency injection
 - Disk failure simulation
@@ -704,12 +739,14 @@ pi_controller_health_status{component="replication"} 1
 ## Performance Considerations
 
 ### Resource Usage
+
 - **Memory**: +50MB per follower (for replication buffers)
 - **CPU**: +5% (for health checks and replication)
 - **Network**: ~100KB/s per follower (WAL shipping)
 - **Disk**: +10% (for WAL retention)
 
 ### Scalability
+
 - Tested up to 5 controllers
 - Recommended max: 7 controllers (quorum 4/7)
 - Beyond 7: consider separate control/data planes

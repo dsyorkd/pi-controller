@@ -7,17 +7,20 @@ Pi-Controller is a comprehensive Kubernetes management platform designed specifi
 ## Table of Contents
 
 ### Architecture
-*   System Overview
-*   Control Plane
-*   Node Agent
+
+* System Overview
+* Control Plane
+* Node Agent
 
 ### API Reference
-*   REST API
-*   gRPC API
-*   WebSocket Events
+
+* REST API
+* gRPC API
+* WebSocket Events
 
 ### Development
-*   Getting Started
+
+* Getting Started
 
 ---
 

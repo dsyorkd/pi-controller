@@ -157,7 +157,7 @@ def list_issues_in_project(github_token, project_id, desired_status=None):
     non_current_issues = []
     current_sprint = get_current_sprint(github_token, project_id)
     print(f"Current sprint: {current_sprint}")
-    
+
     while True:
         variables = {"project": project_id, "cursor": cursor}
         response = requests.post(GITHUB_GRAPHQL_URL,

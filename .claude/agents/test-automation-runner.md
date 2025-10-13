@@ -22,7 +22,7 @@ When you detect code changes, you will:
    - Identify whether the test itself needs updating or if the code needs fixing
    - Preserve the original intent and coverage of any tests you modify
 
-5. **Fix issues intelligently**: 
+5. **Fix issues intelligently**:
    - If the code change broke existing functionality, suggest or implement code fixes
    - If tests need updating due to legitimate changes in behavior, update them while maintaining their original testing intent
    - Never remove test coverage without explicit justification

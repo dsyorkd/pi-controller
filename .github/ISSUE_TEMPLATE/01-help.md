@@ -21,7 +21,7 @@ Steps to reproduce the behavior:
 
 **Environment**
 
-- Harvester ISO version: 
+- Harvester ISO version:
 - Underlying Infrastructure (e.g. Baremetal with Dell PowerEdge R630):
 
 **Additional context**

@@ -3,6 +3,7 @@
 This document provides a comprehensive overview of the security measures implemented in the pi-controller project.
 
 ## Table of Contents
+
 - [Authentication & Authorization](#authentication--authorization)
 - [GPIO Pin Safety](#gpio-pin-safety)
 - [Rate Limiting](#rate-limiting)
@@ -20,6 +21,7 @@ This document provides a comprehensive overview of the security measures impleme
 The system uses industry-standard JWT (JSON Web Tokens) for authentication with the following features:
 
 #### Token Types
+
 - **Access Tokens**: Short-lived (15 minutes) for API access
 - **Refresh Tokens**: Longer-lived (7 days) for token renewal
 - **API Keys**: Service account tokens (90 days)
@@ -54,9 +56,11 @@ The system uses industry-standard JWT (JSON Web Tokens) for authentication with 
 | `admin` | Full access including DELETE operations, cluster lifecycle | System administration |
 
 **Permission Hierarchy:**
+
 ```
 admin > operator > viewer
 ```
+
 - Admin can access everything
 - Operator can access operator + viewer endpoints
 - Viewer can only access viewer endpoints
@@ -76,6 +80,7 @@ clusters.DELETE("/:id", s.requireRole("admin"), clusterHandler.Delete)   // Dele
 ```
 
 **Critical DELETE Operations** (Task 67 ✅):
+
 - All DELETE endpoints require `admin` role
 - Includes: clusters, nodes, GPIO devices, certificates
 - Prevents unauthorized resource deletion
@@ -85,6 +90,7 @@ clusters.DELETE("/:id", s.requireRole("admin"), clusterHandler.Delete)   // Dele
 **Enabled by default** when `EnableAuditLog: true`:
 
 Logs all authentication events:
+
 - Login attempts (success/failure)
 - Token validation failures
 - Authorization failures
@@ -116,6 +122,7 @@ Logs all authentication events:
 #### Default Safe GPIO Pins
 
 BCM GPIO pins 4-27 (excluding critical pins above):
+
 ```
 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
 ```
@@ -123,6 +130,7 @@ BCM GPIO pins 4-27 (excluding critical pins above):
 #### Configuration
 
 **Environment Variables:**
+
 ```bash
 # Override safe pins (comma-separated)
 export GPIO_SAFE_PINS="17,27,22,23,24,25"
@@ -167,6 +175,7 @@ func (s *GPIOService) Create(req CreateGPIODeviceRequest) (*models.GPIODevice, e
 **Implementation:** `internal/api/middleware/ratelimit.go`
 
 **Default Configuration:**
+
 - **60 requests/minute** per client
 - **Burst size:** 10 requests
 - Tracking: By user ID (authenticated) or IP address
@@ -181,12 +190,14 @@ func (s *GPIOService) Create(req CreateGPIODeviceRequest) (*models.GPIODevice, e
 **Solution:** Stricter rate limits specifically for GPIO endpoints.
 
 **Configuration:**
+
 - **10 requests/second** (much stricter than global)
 - **Burst size:** 20 requests
 - Applied to ALL `/api/v1/gpio/*` endpoints
 - Hardware protection priority
 
 **Why Stricter?**
+
 - Prevents rapid relay toggling (can cause coil burnout)
 - Protects against GPIO DoS attacks
 - Prevents motor controller damage
@@ -328,6 +339,7 @@ Properly returns HTTP 405 for invalid methods on existing endpoints.
 **Implementation:** `internal/tls/tls.go`
 
 **Features:**
+
 - Auto-generation of self-signed certificates for development
 - Production certificate support (load from files)
 - ECDSA key generation (more efficient than RSA)
@@ -338,6 +350,7 @@ Properly returns HTTP 405 for invalid methods on existing endpoints.
 **Usage:**
 
 **Development Mode:**
+
 ```yaml
 app:
   environment: development
@@ -350,6 +363,7 @@ app:
 Certificates will be auto-generated at `./data/tls/server.crt` and `./data/tls/server.key`.
 
 **Production Mode:**
+
 ```yaml
 app:
   environment: production
@@ -360,6 +374,7 @@ api:
 ```
 
 **Environment Variables:**
+
 ```bash
 # Production TLS certificate paths
 export TLS_CERT_FILE=/path/to/cert.pem
@@ -371,12 +386,14 @@ export TLS_KEY_FILE=/run/secrets/tls_key
 ```
 
 **Certificate Requirements:**
+
 - Valid x509 certificate in PEM format
 - Private key in PEM format (RSA or ECDSA)
 - Certificate must be valid (not expired)
 - Must match configured hostnames
 
 **Security Notes:**
+
 - Auto-generated certificates are **ONLY** for development
 - Production **MUST** use properly signed certificates (Let's Encrypt, corporate CA, etc.)
 - Certificates are checked for expiry on startup
@@ -475,7 +492,7 @@ curl -X POST -H "Authorization: Bearer <operator-token>" \
 
 For security vulnerabilities, please DO NOT open a public issue. Instead:
 
-1. Email: security@example.com (configure your email)
+1. Email: <security@example.com> (configure your email)
 2. Provide detailed description
 3. Include steps to reproduce
 4. Allow 90 days for patch before disclosure

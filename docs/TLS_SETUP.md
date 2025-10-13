@@ -3,6 +3,7 @@
 This guide covers TLS/HTTPS configuration for the pi-controller project.
 
 ## Table of Contents
+
 - [Overview](#overview)
 - [Development Setup](#development-setup)
 - [Production Setup](#production-setup)
@@ -314,11 +315,13 @@ spec:
 ### Certificate Not Found
 
 **Error:**
+
 ```
 failed to setup TLS: TLS certificate files not found: cert=/path/to/cert.pem, key=/path/to/key.pem
 ```
 
 **Solution:**
+
 - Verify file paths are correct
 - Check file permissions (certificate must be readable, key should be 600)
 - Ensure files exist at specified locations
@@ -326,11 +329,13 @@ failed to setup TLS: TLS certificate files not found: cert=/path/to/cert.pem, ke
 ### Certificate Expired
 
 **Error:**
+
 ```
 failed to load TLS certificates: x509: certificate has expired
 ```
 
 **Solution:**
+
 - Renew certificate using your CA's renewal process
 - For Let's Encrypt: `certbot renew`
 - Restart pi-controller after renewal
@@ -338,11 +343,13 @@ failed to load TLS certificates: x509: certificate has expired
 ### Invalid Certificate
 
 **Error:**
+
 ```
 failed to load TLS certificates: tls: private key does not match public key
 ```
 
 **Solution:**
+
 - Ensure certificate and key files match
 - Verify you're not mixing certificates from different requests
 - Regenerate certificate and key pair together
@@ -350,11 +357,13 @@ failed to load TLS certificates: tls: private key does not match public key
 ### Permission Denied
 
 **Error:**
+
 ```
 failed to read TLS key file: permission denied
 ```
 
 **Solution:**
+
 ```bash
 # Set correct ownership (run as root)
 chown pi-controller:pi-controller /path/to/key.pem
@@ -367,12 +376,14 @@ sudo -u pi-controller ./pi-controller
 ### Auto-Generated Cert in Production
 
 **Warning:**
+
 ```
 Auto-generating self-signed TLS certificate for development
 ⚠️  DO NOT use auto-generated certificates in production!
 ```
 
 **Solution:**
+
 - Set `PI_CONTROLLER_ENVIRONMENT=production`
 - Provide proper TLS certificate files
 - Use Let's Encrypt or corporate CA
@@ -380,11 +391,13 @@ Auto-generating self-signed TLS certificate for development
 ### Port 443 Already in Use
 
 **Error:**
+
 ```
 bind: address already in use
 ```
 
 **Solution:**
+
 ```bash
 # Check what's using port 443
 sudo lsof -i :443
@@ -400,6 +413,7 @@ export API_PORT=8443
 This is expected with self-signed certificates. Add security exception in browser.
 
 **In Production:**
+
 - Ensure certificate is from trusted CA
 - Check certificate is valid and not expired
 - Verify hostname matches certificate Common Name (CN)
@@ -414,6 +428,7 @@ This is expected with self-signed certificates. Add security exception in browse
    - Use secrets management (Vault, AWS Secrets Manager, etc.)
 
 2. **Restrict key file permissions**
+
    ```bash
    chmod 600 /path/to/key.pem
    chown pi-controller:pi-controller /path/to/key.pem
@@ -434,7 +449,7 @@ This is expected with self-signed certificates. Add security exception in browse
 
 6. **Use proper certificate chains**
    - Include intermediate certificates
-   - Test with SSL Labs (https://www.ssllabs.com/ssltest/)
+   - Test with SSL Labs (<https://www.ssllabs.com/ssltest/>)
 
 ---
 

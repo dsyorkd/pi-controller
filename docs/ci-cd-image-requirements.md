@@ -164,7 +164,7 @@ go install honnef.co/go/tools/cmd/staticcheck@latest
 ```yaml
 # Supported build targets
 - linux/amd64 (primary)
-- linux/arm64 (primary) 
+- linux/arm64 (primary)
 - linux/arm/v7 (Raspberry Pi)
 - linux/arm/v6 (older Pi models)
 - darwin/amd64 (optional)

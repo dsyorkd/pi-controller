@@ -8,6 +8,7 @@ Pi-Controller is a comprehensive Kubernetes management platform designed specifi
 ## 1. System Overview
 
 ### Core Philosophy
+
 - **Single Binary Deployment**: Control plane runs as one Go binary with embedded web UI
 - **Zero Dependencies**: No external automation tools (Ansible, Terraform, etc.)
 - **Pi-Native**: Optimized for ARM64/ARMv7 hardware constraints
@@ -15,6 +16,7 @@ Pi-Controller is a comprehensive Kubernetes management platform designed specifi
 - **Homelab-Friendly**: Simple deployment with enterprise-grade scalability
 
 ### Architecture Principles
+
 - **Distributed Control**: Every Pi can act as control plane node
 - **Resilient Communication**: Hybrid gRPC/REST with automatic failover
 - **Hardware Abstraction**: GPIO operations via Kubernetes CRDs
@@ -72,16 +74,19 @@ Pi-Controller is a comprehensive Kubernetes management platform designed specifi
 ## 3. Detailed Component Specifications
 
 ### 3.1 Discovery Service
+
 **Purpose**: Automatic Pi node discovery and network mapping
 **Technology**: mDNS, network scanning, DHCP lease parsing
 
 **Key Features**:
+
 - Multi-protocol discovery (mDNS, network scan, manual registration)
 - Hardware capability detection (GPIO pins, I2C buses, SPI interfaces)
 - Network topology mapping with bandwidth testing
 - Automatic cluster membership management
 
 **Implementation Details**:
+
 ```go
 type DiscoveryService struct {
     mdnsClient     *mdns.Client
@@ -102,10 +107,12 @@ type DiscoveredNode struct {
 ```
 
 ### 3.2 Provisioner Engine
+
 **Purpose**: Automated K3s cluster bootstrapping and node joining
 **Technology**: SSH, K3s installation scripts, certificate management
 
 **Key Features**:
+
 - Zero-touch K3s installation with custom configurations
 - High-availability control plane setup (embedded etcd)
 - Automatic node joining with secure token management
@@ -113,6 +120,7 @@ type DiscoveredNode struct {
 - Pi-optimized K3s configurations (memory limits, storage)
 
 **Implementation Details**:
+
 ```go
 type ProvisionerEngine struct {
     sshPool        *SSHConnectionPool
@@ -132,10 +140,12 @@ type ProvisioningPlan struct {
 ```
 
 ### 3.3 Cluster Manager
+
 **Purpose**: K8s cluster lifecycle management and state reconciliation
 **Technology**: Kubernetes client-go, custom controllers
 
 **Key Features**:
+
 - Multi-cluster state synchronization
 - Workload placement optimization based on Pi capabilities
 - Resource quota management per cluster
@@ -143,6 +153,7 @@ type ProvisioningPlan struct {
 - Cross-cluster networking setup
 
 **Implementation Details**:
+
 ```go
 type ClusterManager struct {
     k8sClients    map[string]kubernetes.Interface
@@ -163,10 +174,12 @@ type ClusterState struct {
 ```
 
 ### 3.4 GPIO CRD Manager
+
 **Purpose**: Kubernetes-native GPIO control via Custom Resources
 **Technology**: Kubernetes Custom Resource Definitions, controller-runtime
 
 **Key Features**:
+
 - GPIO pin state management through CRDs
 - PWM, SPI, I2C interface controls
 - Hardware interrupt handling
@@ -174,10 +187,12 @@ type ClusterState struct {
 - Multi-tenant GPIO resource isolation
 
 ### 3.5 Node Agent (DaemonSet)
+
 **Purpose**: Host-level monitoring and hardware control
 **Technology**: gRPC server, system monitoring, GPIO libraries
 
 **Key Features**:
+
 - Real-time system metrics collection
 - GPIO pin direct hardware access
 - Hardware health monitoring (temperature, voltage)
@@ -189,6 +204,7 @@ type ClusterState struct {
 ### 4.1 REST API Endpoints
 
 #### Cluster Management
+
 ```
 GET    /api/v1/clusters                    # List all clusters
 POST   /api/v1/clusters                    # Create new cluster
@@ -202,6 +218,7 @@ DELETE /api/v1/clusters/{id}/nodes/{node}  # Remove node from cluster
 ```
 
 #### Node Management
+
 ```
 GET    /api/v1/nodes                       # List discovered nodes
 GET    /api/v1/nodes/{id}                  # Get node details
@@ -211,6 +228,7 @@ POST   /api/v1/nodes/{id}/deprovision      # Deprovision node
 ```
 
 #### GPIO Resources
+
 ```
 GET    /api/v1/gpio                        # List GPIO resources
 POST   /api/v1/gpio                        # Create GPIO resource
@@ -222,6 +240,7 @@ DELETE /api/v1/gpio/{id}                   # Delete GPIO resource
 ### 4.2 gRPC Services
 
 #### Node Agent Communication
+
 ```protobuf
 service NodeAgent {
     rpc GetSystemMetrics(Empty) returns (SystemMetrics);
@@ -241,6 +260,7 @@ message SystemMetrics {
 ```
 
 #### Inter-Service Communication
+
 ```protobuf
 service ControlPlane {
     rpc RegisterNode(NodeRegistration) returns (RegistrationResponse);
@@ -253,6 +273,7 @@ service ControlPlane {
 ### 4.3 WebSocket Events
 
 #### Real-time Updates
+
 ```json
 {
     "type": "cluster.node.added",
@@ -352,6 +373,7 @@ CREATE INDEX idx_events_timestamp ON events(timestamp);
 ## 6. GPIO Custom Resource Definitions
 
 ### 6.1 GPIO Pin CRD
+
 ```yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -405,6 +427,7 @@ spec:
 ```
 
 ### 6.2 PWM Controller CRD
+
 ```yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -452,6 +475,7 @@ spec:
 ```
 
 ### 6.3 I2C Device CRD
+
 ```yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -541,6 +565,7 @@ spec:
 ### 7.2 Component Distribution
 
 **Control Plane Nodes (Masters)**:
+
 - Pi-Controller binary (single process)
 - Embedded SQLite database (with replication)
 - Web UI (embedded static files)
@@ -549,6 +574,7 @@ spec:
 - K3s server with embedded etcd
 
 **Worker Nodes**:
+
 - Node Agent DaemonSet pod only
 - K3s agent process
 - Local storage for workloads
@@ -556,6 +582,7 @@ spec:
 ### 7.3 Installation Methods
 
 #### Single Command Installation
+
 ```bash
 # Bootstrap first control plane node
 curl -sfL https://get.pi-controller.io/install.sh | sh -s - \
@@ -571,6 +598,7 @@ curl -sfL https://get.pi-controller.io/install.sh | sh -s - \
 ```
 
 #### Docker Compose (Development)
+
 ```yaml
 version: '3.8'
 services:
@@ -593,6 +621,7 @@ services:
 ### 8.1 Authentication & Authorization
 
 #### Multi-Tier Security Architecture
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      External Clients                          │
@@ -627,6 +656,7 @@ services:
 ```
 
 #### RBAC Policies
+
 ```yaml
 # Cluster Administrator Role
 apiVersion: rbac.authorization.k8s.io/v1
@@ -668,6 +698,7 @@ rules:
 ### 8.2 Communication Security
 
 #### Certificate Management
+
 - **Root CA**: Self-signed cluster root certificate authority
 - **Node Certificates**: Unique client certificates for each Pi node
 - **Service Certificates**: TLS certificates for all internal services
@@ -675,6 +706,7 @@ rules:
 - **Hardware Security**: TPM/secure enclave integration where available
 
 #### Network Security
+
 ```go
 type SecurityConfig struct {
     TLS struct {
@@ -684,20 +716,20 @@ type SecurityConfig struct {
         MinVersion     uint16 // TLS 1.3
         CipherSuites   []uint16
     }
-    
+
     Authentication struct {
         Method         string // "certificate", "jwt", "oidc"
         JWTSecret      string
         OIDCIssuer     string
         TokenExpiry    time.Duration
     }
-    
+
     Authorization struct {
         EnableRBAC     bool
         PolicyFile     string
         AuditLog       string
     }
-    
+
     Network struct {
         AllowedCIDRs   []string
         RateLimits     map[string]int
@@ -709,12 +741,14 @@ type SecurityConfig struct {
 ### 8.3 GPIO Security Model
 
 #### Hardware Access Control
+
 - **Pin Reservation**: Exclusive GPIO pin access via Kubernetes leases
 - **Privilege Escalation**: Controlled sudo access for hardware operations
 - **Hardware Abstraction**: No direct /dev/mem access from containers
 - **Safety Limits**: Voltage/current monitoring with automatic shutdown
 
 #### Resource Isolation
+
 ```yaml
 apiVersion: v1
 kind: Namespace
@@ -739,6 +773,7 @@ spec:
 ## 9. Development Project Structure
 
 ### 9.1 Repository Layout
+
 ```
 pi-controller/
 ├── cmd/                           # Application entry points
@@ -787,6 +822,7 @@ pi-controller/
 #### Core Modules
 
 **cmd/pi-controller (Main Binary)**
+
 ```go
 package main
 
@@ -805,6 +841,7 @@ func main() {
 ```
 
 **pkg/discovery (Node Discovery)**
+
 ```go
 package discovery
 
@@ -828,6 +865,7 @@ type Node struct {
 ```
 
 **pkg/provisioner (Cluster Provisioning)**
+
 ```go
 package provisioner
 
@@ -849,6 +887,7 @@ type ClusterPlan struct {
 ```
 
 **pkg/gpio (GPIO Controllers)**
+
 ```go
 package gpio
 
@@ -866,6 +905,7 @@ type PinController struct {
 ### 9.3 Build System
 
 #### Multi-Architecture Builds
+
 ```makefile
 # Makefile
 GOARCH ?= arm64
@@ -877,26 +917,27 @@ build-all: build-controller build-agent build-cli
 
 .PHONY: build-controller
 build-controller:
-	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
-		-ldflags "-X main.version=$(VERSION)" \
-		-o bin/pi-controller-$(GOOS)-$(GOARCH) \
-		./cmd/pi-controller
+ CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+  -ldflags "-X main.version=$(VERSION)" \
+  -o bin/pi-controller-$(GOOS)-$(GOARCH) \
+  ./cmd/pi-controller
 
 .PHONY: build-agent
 build-agent:
-	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
-		-ldflags "-X main.version=$(VERSION)" \
-		-o bin/pi-agent-$(GOOS)-$(GOARCH) \
-		./cmd/pi-agent
+ CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+  -ldflags "-X main.version=$(VERSION)" \
+  -o bin/pi-agent-$(GOOS)-$(GOARCH) \
+  ./cmd/pi-agent
 
 .PHONY: docker-build
 docker-build:
-	docker buildx build --platform linux/arm64,linux/amd64 \
-		-t pi-controller:$(VERSION) \
-		--push .
+ docker buildx build --platform linux/arm64,linux/amd64 \
+  -t pi-controller:$(VERSION) \
+  --push .
 ```
 
 #### Docker Multi-Stage Build
+
 ```dockerfile
 # Dockerfile
 FROM --platform=$BUILDPLATFORM node:18-alpine AS web-builder
@@ -929,6 +970,7 @@ ENTRYPOINT ["/usr/local/bin/pi-controller"]
 ### 10.1 Pi Hardware Optimization
 
 #### Resource-Aware Scheduling
+
 ```go
 type NodeCapacity struct {
     CPU       resource.Quantity  // ARM cores available
@@ -948,6 +990,7 @@ type ResourceOptimizer struct {
 ```
 
 #### Memory Management
+
 - **SQLite WAL Mode**: Optimized for concurrent reads
 - **Connection Pooling**: Limited database connections per Pi
 - **Memory Caching**: LRU cache for frequently accessed data
@@ -956,12 +999,14 @@ type ResourceOptimizer struct {
 ### 10.2 Network Optimization
 
 #### Efficient Communication Patterns
+
 - **gRPC Streaming**: Reduce connection overhead for real-time data
 - **Message Batching**: Group GPIO operations to reduce network calls
 - **Compression**: gRPC compression for large data transfers
 - **Connection Multiplexing**: HTTP/2 for web UI and API calls
 
 #### Network Resilience
+
 ```go
 type NetworkManager struct {
     connectionPool *grpc.ClientPool
@@ -982,12 +1027,14 @@ type ConnectionPolicy struct {
 ### 10.3 Scalability Architecture
 
 #### Horizontal Scaling (1-100+ Nodes)
+
 - **Distributed Control Plane**: Multiple control plane nodes with leader election
 - **Sharded Database**: SQLite WAL with backup replication
 - **Load Balancing**: HAProxy/keepalived for API endpoint distribution
 - **Event Batching**: Aggregate events before processing
 
 #### Vertical Scaling (Per-Node Optimization)
+
 - **Resource Quotas**: Prevent resource exhaustion
 - **Priority Classes**: Critical system workloads get priority
 - **Node Affinity**: Pin system workloads to appropriate hardware
@@ -998,6 +1045,7 @@ type ConnectionPolicy struct {
 This architecture provides a robust, scalable foundation for managing Raspberry Pi Kubernetes clusters with GPIO-as-a-Service capabilities. The design balances simplicity of deployment with enterprise-grade features, making it suitable for both homelab enthusiasts and small-scale IoT deployments.
 
 Key architectural strengths:
+
 - **Single binary deployment** reduces complexity
 - **Kubernetes-native GPIO control** provides familiar APIs
 - **Multi-protocol communication** ensures reliability
@@ -1019,17 +1067,17 @@ type ControllerServer struct {
     provisionerEngine *provisioner.Engine
     clusterManager    *cluster.Manager
     gpioManager       *gpio.Manager
-    
+
     // Communication layers
     httpServer        *http.Server
     grpcServer        *grpc.Server
     websocketHub      *websocket.Hub
     mcpServer         *mcp.Server
-    
+
     // Data layer
     database          *storage.Database
     configManager     *config.Manager
-    
+
     // Frontend assets (optional)
     webUIHandler      *WebUIHandler
     webUIEnabled      bool
@@ -1037,6 +1085,7 @@ type ControllerServer struct {
 ```
 
 #### Binary Structure & Deployment Modes
+
 ```
 pi-controller (single binary ~35MB)
 ├── Core Application Logic (Go)
@@ -1086,6 +1135,7 @@ The web interface is maintained as a separate repository (`kubes-aura`) and can 
    - Corporate/enterprise deployment pattern
 
 #### CRD-Based Web UI Deployment
+
 ```yaml
 apiVersion: ui.pi-controller.io/v1
 kind: WebInterface
@@ -1115,6 +1165,7 @@ spec:
 ```
 
 #### Frontend Technology Stack (Separate Repository)
+
 ```typescript
 // kubes-aura Repository Architecture
 interface WebUIArchitecture {
@@ -1132,18 +1183,19 @@ interface WebUIArchitecture {
 ```
 
 #### Frontend-Backend Communication Patterns
+
 ```typescript
 // API Client Architecture
 class ApiClient {
   private baseURL: string;
   private authToken: string;
   private wsConnection: WebSocket;
-  
+
   // REST API calls
   async getClusters(): Promise<Cluster[]> {
     return this.get('/api/v1/clusters');
   }
-  
+
   // Real-time updates via WebSocket
   subscribeToClusterEvents(clusterId: string, callback: EventCallback) {
     this.wsConnection.send({
@@ -1151,7 +1203,7 @@ class ApiClient {
       channel: `cluster.${clusterId}.events`
     });
   }
-  
+
   // Server-Sent Events for long-running operations
   streamProvisioningStatus(nodeId: string): EventSource {
     return new EventSource(`/api/v1/nodes/${nodeId}/provision/stream`);
@@ -1160,6 +1212,7 @@ class ApiClient {
 ```
 
 #### Web UI Component Structure (kubes-aura Repository)
+
 ```
 kubes-aura/
 ├── src/
@@ -1201,38 +1254,39 @@ kubes-aura/
 ### 11.3 HTTP Server & Route Architecture
 
 #### Server Initialization & Route Setup
+
 ```go
 func (s *ControllerServer) setupHTTPServer() *http.Server {
     router := mux.NewRouter()
-    
+
     // API routes with versioning
     apiV1 := router.PathPrefix("/api/v1").Subrouter()
     apiV1.Use(s.authMiddleware, s.corsMiddleware, s.loggingMiddleware)
-    
+
     // Cluster management endpoints
     apiV1.HandleFunc("/clusters", s.handleClusters).Methods("GET", "POST")
     apiV1.HandleFunc("/clusters/{id}", s.handleCluster).Methods("GET", "PUT", "DELETE")
     apiV1.HandleFunc("/clusters/{id}/nodes", s.handleClusterNodes).Methods("GET", "POST")
-    
+
     // Node management endpoints
     apiV1.HandleFunc("/nodes", s.handleNodes).Methods("GET")
     apiV1.HandleFunc("/nodes/{id}", s.handleNode).Methods("GET", "PUT")
     apiV1.HandleFunc("/nodes/{id}/provision", s.handleNodeProvision).Methods("POST")
     apiV1.HandleFunc("/nodes/{id}/provision/stream", s.handleProvisionStream).Methods("GET")
-    
+
     // GPIO endpoints
     apiV1.HandleFunc("/gpio", s.handleGPIOResources).Methods("GET", "POST")
     apiV1.HandleFunc("/gpio/{id}", s.handleGPIOResource).Methods("GET", "PUT", "DELETE")
-    
+
     // WebSocket endpoint for real-time updates
     router.HandleFunc("/ws", s.handleWebSocket)
-    
+
     // Health check endpoint (unauthenticated)
     router.HandleFunc("/health", s.handleHealth).Methods("GET")
-    
+
     // Static file serving (embedded web UI)
     router.PathPrefix("/").Handler(s.webUIHandler())
-    
+
     return &http.Server{
         Addr:         fmt.Sprintf(":%d", s.config.HTTPPort),
         Handler:      router,
@@ -1245,6 +1299,7 @@ func (s *ControllerServer) setupHTTPServer() *http.Server {
 ```
 
 #### Static Asset Serving
+
 ```go
 //go:embed web/dist/*
 var webUIAssets embed.FS
@@ -1253,18 +1308,18 @@ func (s *ControllerServer) webUIHandler() http.Handler {
     // Serve embedded React app
     webUI, _ := fs.Sub(webUIAssets, "web/dist")
     fileServer := http.FileServer(http.FS(webUI))
-    
+
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         // Handle client-side routing (SPA)
         if !strings.Contains(r.URL.Path, ".") && r.URL.Path != "/" {
             r.URL.Path = "/"
         }
-        
+
         // Security headers
         w.Header().Set("X-Content-Type-Options", "nosniff")
         w.Header().Set("X-Frame-Options", "DENY")
         w.Header().Set("X-XSS-Protection", "1; mode=block")
-        
+
         fileServer.ServeHTTP(w, r)
     })
 }
@@ -1273,26 +1328,27 @@ func (s *ControllerServer) webUIHandler() http.Handler {
 ### 11.4 Authentication & Session Management
 
 #### JWT-based Authentication Flow
+
 ```mermaid
 sequenceDiagram
     participant Browser
     participant WebUI
     participant ControllerAPI
     participant Database
-    
+
     Browser->>WebUI: Load application
     WebUI->>Browser: React app with login form
-    
+
     Browser->>ControllerAPI: POST /api/v1/auth/login
     ControllerAPI->>Database: Validate credentials
     Database-->>ControllerAPI: User valid
     ControllerAPI->>ControllerAPI: Generate JWT
     ControllerAPI-->>Browser: Set HTTP-only cookie + JWT
-    
+
     Browser->>ControllerAPI: API calls with cookie
     ControllerAPI->>ControllerAPI: Validate JWT
     ControllerAPI-->>Browser: API response
-    
+
     Browser->>WebUI: WebSocket connection
     WebUI->>ControllerAPI: WS upgrade with cookie
     ControllerAPI->>ControllerAPI: Validate JWT
@@ -1300,6 +1356,7 @@ sequenceDiagram
 ```
 
 #### Authentication Implementation
+
 ```go
 type AuthManager struct {
     jwtSecret     []byte
@@ -1315,20 +1372,20 @@ func (am *AuthManager) GenerateTokens(userID string) (TokenPair, error) {
         "iat": time.Now().Unix(),
         "type": "access",
     }
-    
+
     refreshClaims := jwt.MapClaims{
         "sub": userID,
         "exp": time.Now().Add(am.refreshExpiry).Unix(),
         "iat": time.Now().Unix(),
         "type": "refresh",
     }
-    
+
     accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
     refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-    
+
     accessString, _ := accessToken.SignedString(am.jwtSecret)
     refreshString, _ := refreshToken.SignedString(am.jwtSecret)
-    
+
     return TokenPair{
         AccessToken:  accessString,
         RefreshToken: refreshString,
@@ -1343,6 +1400,7 @@ func (am *AuthManager) GenerateTokens(userID string) (TokenPair, error) {
 The pi-controller binary supports three distinct deployment modes, each optimized for different use cases:
 
 #### Mode 1: Standalone Pi Deployment
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Raspberry Pi Node                   │
@@ -1367,6 +1425,7 @@ The pi-controller binary supports three distinct deployment modes, each optimize
 ```
 
 #### Mode 2: Container Deployment
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              Docker/Kubernetes Host                     │
@@ -1386,6 +1445,7 @@ The pi-controller binary supports three distinct deployment modes, each optimize
 ```
 
 #### Mode 3: Remote Control Host
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                Management Workstation                  │
@@ -1411,6 +1471,7 @@ The pi-controller binary supports three distinct deployment modes, each optimize
 ### 12.2 Binary Usage Patterns
 
 #### Command-Line Interface Design
+
 ```bash
 # Primary binary: pi-controller
 pi-controller [GLOBAL-OPTIONS] COMMAND [COMMAND-OPTIONS]
@@ -1435,6 +1496,7 @@ pi-controller version                   # Version information
 ```
 
 #### Server Command (Primary Usage)
+
 ```bash
 # Server command - runs the full control plane
 pi-controller server [OPTIONS]
@@ -1464,6 +1526,7 @@ Server Options:
 #### Deployment Mode Examples
 
 **Standalone Mode (On Pi):**
+
 ```bash
 # Run directly on Raspberry Pi with local storage
 pi-controller server \
@@ -1474,6 +1537,7 @@ pi-controller server \
 ```
 
 **Container Mode:**
+
 ```bash
 # Run in Docker container with external database
 docker run -d \
@@ -1485,6 +1549,7 @@ docker run -d \
 ```
 
 **Remote Control Host Mode:**
+
 ```bash
 # Run on management workstation for multiple clusters
 pi-controller server \
@@ -1497,6 +1562,7 @@ pi-controller server \
 ### 12.2 Installation & Bootstrap Process
 
 #### Single-Node Quickstart
+
 ```bash
 # 1. Download and install binary
 curl -sfL https://get.pi-controller.io/install.sh | sh -s - --channel stable
@@ -1513,6 +1579,7 @@ sudo pi-controller server --cluster-init --node-role=server
 ```
 
 #### Multi-Node Cluster Formation
+
 ```bash
 # On first node (control plane)
 pi-master-1$ sudo pi-controller server --cluster-init --bind-address=192.168.1.10
@@ -1521,7 +1588,7 @@ pi-master-1$ sudo pi-controller server --cluster-init --bind-address=192.168.1.1
 # Cluster initialized successfully!
 # Web UI: https://192.168.1.10:8080
 # Join token: K10abcdef1234567890abcdef1234567890::server:1234567890abcdef
-# Join command for additional servers: 
+# Join command for additional servers:
 #   pi-controller server --server-url=https://192.168.1.10:8080 --join-token=K10abcdef...
 # Join command for agents:
 #   pi-controller agent --server-url=https://192.168.1.10:8080 --join-token=K10abcdef...
@@ -1541,6 +1608,7 @@ pi-worker-1$ sudo pi-controller agent \
 ### 12.3 Configuration Management
 
 #### Configuration File Structure
+
 ```yaml
 # /etc/pi-controller/config.yaml
 apiVersion: v1
@@ -1556,7 +1624,7 @@ server:
   tlsEnabled: true
   autoTLS: true
   deploymentMode: "standalone"  # standalone, container, remote
-  
+
 # Web UI configuration
 webUI:
   mode: "crd"  # embedded, external, crd
@@ -1568,7 +1636,7 @@ webUI:
     repository: "ghcr.io/dsyorkd/kubes-aura"
     version: "latest"
     replicas: 2
-  
+
 # Database configuration  
 database:
   type: "sqlite"
@@ -1579,7 +1647,7 @@ database:
   postgres:
     url: ""
     maxConnections: 25
-    
+
 # Security configuration
 security:
   authentication:
@@ -1594,7 +1662,7 @@ security:
     cipherSuites:
       - "TLS_AES_256_GCM_SHA384"
       - "TLS_AES_128_GCM_SHA256"
-      
+
 # Cluster configuration
 cluster:
   name: "pi-cluster"
@@ -1602,14 +1670,14 @@ cluster:
   cniPlugin: "flannel"
   serviceCIDR: "10.43.0.0/16"
   clusterCIDR: "10.42.0.0/16"
-  
+
 # Node agent configuration
 agent:
   metricsInterval: "30s"
   healthCheckInterval: "10s"
   gpioEnabled: true
   gpioPermissions: "644"
-  
+
 # Logging configuration
 logging:
   level: "info"
@@ -1621,6 +1689,7 @@ logging:
 ```
 
 #### Runtime Configuration Management
+
 ```go
 type ConfigManager struct {
     configPath   string
@@ -1636,7 +1705,7 @@ func (cm *ConfigManager) WatchForChanges() {
             cm.ReloadConfig()
         }
     })
-    
+
     // Also watch for SIGHUP signal
     signal.Notify(cm.reloadSignal, syscall.SIGHUP)
     go func() {
@@ -1651,17 +1720,17 @@ func (cm *ConfigManager) ReloadConfig() error {
     if err != nil {
         return fmt.Errorf("failed to reload config: %w", err)
     }
-    
+
     cm.mutex.Lock()
     oldConfig := cm.config
     cm.config = newConfig
     cm.mutex.Unlock()
-    
+
     // Notify all watchers of config change
     for _, watcher := range cm.watchers {
         watcher.OnConfigChange(oldConfig, newConfig)
     }
-    
+
     return nil
 }
 ```
@@ -1669,6 +1738,7 @@ func (cm *ConfigManager) ReloadConfig() error {
 ### 12.4 Service Management & Lifecycle
 
 #### Systemd Service Configuration
+
 ```ini
 # /etc/systemd/system/pi-controller.service
 [Unit]
@@ -1708,62 +1778,63 @@ WantedBy=multi-user.target
 ```
 
 #### Graceful Shutdown Handling
+
 ```go
 func (s *ControllerServer) Start() error {
     // Setup signal handling for graceful shutdown
     sigChan := make(chan os.Signal, 1)
     signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-    
+
     // Start all services
     g, ctx := errgroup.WithContext(context.Background())
-    
+
     // Start HTTP server
     g.Go(func() error {
         return s.httpServer.ListenAndServeTLS("", "")
     })
-    
+
     // Start gRPC server
     g.Go(func() error {
         lis, _ := net.Listen("tcp", fmt.Sprintf(":%d", s.config.GRPCPort))
         return s.grpcServer.Serve(lis)
     })
-    
+
     // Start background services
     g.Go(func() error {
         return s.discoveryService.Start(ctx)
     })
-    
+
     // Wait for shutdown signal
     go func() {
         sig := <-sigChan
         log.Printf("Received signal %v, initiating graceful shutdown", sig)
-        
+
         if sig == syscall.SIGHUP {
             // Reload configuration
             s.configManager.ReloadConfig()
             return
         }
-        
+
         // Graceful shutdown
         shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
         defer cancel()
-        
+
         // Shutdown HTTP server
         s.httpServer.Shutdown(shutdownCtx)
-        
+
         // Shutdown gRPC server
         s.grpcServer.GracefulStop()
-        
+
         // Stop background services
         s.discoveryService.Stop()
-        
+
         // Close database connections
         s.database.Close()
     }()
-    
+
     // Notify systemd that we're ready
     daemon.SdNotify(false, daemon.SdNotifyReady)
-    
+
     return g.Wait()
 }
 ```
@@ -1771,6 +1842,7 @@ func (s *ControllerServer) Start() error {
 ### 12.5 Network Architecture & Port Usage
 
 #### Port Allocation Strategy
+
 ```
 Port Ranges:
 ├── 8080-8089: HTTP/HTTPS Web UI and API
@@ -1788,6 +1860,7 @@ Port Ranges:
 ```
 
 #### Network Communication Matrix
+
 ```
 ┌─────────────────┬─────────────────┬─────────────────┬─────────────────┐
 │                 │ Control Plane   │ Worker Nodes    │ External Users  │
@@ -1804,6 +1877,7 @@ Port Ranges:
 ```
 
 #### Load Balancing & High Availability
+
 ```yaml
 # HAProxy configuration for multi-master setup
 global:

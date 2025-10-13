@@ -39,17 +39,20 @@ Pi-Controller is a **single-binary, Raft-based cluster management system** for R
 Run pi-controller from a laptop or control plane host to provision and manage remote Raspberry Pis.
 
 **Characteristics**:
+
 - Does NOT participate in Raft cluster
 - Acts as secure ingress point for cluster management
 - Can run temporarily (exit after provisioning) or persistently (management interface)
 - Communicates with cluster via gRPC/REST APIs
 
 **Use Cases**:
+
 - Initial cluster deployment from workstation
 - Secure management console for existing cluster
 - CI/CD integration for cluster operations
 
 **Example**:
+
 ```bash
 # Discover available Pis
 $ pi-controller discover --scan --interface=en0
@@ -72,6 +75,7 @@ $ pi-controller kubernetes install \
 Pi-controller runs as a systemd service on each Raspberry Pi node.
 
 **Characteristics**:
+
 - Participates in Raft cluster for consensus
 - Exposes all API endpoints (REST, gRPC, WebSocket)
 - Manages local GPIO pins
@@ -79,6 +83,7 @@ Pi-controller runs as a systemd service on each Raspberry Pi node.
 - Auto-discovers peers via mDNS
 
 **Installation**:
+
 ```bash
 # Manual installation
 curl -sSL https://install.pi-controller.io | bash
@@ -102,6 +107,7 @@ sudo pi-controller join --cluster=192.168.1.10:9091
 All on-device pi-controller instances form a Raft cluster for distributed consensus.
 
 **What Gets Replicated** (via Raft):
+
 - ✅ Node registry (discovered nodes)
 - ✅ GPIO device configurations
 - ✅ Cluster metadata
@@ -109,12 +115,14 @@ All on-device pi-controller instances form a Raft cluster for distributed consen
 - ❌ GPIO readings (too verbose, local-only)
 
 **Cluster Formation**:
+
 1. First node bootstraps Raft cluster (becomes initial leader)
 2. Subsequent nodes join via `JoinMember` API
 3. Automatic leader election on failure
 4. Quorum maintained (N/2 + 1)
 
 **Tuning for Raspberry Pi**:
+
 ```yaml
 cluster:
   heartbeat_timeout: 1s       # Fast heartbeats for low latency
@@ -133,6 +141,7 @@ cluster:
 Pi-controller advertises itself via mDNS and discovers peers on the local network.
 
 **mDNS Service**:
+
 - Service Type: `_pi-controller._tcp`
 - Port: 9091 (Raft)
 - TXT Records:
@@ -142,6 +151,7 @@ Pi-controller advertises itself via mDNS and discovers peers on the local networ
   - `node_id=<unique-id>` - Node identifier
 
 **Discovery Process**:
+
 1. Pi-controller starts → Advertises via mDNS
 2. Listens for other pi-controller instances
 3. Auto-registers discovered nodes in database
@@ -168,6 +178,7 @@ $ pi-controller cluster invite --node-id=<id>
 GPIO devices represent **desired state** without reservations or ownership.
 
 **GPIODevice Model**:
+
 ```go
 type GPIODevice struct {
     ID          uint
@@ -184,6 +195,7 @@ type GPIODevice struct {
 ```
 
 **No Reservations**: Removed reservation system. GPIO state is simply:
+
 - **Desired value**: What it should be
 - **Current value**: What it actually is (from hardware)
 
@@ -196,6 +208,7 @@ User/API → Raft Leader → Direct gRPC to Target Pi → Local GPIO Hardware
 ```
 
 **Example Flow**:
+
 1. User requests GPIO pin 17 on Pi-2 be set to HIGH
 2. Request hits Pi-1 (current Raft leader)
 3. Pi-1 updates GPIO device state in Raft-replicated database
@@ -205,6 +218,7 @@ User/API → Raft Leader → Direct gRPC to Target Pi → Local GPIO Hardware
 7. State persisted in replicated database
 
 **Reading GPIO**:
+
 - Readings NOT replicated (too verbose)
 - Direct gRPC call to target node
 - Stored locally in each node's SQLite database
@@ -219,6 +233,7 @@ User/API → Raft Leader → Direct gRPC to Target Pi → Local GPIO Hardware
 Users can optionally deploy Kubernetes (K3s, K0s, etc.) on the cluster via Web UI or CLI.
 
 **Provisioning**:
+
 ```bash
 $ pi-controller kubernetes install \
   --distribution=k3s \
@@ -228,6 +243,7 @@ $ pi-controller kubernetes install \
 ```
 
 **What Happens**:
+
 1. Pi-controller provisions K3s cluster (servers + agents)
 2. Deploys pi-controller as **DaemonSet** on all K8s nodes
 3. Registers CRDs: `GPIOPin`, `PWMController`, `I2CDevice`
@@ -241,6 +257,7 @@ $ pi-controller kubernetes install \
 Critical transition: systemd Raft cluster → Kubernetes DaemonSet Raft cluster
 
 **Migration Process** (without losing quorum):
+
 1. DaemonSet pods start on all nodes (different ports temporarily)
 2. DaemonSet cluster initializes with bootstrapped state from systemd cluster
 3. DaemonSet cluster achieves quorum
@@ -249,6 +266,7 @@ Critical transition: systemd Raft cluster → Kubernetes DaemonSet Raft cluster
 6. DaemonSet cluster takes over on standard ports
 
 **Post-Migration**:
+
 - Pi-controller runs exclusively as K8s DaemonSet
 - No systemd service (removed)
 - Raft cluster maintained, now managed by K8s
@@ -261,6 +279,7 @@ Critical transition: systemd Raft cluster → Kubernetes DaemonSet Raft cluster
 The Web UI is maintained in a **separate repository**: `kubes-aura`
 
 **Integration**:
+
 - Connects to pi-controller via gRPC client
 - Manages:
   - Cluster nodes
@@ -270,6 +289,7 @@ The Web UI is maintained in a **separate repository**: `kubes-aura`
   - Monitoring dashboards
 
 **Deployment Options**:
+
 1. Standalone (separate host)
 2. K8s Deployment (if K8s installed)
 3. Embedded in pi-controller (future consideration)
@@ -288,6 +308,7 @@ The Web UI is maintained in a **separate repository**: `kubes-aura`
 ### Certificate Authority
 
 Pi-controller includes embedded CA for certificate management:
+
 - **Local CA** (default): Self-hosted PKI
 - **Vault PKI** (optional): Integration with HashiCorp Vault
 - Auto-generates certificates for nodes
@@ -306,15 +327,18 @@ Pi-controller includes embedded CA for certificate management:
 ### SQLite with Raft Replication
 
 Each pi-controller instance maintains:
+
 - **SQLite database** (local storage)
 - **Raft log** (replicated state changes)
 - **WAL mode** (write-ahead logging for SD card protection)
 
 **Replication Strategy**:
+
 - Raft replicates: Node configs, GPIO devices, cluster metadata, users
 - Local-only: GPIO readings, logs, temporary state
 
 **SD Card Optimization**:
+
 - WAL mode reduces write amplification
 - Batched GPIO readings (5-second windows)
 - Periodic snapshots to limit log growth
@@ -404,6 +428,7 @@ OPTION 2: WITH KUBERNETES (K3s)
 When K8s is installed, pi-controller transitions from systemd to DaemonSet.
 
 **Before Migration**:
+
 ```
 Pi-1: systemd pi-controller (Raft leader)
 Pi-2: systemd pi-controller (Raft follower)
@@ -411,6 +436,7 @@ Pi-3: systemd pi-controller (Raft follower)
 ```
 
 **During Migration**:
+
 ```
 Pi-1: systemd (port 9091) + DaemonSet pod (port 9092)  ← Parallel running
 Pi-2: systemd (port 9091) + DaemonSet pod (port 9092)  ← State sync
@@ -418,6 +444,7 @@ Pi-3: systemd (port 9091) + DaemonSet pod (port 9092)  ← Quorum maintained
 ```
 
 **After Migration**:
+
 ```
 Pi-1: DaemonSet pod only (port 9091)  ← systemd disabled & removed
 Pi-2: DaemonSet pod only (port 9091)  ← systemd disabled & removed
@@ -433,11 +460,13 @@ Pi-3: DaemonSet pod only (port 9091)  ← systemd disabled & removed
 ### Deployment Modes
 
 **Portable Mode** (environment variable):
+
 ```bash
 PI_CONTROLLER_MODE=portable    # Client-only, no Raft
 ```
 
 **On-Device Mode** (default):
+
 ```yaml
 cluster:
   enabled: true                 # Participate in Raft
@@ -474,9 +503,10 @@ kubernetes:
 
 ## Differences from Original Architecture
 
-### What Changed:
+### What Changed
 
 ❌ **Removed**:
+
 - Separate `pi-agent` binary
 - NodeTypeAgent / NodeTypeController distinctions
 - GPIO pin reservation system (ReservedBy, ReservationTTL)
@@ -484,6 +514,7 @@ kubernetes:
 - Embedded Web UI (moved to kubes-aura repo)
 
 ✅ **Added/Clarified**:
+
 - Portable mode (client-only operation)
 - Single binary for all nodes
 - Raft-based clustering (all nodes equal)
@@ -491,7 +522,7 @@ kubernetes:
 - Simplified GPIO state model
 - Separate Web UI repository (kubes-aura)
 
-### Philosophy Shift:
+### Philosophy Shift
 
 **Before**: Master/Agent hierarchy
 **After**: Peer-to-peer Raft cluster
@@ -519,6 +550,7 @@ kubernetes:
 ## Summary
 
 Pi-Controller provides a unified, single-binary solution for managing Raspberry Pi clusters with:
+
 - Automatic discovery via mDNS
 - Raft-based distributed consensus
 - Optional Kubernetes integration

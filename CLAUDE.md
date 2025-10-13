@@ -122,12 +122,17 @@ All code changes must be submitted via a Pull Request.
 1. **Target Branch**: PRs for features and bugfixes should target the `develop` branch.
 2. **Title Format**: The PR title must be clear and follow this format:
    `[<Issue-ID>] <Type>(<scope>): <Description>`
-  - *Example*: `[PI-42] feat(discovery): implement mDNS node discovery service`
+
+- *Example*: `[PI-42] feat(discovery): implement mDNS node discovery service`
+
 3. **Description**: The PR description is critical and must clearly explain:
-  - **What** was changed.
-  - **Why** this change is necessary (linking to the business value or bug).
-  - **How** the change was implemented and any architectural decisions made.
+
+- **What** was changed.
+- **Why** this change is necessary (linking to the business value or bug).
+- **How** the change was implemented and any architectural decisions made.
+
 4. **CI Checks**: All automated CI checks (linting, tests, build) must pass. A PR cannot be merged if any checks are failing.
 5. **Code Review**:
-  - At least **one** approval from another developer is required before merging.
-  - Address all review comments before requesting a final review or merge.
+
+- At least **one** approval from another developer is required before merging.
+- Address all review comments before requesting a final review or merge.
