@@ -13,9 +13,11 @@ pip install pre-commit
 pre-commit install  # Installs pre-commit hook only (NOT pre-push)
 pre-commit run --all-files  # Optional initial run
 
-# IMPORTANT: Do NOT install pre-push hooks
-# pre-commit install --hook-type pre-push  # ❌ DON'T DO THIS
-# Reason: It runs the same checks twice (once on commit, once on push), doubling wait time
+# IMPORTANT: Do NOT install additional hook types
+# pre-commit install --hook-type pre-push    # ❌ DON'T DO THIS
+# pre-commit install --hook-type commit-msg  # ❌ DON'T DO THIS
+# Reason: Most hooks don't specify 'stages', so they run on ALL hook types
+# This causes the same checks to run 2-3 times per commit, multiplying wait time
 ```
 
 ### Verification
