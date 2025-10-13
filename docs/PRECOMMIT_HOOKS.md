@@ -10,8 +10,12 @@
 
 # Option 2: Manual setup
 pip install pre-commit
-pre-commit install
+pre-commit install  # Installs pre-commit hook only (NOT pre-push)
 pre-commit run --all-files  # Optional initial run
+
+# IMPORTANT: Do NOT install pre-push hooks
+# pre-commit install --hook-type pre-push  # ❌ DON'T DO THIS
+# Reason: It runs the same checks twice (once on commit, once on push), doubling wait time
 ```
 
 ### Verification
