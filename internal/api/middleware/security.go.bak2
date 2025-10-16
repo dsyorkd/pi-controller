@@ -128,7 +128,7 @@ func (sm *SecurityMiddleware) HostValidation() gin.HandlerFunc {
 		if !sm.isAllowedHost(host) {
 			sm.logger.WithFields(logrus.Fields{
 				"client_ip":  sanitizeLogValue(c.ClientIP()),
-				"host":       sanitizeLogValue(host),
+				"host":       host,
 				"user_agent": sanitizeLogValue(c.GetHeader("User-Agent")),
 			}).Warn("Request blocked: host not allowed")
 

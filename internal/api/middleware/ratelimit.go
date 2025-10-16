@@ -98,11 +98,11 @@ func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 		// Check if request is allowed
 		if !limiter.Allow() {
 			rl.logger.WithFields(logrus.Fields{
-				"client_id":  clientID,
-				"client_ip":  c.ClientIP(),
-				"method":     c.Request.Method,
-				"path":       c.Request.URL.Path,
-				"user_agent": c.GetHeader("User-Agent"),
+				"client_id":  sanitizeLogValue(clientID),
+				"client_ip":  sanitizeLogValue(c.ClientIP()),
+				"method":     sanitizeLogValue(c.Request.Method),
+				"path":       sanitizeLogValue(c.Request.URL.Path),
+				"user_agent": sanitizeLogValue(c.GetHeader("User-Agent")),
 			}).Warn("Rate limit exceeded")
 
 			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", rl.config.RequestsPerMinute))

@@ -11,10 +11,10 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// GPIORateLimitConfig holds rate limiting configuration specific to GPIO operations
-type GPIORateLimitConfig struct {
+// RateLimitConfig holds rate limiting configuration
+type RateLimitConfig struct {
 	Enabled           bool          `yaml:"enabled"`
-	RequestsPerSecond int           `yaml:"requests_per_second"`
+	RequestsPerMinute int           `yaml:"requests_per_minute"`
 	BurstSize         int           `yaml:"burst_size"`
 	CleanupInterval   time.Duration `yaml:"cleanup_interval"`
 	EnableByUser      bool          `yaml:"enable_by_user"`
@@ -22,13 +22,12 @@ type GPIORateLimitConfig struct {
 	WhitelistedIPs    []string      `yaml:"whitelisted_ips"`
 }
 
-// DefaultGPIORateLimitConfig returns strict default rate limiting for GPIO endpoints
-// GPIO operations can cause hardware damage if performed too rapidly
-func DefaultGPIORateLimitConfig() *GPIORateLimitConfig {
-	return &GPIORateLimitConfig{
+// DefaultRateLimitConfig returns secure default rate limiting configuration
+func DefaultRateLimitConfig() *RateLimitConfig {
+	return &RateLimitConfig{
 		Enabled:           true,
-		RequestsPerSecond: 10, // Conservative limit to protect hardware
-		BurstSize:         20, // Allow small bursts for multi-pin operations
+		RequestsPerMinute: 60,
+		BurstSize:         10,
 		CleanupInterval:   5 * time.Minute,
 		EnableByUser:      true,
 		EnableByIP:        true,
@@ -36,24 +35,24 @@ func DefaultGPIORateLimitConfig() *GPIORateLimitConfig {
 	}
 }
 
-// GPIORateLimiter manages rate limiting specifically for GPIO endpoints
-type GPIORateLimiter struct {
-	config    *GPIORateLimitConfig
+// RateLimiter manages rate limiting for clients
+type RateLimiter struct {
+	config    *RateLimitConfig
 	logger    *logrus.Entry
 	limiters  map[string]*rate.Limiter
 	mutex     sync.RWMutex
 	lastClean time.Time
 }
 
-// NewGPIORateLimiter creates a new GPIO-specific rate limiter
-func NewGPIORateLimiter(config *GPIORateLimitConfig, logger *logrus.Logger) *GPIORateLimiter {
+// NewRateLimiter creates a new rate limiter
+func NewRateLimiter(config *RateLimitConfig, logger *logrus.Logger) *RateLimiter {
 	if config == nil {
-		config = DefaultGPIORateLimitConfig()
+		config = DefaultRateLimitConfig()
 	}
 
-	rl := &GPIORateLimiter{
+	rl := &RateLimiter{
 		config:    config,
-		logger:    logger.WithField("component", "gpio_ratelimit"),
+		logger:    logger.WithField("component", "ratelimit"),
 		limiters:  make(map[string]*rate.Limiter),
 		lastClean: time.Now(),
 	}
@@ -62,17 +61,17 @@ func NewGPIORateLimiter(config *GPIORateLimitConfig, logger *logrus.Logger) *GPI
 	go rl.cleanupRoutine()
 
 	rl.logger.WithFields(logrus.Fields{
-		"requests_per_second": config.RequestsPerSecond,
+		"requests_per_minute": config.RequestsPerMinute,
 		"burst_size":          config.BurstSize,
 		"enable_by_user":      config.EnableByUser,
 		"enable_by_ip":        config.EnableByIP,
-	}).Info("GPIO rate limiter initialized with strict limits")
+	}).Info("Rate limiter initialized")
 
 	return rl
 }
 
-// RateLimit returns a rate limiting middleware for GPIO operations
-func (rl *GPIORateLimiter) RateLimit() gin.HandlerFunc {
+// RateLimit returns a rate limiting middleware
+func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip rate limiting if disabled
 		if !rl.config.Enabled {
@@ -89,7 +88,6 @@ func (rl *GPIORateLimiter) RateLimit() gin.HandlerFunc {
 
 		// Check if IP is whitelisted
 		if rl.isWhitelisted(c.ClientIP()) {
-			rl.logger.WithField("client_ip", sanitizeLogValue(c.ClientIP())).Debug("Whitelisted IP, skipping rate limit")
 			c.Next()
 			return
 		}
@@ -100,26 +98,21 @@ func (rl *GPIORateLimiter) RateLimit() gin.HandlerFunc {
 		// Check if request is allowed
 		if !limiter.Allow() {
 			rl.logger.WithFields(logrus.Fields{
-				"client_id":  sanitizeLogValue(clientID),
+				"client_id":  clientID,
 				"client_ip":  sanitizeLogValue(c.ClientIP()),
 				"method":     sanitizeLogValue(c.Request.Method),
 				"path":       sanitizeLogValue(c.Request.URL.Path),
 				"user_agent": sanitizeLogValue(c.GetHeader("User-Agent")),
-			}).Warn("GPIO rate limit exceeded - potential hardware abuse attempt")
+			}).Warn("Rate limit exceeded")
 
-			// Calculate retry after time
-			retryAfter := int(time.Second.Seconds())
-
-			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", rl.config.RequestsPerSecond))
+			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", rl.config.RequestsPerMinute))
 			c.Header("X-RateLimit-Remaining", "0")
-			c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Second).Unix()))
-			c.Header("Retry-After", fmt.Sprintf("%d", retryAfter))
+			c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()))
 
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":       "Rate Limit Exceeded",
-				"message":     "GPIO operation rate limit exceeded. Rapid GPIO switching can damage hardware.",
-				"retry_after": retryAfter,
-				"limit":       rl.config.RequestsPerSecond,
+				"message":     "Too many requests, please slow down",
+				"retry_after": 60,
 			})
 			c.Abort()
 			return
@@ -127,16 +120,16 @@ func (rl *GPIORateLimiter) RateLimit() gin.HandlerFunc {
 
 		// Add rate limit headers
 		remaining := int(limiter.Tokens())
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", rl.config.RequestsPerSecond))
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", rl.config.RequestsPerMinute))
 		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
-		c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Second).Unix()))
+		c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()))
 
 		c.Next()
 	}
 }
 
 // getClientID returns a client identifier for rate limiting
-func (rl *GPIORateLimiter) getClientID(c *gin.Context) string {
+func (rl *RateLimiter) getClientID(c *gin.Context) string {
 	// Prioritize user-based rate limiting if enabled and user is authenticated
 	if rl.config.EnableByUser {
 		if userID := GetUserID(c); userID != "" {
@@ -153,7 +146,7 @@ func (rl *GPIORateLimiter) getClientID(c *gin.Context) string {
 }
 
 // getLimiter gets or creates a rate limiter for a client
-func (rl *GPIORateLimiter) getLimiter(clientID string) *rate.Limiter {
+func (rl *RateLimiter) getLimiter(clientID string) *rate.Limiter {
 	rl.mutex.Lock()
 	defer rl.mutex.Unlock()
 
@@ -162,20 +155,18 @@ func (rl *GPIORateLimiter) getLimiter(clientID string) *rate.Limiter {
 		return limiter
 	}
 
-	// Create new limiter with per-second rate
+	// Create new limiter
 	limiter := rate.NewLimiter(
-		rate.Limit(rl.config.RequestsPerSecond),
+		rate.Every(time.Minute/time.Duration(rl.config.RequestsPerMinute)),
 		rl.config.BurstSize,
 	)
 	rl.limiters[clientID] = limiter
-
-	rl.logger.WithField("client_id", sanitizeLogValue(clientID)).Debug("Created new GPIO rate limiter for client")
 
 	return limiter
 }
 
 // isWhitelisted checks if an IP is whitelisted
-func (rl *GPIORateLimiter) isWhitelisted(ip string) bool {
+func (rl *RateLimiter) isWhitelisted(ip string) bool {
 	for _, whitelistedIP := range rl.config.WhitelistedIPs {
 		if ip == whitelistedIP {
 			return true
@@ -185,7 +176,7 @@ func (rl *GPIORateLimiter) isWhitelisted(ip string) bool {
 }
 
 // cleanupRoutine periodically cleans up old limiters
-func (rl *GPIORateLimiter) cleanupRoutine() {
+func (rl *RateLimiter) cleanupRoutine() {
 	ticker := time.NewTicker(rl.config.CleanupInterval)
 	defer ticker.Stop()
 
@@ -195,39 +186,35 @@ func (rl *GPIORateLimiter) cleanupRoutine() {
 }
 
 // cleanup removes inactive limiters to prevent memory leaks
-func (rl *GPIORateLimiter) cleanup() {
+func (rl *RateLimiter) cleanup() {
 	rl.mutex.Lock()
 	defer rl.mutex.Unlock()
 
 	now := time.Now()
-	removed := 0
-
 	for clientID, limiter := range rl.limiters {
-		// Remove limiter if it's at full capacity (hasn't been used recently)
-		if limiter.Tokens() >= float64(rl.config.BurstSize) {
+		// Remove limiter if it hasn't been used recently
+		if limiter.Tokens() >= float64(rl.config.BurstSize) && now.Sub(rl.lastClean) > rl.config.CleanupInterval {
 			delete(rl.limiters, clientID)
-			removed++
 		}
 	}
 
 	rl.lastClean = now
-
-	if removed > 0 {
-		rl.logger.WithField("removed_count", removed).Debug("GPIO rate limiter cleanup completed")
-	}
+	rl.logger.Debug("Rate limiter cleanup completed")
 }
 
-// GetStats returns GPIO rate limiting statistics
-func (rl *GPIORateLimiter) GetStats() map[string]interface{} {
+// GetStats returns rate limiting statistics
+func (rl *RateLimiter) GetStats() map[string]interface{} {
 	rl.mutex.RLock()
 	defer rl.mutex.RUnlock()
 
-	return map[string]interface{}{
+	stats := map[string]interface{}{
 		"active_limiters":     len(rl.limiters),
-		"requests_per_second": rl.config.RequestsPerSecond,
+		"requests_per_minute": rl.config.RequestsPerMinute,
 		"burst_size":          rl.config.BurstSize,
 		"cleanup_interval":    rl.config.CleanupInterval.String(),
 		"enable_by_user":      rl.config.EnableByUser,
 		"enable_by_ip":        rl.config.EnableByIP,
 	}
+
+	return stats
 }

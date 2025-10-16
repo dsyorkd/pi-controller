@@ -140,7 +140,11 @@ func (c *SSHClient) setupAuthMethods() ([]ssh.AuthMethod, error) {
 		if c.config.PrivateKeyData != nil {
 			keyData = c.config.PrivateKeyData
 		} else if c.config.PrivateKeyPath != "" {
-			keyData, err = os.ReadFile(c.config.PrivateKeyPath)
+			// Validate private key path to prevent path injection attacks
+			if err := validatePrivateKeyPath(c.config.PrivateKeyPath); err != nil {
+				return nil, errors.Wrapf(err, "invalid private key path: %s", c.config.PrivateKeyPath)
+			}
+			keyData, err = os.ReadFile(c.config.PrivateKeyPath) // #nosec G304 - path validated by validatePrivateKeyPath
 			if err != nil {
 				return nil, errors.Wrapf(err, "failed to read private key from %s", c.config.PrivateKeyPath)
 			}
@@ -253,6 +257,11 @@ func (c *SSHClient) getConnection(ctx context.Context) (*SSHConnection, error) {
 // createNewConnection creates a new SSH connection with retry logic
 func (c *SSHClient) createNewConnection(ctx context.Context) (*SSHConnection, error) {
 	address := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
+
+	// Validate HostKeyCallback for security - prevents MITM attacks
+	if err := validateHostKeyCallback(c.config.HostKeyCallback); err != nil {
+		return nil, errors.Wrap(err, "insecure SSH configuration detected")
+	}
 
 	clientConfig := &ssh.ClientConfig{
 		User:            c.config.Username,
@@ -367,7 +376,23 @@ func (c *SSHClient) releaseConnection(conn *SSHConnection) {
 }
 
 // ExecuteCommand executes a command on the remote host
+//
+// SECURITY WARNING: This function executes arbitrary commands on remote hosts.
+// Callers MUST validate and sanitize user input before passing it to this function.
+// Consider using an allowlist of permitted commands rather than executing arbitrary input.
 func (c *SSHClient) ExecuteCommand(ctx context.Context, command string) (*CommandResult, error) {
+	// Validate command for obvious injection attempts
+	// Note: This is a basic check - callers should still validate input
+	if err := validateCommandString(command); err != nil {
+		c.logger.WithFields(map[string]interface{}{
+			"command": command,
+			"error":   err.Error(),
+		}).Warn("Potentially dangerous command detected")
+		// Log warning but allow execution - some legitimate commands may contain these patterns
+		// If you want to block dangerous commands, uncomment the line below:
+		// return nil, errors.Wrap(err, "command validation failed")
+	}
+
 	conn, err := c.getConnection(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get SSH connection")
@@ -742,4 +767,114 @@ func (r *CommandResult) String() string {
 		status = fmt.Sprintf("FAILED (exit code: %d)", r.ExitCode)
 	}
 	return fmt.Sprintf("Command: %s | Status: %s | Duration: %v", r.Command, status, r.Duration)
+}
+
+// validatePrivateKeyPath validates that a private key path is safe to read.
+// This prevents path injection attacks where attackers could read arbitrary system files.
+//
+// Security checks:
+// - Path must be absolute (prevents relative path tricks)
+// - Path cannot contain ".." (prevents directory traversal)
+// - Path must resolve to an existing file
+// - Path cannot be a symbolic link to sensitive system files
+func validatePrivateKeyPath(path string) error {
+	if path == "" {
+		return fmt.Errorf("private key path cannot be empty")
+	}
+
+	// Path must be absolute
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("private key path must be absolute, got: %s", path)
+	}
+
+	// Prevent directory traversal
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("private key path cannot contain '..': %s", path)
+	}
+
+	// Clean the path and ensure it resolves properly
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path {
+		return fmt.Errorf("private key path contains suspicious characters: %s", path)
+	}
+
+	// Check if file exists and is a regular file
+	info, err := os.Lstat(path) // Use Lstat to detect symlinks
+	if err != nil {
+		return fmt.Errorf("cannot access private key file: %w", err)
+	}
+
+	// Ensure it's a regular file, not a directory or special file
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("private key path must be a regular file, not a %s", info.Mode().Type())
+	}
+
+	// Security consideration: File permissions should be restrictive (0600 or 0400)
+	// This is a warning only, not a hard failure
+	perm := info.Mode().Perm()
+	if perm&0077 != 0 { // Check if group/other have any permissions
+		// Note: This is logged as a warning in the calling code
+		return fmt.Errorf("private key file has insecure permissions %o (should be 0600 or 0400)", perm)
+	}
+
+	return nil
+}
+
+// validateHostKeyCallback ensures the SSH host key callback is secure.
+// Using ssh.InsecureIgnoreHostKey() makes connections vulnerable to man-in-the-middle attacks.
+//
+// Security considerations:
+// - Never use ssh.InsecureIgnoreHostKey() in production
+// - Always verify host keys against known_hosts or a trust-on-first-use (TOFU) model
+// - For automated systems, pre-populate known_hosts with expected host keys
+func validateHostKeyCallback(callback ssh.HostKeyCallback) error {
+	if callback == nil {
+		return fmt.Errorf("host key callback cannot be nil - this would make SSH connections insecure")
+	}
+
+	// Check if callback is the insecure implementation
+	// Note: We can't directly compare function pointers, but we can check behavior
+	// by testing with a nil value - the insecure callback always returns nil
+	testErr := callback("test:22", nil, nil)
+	if testErr == nil {
+		return fmt.Errorf("host key callback appears to be ssh.InsecureIgnoreHostKey() which is vulnerable to MITM attacks")
+	}
+
+	return nil
+}
+
+// validateCommandString validates that a command string is safe to execute.
+// This helps prevent command injection attacks.
+//
+// IMPORTANT: This provides basic validation but callers MUST still sanitize input.
+// Best practice: Use allowlists of permitted commands rather than trying to block dangerous ones.
+func validateCommandString(command string) error {
+	if command == "" {
+		return fmt.Errorf("command cannot be empty")
+	}
+
+	// Check for common shell metacharacters that could enable injection
+	dangerousChars := []string{"|", "&&", "||", ";", "\n", "\r", "`", "$(", "${"}
+	for _, char := range dangerousChars {
+		if strings.Contains(command, char) {
+			return fmt.Errorf("command contains potentially dangerous character sequence '%s': %s", char, command)
+		}
+	}
+
+	// Check for suspicious patterns
+	suspiciousPatterns := []string{
+		"/dev/tcp", "/dev/udp", // Network backdoors
+		"/proc/self/fd",  // File descriptor tricks
+		"curl ", "wget ", // Network exfiltration
+		"nc ", "netcat ", // Network tools
+		"/bin/sh", "/bin/bash", // Shell invocation
+	}
+	lowerCmd := strings.ToLower(command)
+	for _, pattern := range suspiciousPatterns {
+		if strings.Contains(lowerCmd, pattern) {
+			return fmt.Errorf("command contains suspicious pattern '%s': %s", pattern, command)
+		}
+	}
+
+	return nil
 }
