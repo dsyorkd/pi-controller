@@ -1,0 +1,27 @@
+[Unit]
+Description=Pi-Controller - Raspberry Pi Cluster Management
+Documentation=https://github.com/yourusername/pi-controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pi-controller
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65536
+
+# Environment
+Environment="PI_CONTROLLER_MODE=on-device"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pi-controller
+
+# Security hardening (optional - uncomment if desired)
+#NoNewPrivileges=true
+#PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
