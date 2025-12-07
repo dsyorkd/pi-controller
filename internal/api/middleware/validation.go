@@ -456,14 +456,14 @@ func (v *Validator) shouldSkipValidation(key string) bool {
 		"jwt",
 		"password", // Also skip passwords as they may contain special characters
 	}
-	
+
 	lowerKey := strings.ToLower(key)
 	for _, skipField := range skipFields {
 		if strings.Contains(lowerKey, skipField) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -480,7 +480,7 @@ func (v *Validator) validateJSONValueWithKey(value interface{}, key string) erro
 		if v.shouldSkipValidation(key) {
 			return nil
 		}
-		
+
 		// Check string value for malicious content
 		if v.config.EnableSQLCheck && v.containsSQLInjection(val) {
 			return fmt.Errorf("request body contains potentially malicious content")
