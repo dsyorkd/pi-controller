@@ -467,11 +467,6 @@ func (v *Validator) shouldSkipValidation(key string) bool {
 	return false
 }
 
-// validateJSONValue recursively validates JSON values
-func (v *Validator) validateJSONValue(value interface{}) error {
-	return v.validateJSONValueWithKey(value, "")
-}
-
 // validateJSONValueWithKey recursively validates JSON values with field name context
 func (v *Validator) validateJSONValueWithKey(value interface{}, key string) error {
 	switch val := value.(type) {
