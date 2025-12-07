@@ -53,6 +53,32 @@
       "groupName": "Node.js toolchain updates",
       "automerge": false,
       "labels": ["node-toolchain"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "schedule": ["before 6am on thursday"],
+      "automerge": false,
+      "labels": ["github-actions"],
+      "pinDigests": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackagePatterns": ["^actions/"],
+      "groupName": "GitHub Actions (actions org)",
+      "schedule": ["before 6am on thursday"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackagePatterns": ["^github/codeql-action"],
+      "groupName": "CodeQL Actions",
+      "schedule": ["before 6am on thursday"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackagePatterns": ["^docker/"],
+      "groupName": "Docker Actions",
+      "schedule": ["before 6am on thursday"]
     }
   ],
   "vulnerabilityAlerts": {

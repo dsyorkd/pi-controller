@@ -23,7 +23,8 @@ permissions:
   actions: read
 
 env:
-  GO_VERSION: "1.25"  # Use Go 1.25 for consistency
+  # renovate: datasource=golang-version depName=go
+  GO_VERSION: "1.25.5"  # Use Go 1.25.5 (matches go.mod toolchain)
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -106,7 +107,7 @@ jobs:
           sudo apt-get install -y make protobuf-compiler
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true

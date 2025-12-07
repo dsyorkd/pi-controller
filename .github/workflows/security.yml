@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25.1"  # Use Go 1.25.1 (matches release.yml and latest project version)
+  # renovate: datasource=golang-version depName=go
+  GO_VERSION: "1.25.5"  # Use Go 1.25.5 (matches go.mod toolchain)
 
 jobs:
   # Dependency vulnerability scanning

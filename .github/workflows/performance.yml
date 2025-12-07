@@ -14,7 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"
+  # renovate: datasource=golang-version depName=go
+  GO_VERSION: "1.25.5"
   CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
 
 jobs:
