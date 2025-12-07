@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/dsyorkd/pi-controller#readme",
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "^1.55.1",
     "@types/node": "^24.5.2"
   },
   "dependencies": {
