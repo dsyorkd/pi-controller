@@ -54,6 +54,7 @@ type Server struct {
 	validator           *middleware.Validator
 	rateLimiter         *middleware.RateLimiter
 	gpioRateLimiter     *middleware.GPIORateLimiter
+	securityMiddleware  *middleware.SecurityMiddleware
 	raftCluster         *clustering.RaftCluster
 	healthChecker       *health.HealthChecker
 	router              *gin.Engine
@@ -97,6 +98,9 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	// Initialize GPIO-specific rate limiter with stricter limits
 	gpioRateLimiter := middleware.NewGPIORateLimiter(middleware.DefaultGPIORateLimitConfig(), logrusLogger)
 
+	// Initialize security middleware for HTTP security headers
+	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), logrusLogger)
+
 	s := &Server{
 		config:              cfg,
 		logger:              log,
@@ -110,6 +114,7 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 		validator:           validator,
 		rateLimiter:         rateLimiter,
 		gpioRateLimiter:     gpioRateLimiter,
+		securityMiddleware:  securityMiddleware,
 		router:              router,
 	}
 
@@ -121,6 +126,7 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 func (s *Server) setupRoutes() {
 	// Global middleware
 	s.router.Use(middleware.Logger(s.logger))
+	s.router.Use(s.securityMiddleware.SecurityHeaders()) // Add security headers to all responses
 
 	// Add NoMethod handler to return 405 for unsupported methods
 	s.router.NoMethod(func(c *gin.Context) {
@@ -447,6 +453,9 @@ func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Databas
 	disabledGPIOConfig.Enabled = false
 	gpioRateLimiter := middleware.NewGPIORateLimiter(disabledGPIOConfig, logrusLogger)
 
+	// Initialize security middleware for HTTP security headers
+	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), logrusLogger)
+
 	s := &Server{
 		config:              cfg,
 		logger:              log,
@@ -460,6 +469,7 @@ func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Databas
 		validator:           validator,
 		rateLimiter:         rateLimiter,
 		gpioRateLimiter:     gpioRateLimiter,
+		securityMiddleware:  securityMiddleware,
 		router:              router,
 	}
 
