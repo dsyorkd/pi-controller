@@ -241,6 +241,14 @@ func (h *NodeHandler) handleServiceError(c *gin.Context, err error, message stri
 		return
 	}
 
+	if services.IsInvalidInput(err) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": err.Error(),
+		})
+		return
+	}
+
 	if err == services.ErrHasAssociatedResources {
 		c.JSON(http.StatusConflict, gin.H{
 			"error":   "Conflict",

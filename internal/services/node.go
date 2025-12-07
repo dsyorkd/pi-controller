@@ -28,6 +28,7 @@ func NewNodeService(db *storage.Database, logger logger.Interface) *NodeService 
 // CreateNodeRequest represents the request to create a node
 type CreateNodeRequest struct {
 	Name              string                 `json:"name" validate:"required,min=1,max=100"`
+	Hostname          string                 `json:"hostname" validate:"omitempty,max=253"`
 	IPAddress         string                 `json:"ip_address" validate:"required,ip"`
 	MACAddress        string                 `json:"mac_address"`
 	Role              models.NodeRole        `json:"role" validate:"required,oneof=master worker"`
@@ -46,6 +47,7 @@ type CreateNodeRequest struct {
 // UpdateNodeRequest represents the request to update a node
 type UpdateNodeRequest struct {
 	Name          *string            `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
+	Hostname      *string            `json:"hostname,omitempty" validate:"omitempty,max=253"`
 	IPAddress     *string            `json:"ip_address,omitempty" validate:"omitempty,ip"`
 	MACAddress    *string            `json:"mac_address,omitempty" validate:"omitempty,mac"`
 	Status        *models.NodeStatus `json:"status,omitempty"`
@@ -193,6 +195,13 @@ func (s *NodeService) GetByIPAddress(ipAddress string) (*models.Node, error) {
 
 // Create creates a new node
 func (s *NodeService) Create(req CreateNodeRequest) (*models.Node, error) {
+	// Validate hostname to prevent command injection
+	if req.Hostname != "" {
+		if err := validation.ValidateHostname("hostname", req.Hostname); err != nil {
+			return nil, errors.Wrapf(ErrInvalidInput, "invalid hostname: %v", err)
+		}
+	}
+
 	// Validate IP address format to prevent command injection
 	if err := validation.ValidateIPAddress("ip_address", req.IPAddress); err != nil {
 		return nil, errors.Wrapf(ErrInvalidInput, "invalid IP address: %v", err)
@@ -269,6 +278,13 @@ func (s *NodeService) Create(req CreateNodeRequest) (*models.Node, error) {
 
 // Update updates an existing node
 func (s *NodeService) Update(id uint, req UpdateNodeRequest) (*models.Node, error) {
+	// Validate hostname to prevent command injection
+	if req.Hostname != nil && *req.Hostname != "" {
+		if err := validation.ValidateHostname("hostname", *req.Hostname); err != nil {
+			return nil, errors.Wrapf(ErrInvalidInput, "invalid hostname: %v", err)
+		}
+	}
+
 	node, err := s.GetByID(id, false)
 	if err != nil {
 		return nil, err

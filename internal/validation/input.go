@@ -261,6 +261,59 @@ func ValidateIPAddress(fieldName, value string) error {
 	return nil
 }
 
+// ValidateHostname validates a hostname against command injection and ensures RFC-compliant format
+func ValidateHostname(fieldName, value string) error {
+	if value == "" {
+		return nil // Hostname is typically optional
+	}
+
+	if len(value) > 253 {
+		return &ValidationError{
+			Field:   fieldName,
+			Message: "hostname exceeds maximum length of 253 characters",
+			Value:   value,
+		}
+	}
+
+	// Check for command injection patterns
+	// Shell command substitution patterns
+	commandInjectionPatterns := []string{
+		"$(", // Command substitution $(...)
+		"`",  // Backtick command substitution
+		"${", // Variable expansion (can be dangerous in some contexts)
+		"|",  // Pipe
+		"&",  // Background execution or AND
+		";",  // Command separator
+		"<",  // Input redirection
+		">",  // Output redirection
+		"\n", // Newline (can be used for command chaining)
+		"\r", // Carriage return
+	}
+
+	for _, pattern := range commandInjectionPatterns {
+		if strings.Contains(value, pattern) {
+			return &ValidationError{
+				Field:   fieldName,
+				Message: "contains characters that could be used for command injection",
+				Value:   value,
+			}
+		}
+	}
+
+	// RFC 1123 hostname validation: labels separated by dots
+	// Each label: 1-63 chars, alphanumeric or hyphens, cannot start/end with hyphen
+	hostnamePattern := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
+	if !hostnamePattern.MatchString(value) {
+		return &ValidationError{
+			Field:   fieldName,
+			Message: "not a valid hostname (must follow RFC 1123 format: alphanumeric and hyphens, labels separated by dots)",
+			Value:   value,
+		}
+	}
+
+	return nil
+}
+
 // SanitizeString removes potentially dangerous characters from a string
 // This should be used as a last resort - proper validation is preferred
 func SanitizeString(value string) string {
