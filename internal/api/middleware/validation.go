@@ -438,17 +438,49 @@ func (v *Validator) validateJSONBody(c *gin.Context) error {
 	}
 
 	// Recursively check all string values in the JSON
-	if err := v.validateJSONValue(data); err != nil {
+	if err := v.validateJSONValueWithKey(data, ""); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// shouldSkipValidation checks if a field should be excluded from content validation
+func (v *Validator) shouldSkipValidation(key string) bool {
+	// Skip validation for token fields as they contain encoded data
+	// that may trigger false positives
+	skipFields := []string{
+		"token",
+		"access_token",
+		"refresh_token",
+		"jwt",
+		"password", // Also skip passwords as they may contain special characters
+	}
+	
+	lowerKey := strings.ToLower(key)
+	for _, skipField := range skipFields {
+		if strings.Contains(lowerKey, skipField) {
+			return true
+		}
+	}
+	
+	return false
+}
+
 // validateJSONValue recursively validates JSON values
 func (v *Validator) validateJSONValue(value interface{}) error {
+	return v.validateJSONValueWithKey(value, "")
+}
+
+// validateJSONValueWithKey recursively validates JSON values with field name context
+func (v *Validator) validateJSONValueWithKey(value interface{}, key string) error {
 	switch val := value.(type) {
 	case string:
+		// Skip validation for token and password fields
+		if v.shouldSkipValidation(key) {
+			return nil
+		}
+		
 		// Check string value for malicious content
 		if v.config.EnableSQLCheck && v.containsSQLInjection(val) {
 			return fmt.Errorf("request body contains potentially malicious content")
@@ -461,15 +493,15 @@ func (v *Validator) validateJSONValue(value interface{}) error {
 		}
 	case map[string]interface{}:
 		// Recursively check all values in the map
-		for _, mapVal := range val {
-			if err := v.validateJSONValue(mapVal); err != nil {
+		for mapKey, mapVal := range val {
+			if err := v.validateJSONValueWithKey(mapVal, mapKey); err != nil {
 				return err
 			}
 		}
 	case []interface{}:
 		// Recursively check all values in the array
 		for _, arrVal := range val {
-			if err := v.validateJSONValue(arrVal); err != nil {
+			if err := v.validateJSONValueWithKey(arrVal, key); err != nil {
 				return err
 			}
 		}
