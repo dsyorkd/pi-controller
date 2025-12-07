@@ -14,14 +14,20 @@ import (
 
 // Server represents the gRPC server
 type Server struct {
-	config   *config.GRPCConfig
-	logger   logger.Interface
-	database *storage.Database
-	server   *grpc.Server
+	config     *config.GRPCConfig
+	logger     logger.Interface
+	database   *storage.Database
+	authConfig *AuthConfig
+	server     *grpc.Server
 }
 
 // New creates a new gRPC server instance
 func New(cfg *config.GRPCConfig, logger logger.Interface, db *storage.Database) (*Server, error) {
+	return NewWithAuth(cfg, logger, db, nil)
+}
+
+// NewWithAuth creates a new gRPC server instance with authentication support
+func NewWithAuth(cfg *config.GRPCConfig, logger logger.Interface, db *storage.Database, authCfg *AuthConfig) (*Server, error) {
 	var opts []grpc.ServerOption
 
 	// Add TLS credentials if configured
@@ -33,17 +39,39 @@ func New(cfg *config.GRPCConfig, logger logger.Interface, db *storage.Database) 
 		opts = append(opts, grpc.Creds(creds))
 	}
 
-	// Add logging interceptor
-	opts = append(opts, grpc.UnaryInterceptor(loggingInterceptor(logger)))
-	opts = append(opts, grpc.StreamInterceptor(streamLoggingInterceptor(logger)))
+	// Build unary interceptor chain
+	unaryInterceptors := []grpc.UnaryServerInterceptor{
+		loggingInterceptor(logger),
+	}
+
+	// Build stream interceptor chain
+	streamInterceptors := []grpc.StreamServerInterceptor{
+		streamLoggingInterceptor(logger),
+	}
+
+	// Add auth interceptors if authentication is enabled
+	if authCfg != nil && authCfg.Enabled {
+		authCfg.Logger = logger
+		if authCfg.SkipMethods == nil {
+			authCfg.SkipMethods = DefaultSkipMethods()
+		}
+		unaryInterceptors = append(unaryInterceptors, AuthUnaryInterceptor(authCfg))
+		streamInterceptors = append(streamInterceptors, AuthStreamInterceptor(authCfg))
+		logger.Info("gRPC authentication enabled")
+	}
+
+	// Chain interceptors
+	opts = append(opts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
+	opts = append(opts, grpc.ChainStreamInterceptor(streamInterceptors...))
 
 	grpcServer := grpc.NewServer(opts...)
 
 	s := &Server{
-		config:   cfg,
-		logger:   logger,
-		database: db,
-		server:   grpcServer,
+		config:     cfg,
+		logger:     logger,
+		database:   db,
+		authConfig: authCfg,
+		server:     grpcServer,
 	}
 
 	// Register service implementation
