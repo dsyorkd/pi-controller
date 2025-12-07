@@ -12,7 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"
+  # renovate: datasource=golang-version depName=go
+  GO_VERSION: "1.25.5"
+  # renovate: datasource=github-releases depName=golangci/golangci-lint
   GOLANGCI_LINT_VERSION: "v1.62.2"
 
 jobs:
