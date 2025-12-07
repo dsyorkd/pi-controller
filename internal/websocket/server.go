@@ -15,10 +15,11 @@ import (
 
 // Server represents the WebSocket server
 type Server struct {
-	config   *config.WebSocketConfig
-	logger   logger.Interface
-	database *storage.Database
-	upgrader websocket.Upgrader
+	config     *config.WebSocketConfig
+	logger     logger.Interface
+	database   *storage.Database
+	authConfig *AuthConfig
+	upgrader   websocket.Upgrader
 
 	// Client management
 	clients    map[*Client]bool
@@ -39,6 +40,11 @@ type Client struct {
 	conn   *websocket.Conn
 	send   chan []byte
 	id     string
+
+	// Authentication
+	userID        string
+	role          string
+	authenticated bool
 
 	// Subscription management
 	subscriptions map[string]bool
@@ -117,6 +123,11 @@ type ErrorMessage struct {
 
 // New creates a new WebSocket server
 func New(cfg *config.WebSocketConfig, logger logger.Interface, db *storage.Database) *Server {
+	return NewWithAuth(cfg, logger, db, nil)
+}
+
+// NewWithAuth creates a new WebSocket server with authentication support
+func NewWithAuth(cfg *config.WebSocketConfig, logger logger.Interface, db *storage.Database, authCfg *AuthConfig) *Server {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  cfg.ReadBufferSize,
 		WriteBufferSize: cfg.WriteBufferSize,
@@ -125,10 +136,11 @@ func New(cfg *config.WebSocketConfig, logger logger.Interface, db *storage.Datab
 		},
 	}
 
-	return &Server{
+	server := &Server{
 		config:     cfg,
 		logger:     logger,
 		database:   db,
+		authConfig: authCfg,
 		upgrader:   upgrader,
 		clients:    make(map[*Client]bool),
 		broadcast:  make(chan []byte, 256),
@@ -136,6 +148,13 @@ func New(cfg *config.WebSocketConfig, logger logger.Interface, db *storage.Datab
 		unregister: make(chan *Client),
 		shutdown:   make(chan struct{}),
 	}
+
+	if authCfg != nil && authCfg.Enabled {
+		authCfg.Logger = logger
+		logger.Info("WebSocket authentication enabled")
+	}
+
+	return server
 }
 
 // Start starts the WebSocket server
@@ -235,6 +254,16 @@ func (s *Server) run() {
 
 // handleWebSocket handles WebSocket upgrade requests
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Attempt authentication from request (query param or header)
+	userID, role, err := s.authenticateFromRequest(r)
+	if err != nil {
+		s.logger.WithError(err).Warn("WebSocket authentication failed")
+		if s.authConfig != nil && s.authConfig.Enabled && !s.authConfig.AllowAnonymous {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to upgrade WebSocket connection")
@@ -246,6 +275,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn:          conn,
 		send:          make(chan []byte, 256),
 		id:            generateClientID(),
+		userID:        userID,
+		role:          role,
+		authenticated: userID != "",
 		subscriptions: make(map[string]bool),
 	}
 
@@ -433,7 +465,15 @@ func (c *Client) writePump() {
 // handleMessage processes incoming messages from clients
 func (c *Client) handleMessage(msg Message) {
 	switch msg.Type {
+	case MessageTypeAuth:
+		c.handleAuthMessage(msg)
+
 	case MessageTypeSubscribe:
+		// Check authentication if required
+		if c.server.authConfig != nil && c.server.authConfig.Enabled && !c.authenticated {
+			c.sendError(401, "Authentication required")
+			return
+		}
 		var sub SubscribeMessage
 		if err := json.Unmarshal(msg.Payload, &sub); err != nil {
 			c.sendError(400, "Invalid subscribe message")
