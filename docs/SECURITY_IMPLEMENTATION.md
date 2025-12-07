@@ -5,6 +5,9 @@ This document provides a comprehensive overview of the security measures impleme
 ## Table of Contents
 
 - [Authentication & Authorization](#authentication--authorization)
+- [gRPC Authentication](#grpc-authentication)
+- [WebSocket Authentication](#websocket-authentication)
+- [Security Headers](#security-headers)
 - [GPIO Pin Safety](#gpio-pin-safety)
 - [Rate Limiting](#rate-limiting)
 - [Input Validation](#input-validation)
@@ -95,6 +98,210 @@ Logs all authentication events:
 - Token validation failures
 - Authorization failures
 - User actions with request context
+
+---
+
+## gRPC Authentication
+
+### Interceptor-Based Authentication
+
+**Implementation:** `internal/grpc/server/auth_interceptor.go`
+
+The gRPC server uses interceptors to authenticate all RPC calls using JWT tokens.
+
+#### Configuration
+
+```go
+authCfg := &server.AuthConfig{
+    Enabled:          true,
+    AuthManager:      authManager,  // Shared with HTTP API
+    SkipMethods:      server.DefaultSkipMethods(),
+    AllowInternalTLS: false,
+}
+```
+
+#### Interceptor Chain
+
+The server uses chained interceptors for both unary and streaming RPCs:
+
+1. **Logging Interceptor** - Logs all RPC calls
+2. **Auth Interceptor** - Validates JWT tokens from metadata
+
+#### Token Validation
+
+Tokens are extracted from gRPC metadata (headers):
+
+```go
+// Client sends token in metadata
+md := metadata.Pairs("authorization", "Bearer "+token)
+ctx := metadata.NewOutgoingContext(context.Background(), md)
+```
+
+#### Skipped Methods
+
+Health check endpoints bypass authentication for load balancer compatibility:
+
+```go
+DefaultSkipMethods() = []string{
+    "/grpc.health.v1.Health/Check",
+    "/grpc.health.v1.Health/Watch",
+    "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+}
+```
+
+#### Role-Based Access Control
+
+Use `RequireRole` in RPC handlers:
+
+```go
+func (s *PiControllerServer) DeleteCluster(ctx context.Context, req *pb.DeleteClusterRequest) (*pb.Empty, error) {
+    // Require admin role for DELETE operations
+    if err := server.RequireRole(ctx, middleware.RoleAdmin); err != nil {
+        return nil, err  // Returns codes.PermissionDenied
+    }
+    // ... implementation
+}
+```
+
+#### Context Helpers
+
+```go
+// Get authenticated user info
+userID := server.GetUserIDFromContext(ctx)
+role := server.GetUserRoleFromContext(ctx)
+isAuth := server.IsAuthenticated(ctx)
+```
+
+---
+
+## WebSocket Authentication
+
+### Connection-Time Authentication
+
+**Implementation:** `internal/websocket/auth.go`
+
+WebSocket connections can be authenticated at connection time or via messages after connection.
+
+#### Authentication Methods
+
+1. **Query Parameter** (for JavaScript clients that can't set headers)
+
+   ```javascript
+   const ws = new WebSocket('wss://host/ws?token=<jwt-token>')
+   ```
+
+2. **Authorization Header** (for clients that support it)
+
+   ```javascript
+   const ws = new WebSocket('wss://host/ws', {
+     headers: { 'Authorization': 'Bearer <jwt-token>' }
+   })
+   ```
+
+3. **Post-Connection Auth Message** (for re-authentication or token refresh)
+
+   ```json
+   {
+     "type": "auth",
+     "payload": { "token": "<jwt-token>" },
+     "timestamp": "2025-01-01T00:00:00Z"
+   }
+   ```
+
+#### Configuration
+
+```go
+authConfig := &websocket.AuthConfig{
+    Enabled:        true,
+    AuthManager:    authManager,  // Shared with HTTP API
+    AllowAnonymous: false,        // Set true for read-only public access
+    Logger:         logger,
+}
+```
+
+#### Anonymous Access Mode
+
+When `AllowAnonymous: true`:
+
+- Unauthenticated connections are allowed with `viewer` role
+- UserID is set to `anonymous`
+- Can only subscribe to public topics
+- Write operations still require authentication
+
+#### Subscription Authorization
+
+Subscriptions require authentication when auth is enabled:
+
+```go
+case MessageTypeSubscribe:
+    if s.authConfig != nil && s.authConfig.Enabled && !c.authenticated {
+        c.sendError(401, "Authentication required")
+        return
+    }
+    // ... allow subscription
+```
+
+#### Role-Based Topic Access
+
+```go
+// Check if client can access a topic
+if client.hasRole(middleware.RoleOperator) {
+    // Can subscribe to operational topics
+}
+```
+
+---
+
+## Security Headers
+
+### HTTP Security Headers Middleware
+
+**Implementation:** `internal/api/middleware/security.go`
+
+The API server applies security headers to all HTTP responses.
+
+#### Headers Applied
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME type sniffing |
+| `X-Frame-Options` | `DENY` | Prevents clickjacking |
+| `X-XSS-Protection` | `1; mode=block` | Legacy XSS protection |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Controls referrer leakage |
+| `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` | Disables sensitive features |
+| `Cache-Control` | `no-store, no-cache, must-revalidate` | Prevents sensitive data caching |
+| `Pragma` | `no-cache` | HTTP/1.0 cache prevention |
+
+#### Content Security Policy (CSP)
+
+```
+default-src 'self';
+script-src 'self';
+style-src 'self' 'unsafe-inline';
+img-src 'self' data:;
+font-src 'self';
+connect-src 'self' wss:;
+frame-ancestors 'none';
+base-uri 'self';
+form-action 'self'
+```
+
+#### HTTPS Enforcement
+
+In production environment (`PI_CONTROLLER_ENVIRONMENT=production`):
+
+- HTTP requests are redirected to HTTPS
+- HSTS header is added: `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+
+#### Host Validation
+
+Optional host validation prevents host header attacks:
+
+```go
+securityMiddleware := middleware.NewSecurityMiddleware(
+    middleware.WithAllowedHosts([]string{"api.example.com", "localhost"}),
+)
+```
 
 ---
 
@@ -333,6 +540,16 @@ Properly returns HTTP 405 for invalid methods on existing endpoints.
 | | Certificate validation | tls/tls.go:192-220 | ✅ |
 | **Logging** | Audit logging | auth.go:570-586 | ✅ |
 | | Security events | Throughout | ✅ |
+| **gRPC** | JWT authentication | grpc/server/auth_interceptor.go | ✅ |
+| | Role-based access control | auth_interceptor.go:RequireRole | ✅ |
+| | Health check bypass | auth_interceptor.go:DefaultSkipMethods | ✅ |
+| **WebSocket** | Connection auth | websocket/auth.go | ✅ |
+| | Message-based auth | auth.go:handleAuthMessage | ✅ |
+| | Anonymous mode | auth.go:AllowAnonymous | ✅ |
+| **Security Headers** | X-Content-Type-Options | middleware/security.go | ✅ |
+| | X-Frame-Options | middleware/security.go | ✅ |
+| | Content-Security-Policy | middleware/security.go | ✅ |
+| | HSTS (production) | middleware/security.go | ✅ |
 
 ### ✅ TLS/HTTPS Implementation (COMPLETED)
 
@@ -539,6 +756,6 @@ export TLS_KEY_FILE=/path/to/your/key.pem
 
 ---
 
-**Last Updated:** 2025-01-30
-**Implemented Tasks:** 60, 61, 67, 68, TLS/HTTPS
+**Last Updated:** 2025-12-07
+**Implemented Tasks:** 60, 61, 67, 68, TLS/HTTPS, gRPC Auth, WebSocket Auth, Security Headers
 **Security Status:** Production-Ready
