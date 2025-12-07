@@ -90,14 +90,6 @@ repos:
 # Local hooks for custom checks
   - repo: local
     hooks:
-      # Security scanning with gosec (must match CI configuration)
-      - id: gosec
-        name: Security scan with gosec
-        entry: bash -c 'gosec -exclude-generated ./...'
-        language: system
-        pass_filenames: false
-        files: \.go$
-
       # Run Go tests on changed packages (commit-time only)
       - id: go-test-changed
         name: Run Go tests on changed packages
