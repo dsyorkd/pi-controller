@@ -153,14 +153,15 @@ build-controller: ## Build pi-controller binary
 
 
 # Cross-compilation targets
+# Note: CGO_ENABLED=0 for cross-compilation (no C dependencies needed for main binary)
 build-linux-amd64: ## Build for Linux AMD64
-	@$(MAKE) build GOOS=linux GOARCH=amd64
+	@$(MAKE) build GOOS=linux GOARCH=amd64 CGO_ENABLED=0
 
-build-linux-arm64: ## Build for Linux ARM64 (Raspberry Pi)
-	@$(MAKE) build GOOS=linux GOARCH=arm64
+build-linux-arm64: ## Build for Linux ARM64 (Raspberry Pi 64-bit)
+	@$(MAKE) build GOOS=linux GOARCH=arm64 CGO_ENABLED=0
 
 build-linux-arm: ## Build for Linux ARM (Raspberry Pi 32-bit)
-	@$(MAKE) build GOOS=linux GOARCH=arm GOARM=7
+	@$(MAKE) build GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0
 
 build-darwin-amd64: ## Build for macOS AMD64
 	@$(MAKE) build GOOS=darwin GOARCH=amd64
@@ -169,7 +170,7 @@ build-darwin-arm64: ## Build for macOS ARM64 (Apple Silicon)
 	@$(MAKE) build GOOS=darwin GOARCH=arm64
 
 build-windows-amd64: ## Build for Windows AMD64
-	@$(MAKE) build GOOS=windows GOARCH=amd64
+	@$(MAKE) build GOOS=windows GOARCH=amd64 CGO_ENABLED=0
 
 build-all: ## Build for all supported platforms
 	@echo "Building for all platforms..."
