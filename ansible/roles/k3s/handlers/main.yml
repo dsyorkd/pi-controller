@@ -1,0 +1,6 @@
+---
+# K3s Cleanup Handlers
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

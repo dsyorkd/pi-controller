@@ -1,0 +1,153 @@
+---
+# Pi Controller Role
+# ==================
+# Installs and configures pi-controller service:
+# - Downloads or copies binary
+# - Creates configuration
+# - Sets up systemd service
+# - Manages cluster membership
+
+- name: Set architecture fact
+  ansible.builtin.set_fact:
+    pi_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'arm' }}"
+
+# ----------------------
+# Backup Existing State
+# ----------------------
+- name: Check for existing installation
+  ansible.builtin.stat:
+    path: /usr/local/bin/pi-controller
+  register: existing_binary
+
+- name: Check for existing database
+  ansible.builtin.stat:
+    path: "{{ database_path }}"
+  register: existing_db
+
+- name: Create backup of existing state
+  when:
+    - create_backup | default(true)
+    - existing_db.stat.exists
+  block:
+    - name: Ensure backup directory exists
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Backup existing database
+      ansible.builtin.copy:
+        src: "{{ database_path }}"
+        dest: "{{ backup_dir }}/pi-controller-{{ ansible_date_time.epoch }}.db"
+        remote_src: true
+        mode: "0644"
+
+    - name: Clean old backups (keep last N)
+      ansible.builtin.shell: |
+        ls -t {{ backup_dir }}/pi-controller-*.db 2>/dev/null | tail -n +{{ keep_backup_count + 1 }} | xargs -r rm
+      changed_when: false
+      args:
+        executable: /bin/bash
+
+# ----------------------
+# Stop Existing Service
+# ----------------------
+- name: Stop pi-controller service if running
+  ansible.builtin.systemd:
+    name: pi-controller
+    state: stopped
+  ignore_errors: true
+  when: existing_binary.stat.exists
+
+# ----------------------
+# Install Binary
+# ----------------------
+- name: Install from local build
+  when: pi_controller_local_binary is defined
+  block:
+    - name: Copy local binary to Pi
+      ansible.builtin.copy:
+        src: "{{ pi_controller_local_binary }}"
+        dest: /usr/local/bin/pi-controller
+        mode: "0755"
+        owner: root
+        group: root
+
+- name: Install from release
+  when: pi_controller_local_binary is not defined
+  block:
+    - name: Download pi-controller binary
+      ansible.builtin.get_url:
+        url: "{{ pi_controller_binary_url }}"
+        dest: /usr/local/bin/pi-controller
+        mode: "0755"
+        owner: root
+        group: root
+      when: pi_controller_version != 'local'
+
+- name: Verify binary is executable
+  ansible.builtin.command: /usr/local/bin/pi-controller version
+  register: version_check
+  changed_when: false
+
+- name: Display installed version
+  ansible.builtin.debug:
+    msg: "Installed pi-controller: {{ version_check.stdout }}"
+
+# ----------------------
+# Configuration
+# ----------------------
+- name: Create configuration directory
+  ansible.builtin.file:
+    path: "{{ config_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Generate configuration file
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ config_dir }}/config.yaml"
+    mode: "0644"
+    backup: true
+  notify: restart pi-controller
+
+# ----------------------
+# Systemd Service
+# ----------------------
+- name: Install systemd service file
+  ansible.builtin.template:
+    src: pi-controller.service.j2
+    dest: /etc/systemd/system/pi-controller.service
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart pi-controller
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start pi-controller service
+  ansible.builtin.systemd:
+    name: pi-controller
+    state: started
+    enabled: true
+  when: start_service | default(true)
+
+# ----------------------
+# Health Check
+# ----------------------
+- name: Wait for pi-controller to be healthy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ api_port }}/health"
+    status_code: 200
+  register: health_check
+  retries: 30
+  delay: 2
+  until: health_check.status == 200
+  when: start_service | default(true)
+
+- name: Display health status
+  ansible.builtin.debug:
+    msg: "pi-controller is healthy on {{ inventory_hostname }}"
+  when: start_service | default(true)

@@ -1,0 +1,46 @@
+---
+# Release Lock Playbook
+# =====================
+# Emergency lock release for when a test fails and leaves a stale lock.
+#
+# Usage:
+#   ansible-playbook playbooks/release-lock.yml
+
+- name: Force release cluster lock
+  hosts: bootstrap
+  gather_facts: true
+  tasks:
+    - name: Check current lock status
+      ansible.builtin.stat:
+        path: "{{ test_cluster_lock_file | default('/tmp/pi-controller-test.lock') }}"
+      register: lock_stat
+
+    - name: Read lock metadata
+      ansible.builtin.slurp:
+        src: "{{ test_cluster_lock_file | default('/tmp/pi-controller-test.lock') }}"
+      register: lock_content
+      when: lock_stat.stat.exists
+
+    - name: Display lock info
+      ansible.builtin.debug:
+        msg: |
+          Current lock status:
+          {{ lock_content.content | b64decode | from_json | to_nice_yaml }}
+      when: lock_stat.stat.exists
+
+    - name: No lock found
+      ansible.builtin.debug:
+        msg: "No lock file found - cluster is not locked"
+      when: not lock_stat.stat.exists
+
+    - name: Release lock
+      ansible.builtin.include_role:
+        name: cluster-lock
+      vars:
+        lock_action: release
+      when: lock_stat.stat.exists
+
+    - name: Confirm lock released
+      ansible.builtin.debug:
+        msg: "Lock has been released"
+      when: lock_stat.stat.exists

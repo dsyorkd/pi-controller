@@ -1,0 +1,156 @@
+name: Pi Integration Tests
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      reset_before_test:
+        description: 'Reset cluster before running tests'
+        required: false
+        default: 'false'
+        type: boolean
+
+# Only ONE run at a time against the Pi cluster
+concurrency:
+  group: pi-cluster
+  cancel-in-progress: false
+
+env:
+  PI_CONTROLLER_VERSION: ${{ github.sha }}
+
+jobs:
+  build:
+    name: Build ARM64 Binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build for ARM64
+        run: make build-linux-arm64
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-controller-linux-arm64
+          path: build/pi-controller-linux-arm64
+          retention-days: 1
+
+  deploy-and-test:
+    name: Deploy & Test on Pi Cluster
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: pi-controller-linux-arm64
+          path: build/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible
+        run: |
+          pip install ansible ansible-lint
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_cluster_key
+          chmod 600 ~/.ssh/pi_cluster_key
+          # Add known hosts to avoid prompts
+          ssh-keyscan -p 8002 ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p 8003 ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p 8004 ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Create dynamic inventory
+        run: |
+          cat > ansible/inventory/ci-hosts.yml << 'EOF'
+          all:
+            vars:
+              ansible_ssh_private_key_file: ~/.ssh/pi_cluster_key
+              pi_controller_local_binary: "{{ playbook_dir }}/../../build/pi-controller-linux-arm64"
+            children:
+              pis:
+                hosts:
+                  pi-node-1:
+                    ansible_host: ${{ secrets.PI_HOST }}
+                    ansible_port: 8002
+                  pi-node-2:
+                    ansible_host: ${{ secrets.PI_HOST }}
+                    ansible_port: 8003
+                  pi-node-3:
+                    ansible_host: ${{ secrets.PI_HOST }}
+                    ansible_port: 8004
+                vars:
+                  ansible_user: pi
+              bootstrap:
+                hosts:
+                  pi-node-1:
+                vars:
+                  cluster_bootstrap: true
+              workers:
+                hosts:
+                  pi-node-2:
+                  pi-node-3:
+                vars:
+                  cluster_bootstrap: false
+          EOF
+
+      - name: Reset cluster (if requested)
+        if: github.event.inputs.reset_before_test == 'true'
+        working-directory: ansible
+        run: |
+          ansible-playbook playbooks/reset-cluster.yml \
+            -i inventory/ci-hosts.yml \
+            -e force_reset=true
+
+      - name: Deploy and test
+        working-directory: ansible
+        run: |
+          chmod +x ../build/pi-controller-linux-arm64
+          ansible-playbook playbooks/deploy-test.yml \
+            -i inventory/ci-hosts.yml \
+            -e pi_controller_local_binary="../build/pi-controller-linux-arm64"
+
+      - name: Cleanup on failure
+        if: failure()
+        working-directory: ansible
+        run: |
+          # Release lock if held
+          ansible-playbook playbooks/release-lock.yml \
+            -i inventory/ci-hosts.yml || true
+          # Optionally reset cluster
+          # ansible-playbook playbooks/reset-cluster.yml \
+          #   -i inventory/ci-hosts.yml \
+          #   -e force_reset=true
+
+      - name: Collect logs on failure
+        if: failure()
+        working-directory: ansible
+        run: |
+          ansible pis -i inventory/ci-hosts.yml -m shell \
+            -a "journalctl -u pi-controller --no-pager -n 100" \
+            > ../pi-controller-logs.txt 2>&1 || true
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-controller-logs
+          path: pi-controller-logs.txt
+          retention-days: 7

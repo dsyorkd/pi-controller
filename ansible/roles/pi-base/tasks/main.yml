@@ -1,0 +1,206 @@
+---
+# Pi Base Role
+# =============
+# Prepares a Raspberry Pi for running pi-controller:
+# - System updates
+# - Required packages
+# - GPIO permissions
+# - Network configuration
+# - Time synchronization
+
+- name: Gather facts about the Pi
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+      - network
+
+- name: Detect Raspberry Pi model
+  ansible.builtin.slurp:
+    src: /proc/device-tree/model
+  register: pi_model_raw
+  ignore_errors: true
+
+- name: Set Pi model fact
+  ansible.builtin.set_fact:
+    pi_model: "{{ pi_model_raw.content | b64decode | regex_replace('\\x00', '') | trim }}"
+    is_raspberry_pi: true
+  when: pi_model_raw is succeeded
+
+- name: Set architecture fact
+  ansible.builtin.set_fact:
+    pi_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'arm' }}"
+
+- name: Display detected hardware
+  ansible.builtin.debug:
+    msg: |
+      Detected: {{ pi_model | default('Unknown device') }}
+      Architecture: {{ pi_arch }}
+      Memory: {{ ansible_memtotal_mb }}MB
+
+# ----------------------
+# System Updates
+# ----------------------
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+
+- name: Install essential packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - jq
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - apt-transport-https
+      - python3-pip
+      - git
+      - htop
+      - iotop
+      - net-tools
+      - dnsutils
+      - iputils-ping
+    state: present
+  when: ansible_os_family == 'Debian'
+
+# ----------------------
+# GPIO Setup
+# ----------------------
+- name: Ensure gpio group exists
+  ansible.builtin.group:
+    name: gpio
+    state: present
+
+- name: Add user to gpio group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: gpio
+    append: true
+
+- name: Create GPIO udev rules
+  ansible.builtin.copy:
+    content: |
+      # Allow gpio group access to GPIO pins
+      SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"
+      SUBSYSTEM=="gpio", KERNEL=="gpio*", GROUP="gpio", MODE="0660"
+
+      # Memory-mapped GPIO access (for legacy applications)
+      SUBSYSTEM=="bcm2835-gpiomem", GROUP="gpio", MODE="0660"
+    dest: /etc/udev/rules.d/99-gpio.rules
+    mode: "0644"
+  notify: reload udev
+  when: is_raspberry_pi | default(false)
+
+# ----------------------
+# Kernel Modules
+# ----------------------
+- name: Enable required kernel modules
+  ansible.builtin.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - i2c-dev
+    - spi-bcm2835
+  ignore_errors: true
+  when: is_raspberry_pi | default(false)
+
+- name: Persist kernel modules
+  ansible.builtin.lineinfile:
+    path: /etc/modules-load.d/pi-controller.conf
+    line: "{{ item }}"
+    create: true
+    mode: "0644"
+  loop:
+    - i2c-dev
+    - spi-bcm2835
+  when: is_raspberry_pi | default(false)
+
+# ----------------------
+# Network Configuration
+# ----------------------
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+  loop:
+    - net.ipv4.ip_forward
+    - net.ipv6.conf.all.forwarding
+  when: enable_ip_forwarding | default(true)
+
+- name: Configure mDNS (Avahi)
+  ansible.builtin.apt:
+    name: avahi-daemon
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Ensure Avahi is running
+  ansible.builtin.systemd:
+    name: avahi-daemon
+    state: started
+    enabled: true
+
+# ----------------------
+# Time Synchronization
+# ----------------------
+- name: Configure NTP
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Ensure chrony is running
+  ansible.builtin.systemd:
+    name: chrony
+    state: started
+    enabled: true
+
+# ----------------------
+# Directories
+# ----------------------
+- name: Create required directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ data_dir }}"
+    - "{{ config_dir }}"
+    - "{{ log_dir | default('/var/log/pi-controller') }}"
+    - "{{ backup_dir | default('/var/lib/pi-controller/backups') }}"
+
+# ----------------------
+# Firewall (optional)
+# ----------------------
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  when:
+    - ansible_os_family == 'Debian'
+    - enable_firewall | default(false)
+
+- name: Configure firewall rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ api_port }}"
+    - "{{ grpc_port }}"
+    - "{{ websocket_port }}"
+    - "{{ cluster_port }}"
+    - "22"  # SSH
+  when: enable_firewall | default(false)
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: enable_firewall | default(false)

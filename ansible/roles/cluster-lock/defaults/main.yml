@@ -1,0 +1,15 @@
+---
+# Cluster Lock Defaults
+# =====================
+
+# Path to the lock file on the bootstrap node
+test_cluster_lock_file: /tmp/pi-controller-test.lock
+
+# Maximum time (seconds) a lock can be held before it's considered stale
+test_lock_timeout: 600
+
+# Action to perform: 'acquire' or 'release'
+lock_action: acquire
+
+# Reason for acquiring the lock (for debugging)
+lock_reason: "ansible-playbook"

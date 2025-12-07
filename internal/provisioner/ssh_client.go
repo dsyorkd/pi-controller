@@ -375,24 +375,46 @@ func (c *SSHClient) releaseConnection(conn *SSHConnection) {
 	conn.lastUsed = time.Now()
 }
 
-// ExecuteCommand executes a command on the remote host
+// ExecuteSafeCommand executes a command with properly escaped arguments.
+// This is the PREFERRED method for executing commands with user-controlled input.
 //
-// SECURITY WARNING: This function executes arbitrary commands on remote hosts.
-// Callers MUST validate and sanitize user input before passing it to this function.
-// Consider using an allowlist of permitted commands rather than executing arbitrary input.
+// Example:
+//
+//	client.ExecuteSafeCommand(ctx, "mkdir", "-p", userProvidedPath)
+//	client.ExecuteSafeCommand(ctx, "cat", filePath)
+func (c *SSHClient) ExecuteSafeCommand(ctx context.Context, command string, args ...string) (*CommandResult, error) {
+	// Validate the base command (should be a simple command name)
+	if err := validateBaseCommand(command); err != nil {
+		return nil, errors.Wrap(err, "invalid command")
+	}
+
+	// Build the full command with properly escaped arguments
+	fullCommand := buildSafeCommand(command, args...)
+
+	return c.executeCommandInternal(ctx, fullCommand)
+}
+
+// ExecuteCommand executes a raw command string on the remote host.
+//
+// SECURITY WARNING: This function is for INTERNAL USE with trusted command strings only.
+// For any user-controlled input, use ExecuteSafeCommand instead.
+// This function will REJECT commands containing shell metacharacters.
 func (c *SSHClient) ExecuteCommand(ctx context.Context, command string) (*CommandResult, error) {
-	// Validate command for obvious injection attempts
-	// Note: This is a basic check - callers should still validate input
+	// Validate command and BLOCK dangerous patterns
 	if err := validateCommandString(command); err != nil {
 		c.logger.WithFields(map[string]interface{}{
 			"command": command,
 			"error":   err.Error(),
-		}).Warn("Potentially dangerous command detected")
-		// Log warning but allow execution - some legitimate commands may contain these patterns
-		// If you want to block dangerous commands, uncomment the line below:
-		// return nil, errors.Wrap(err, "command validation failed")
+		}).Error("Blocked potentially dangerous command")
+		return nil, errors.Wrap(err, "command validation failed: potentially dangerous command blocked")
 	}
 
+	return c.executeCommandInternal(ctx, command)
+}
+
+// executeCommandInternal is the internal implementation that actually runs commands.
+// It should only be called after validation.
+func (c *SSHClient) executeCommandInternal(ctx context.Context, command string) (*CommandResult, error) {
 	conn, err := c.getConnection(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get SSH connection")
@@ -846,8 +868,8 @@ func validateHostKeyCallback(callback ssh.HostKeyCallback) error {
 // validateCommandString validates that a command string is safe to execute.
 // This helps prevent command injection attacks.
 //
-// IMPORTANT: This provides basic validation but callers MUST still sanitize input.
-// Best practice: Use allowlists of permitted commands rather than trying to block dangerous ones.
+// IMPORTANT: This function now BLOCKS dangerous commands instead of just logging.
+// For commands that legitimately need shell constructs, use ExecuteTrustedCommand.
 func validateCommandString(command string) error {
 	if command == "" {
 		return fmt.Errorf("command cannot be empty")
@@ -857,7 +879,7 @@ func validateCommandString(command string) error {
 	dangerousChars := []string{"|", "&&", "||", ";", "\n", "\r", "`", "$(", "${"}
 	for _, char := range dangerousChars {
 		if strings.Contains(command, char) {
-			return fmt.Errorf("command contains potentially dangerous character sequence '%s': %s", char, command)
+			return fmt.Errorf("command contains potentially dangerous character sequence '%s'", char)
 		}
 	}
 
@@ -865,16 +887,98 @@ func validateCommandString(command string) error {
 	suspiciousPatterns := []string{
 		"/dev/tcp", "/dev/udp", // Network backdoors
 		"/proc/self/fd",  // File descriptor tricks
-		"curl ", "wget ", // Network exfiltration
 		"nc ", "netcat ", // Network tools
-		"/bin/sh", "/bin/bash", // Shell invocation
 	}
 	lowerCmd := strings.ToLower(command)
 	for _, pattern := range suspiciousPatterns {
 		if strings.Contains(lowerCmd, pattern) {
-			return fmt.Errorf("command contains suspicious pattern '%s': %s", pattern, command)
+			return fmt.Errorf("command contains suspicious pattern '%s'", pattern)
 		}
 	}
 
 	return nil
+}
+
+// validateBaseCommand validates that a command is a simple command name without paths or special characters.
+// This ensures only known commands can be executed.
+func validateBaseCommand(command string) error {
+	if command == "" {
+		return fmt.Errorf("command cannot be empty")
+	}
+
+	// Command should not contain path separators (use full path if needed)
+	// Allow absolute paths but validate they point to expected locations
+	if strings.Contains(command, "..") {
+		return fmt.Errorf("command cannot contain path traversal")
+	}
+
+	// Check for shell metacharacters
+	dangerousChars := []string{"|", "&", ";", "\n", "\r", "`", "$", "(", ")", "{", "}", "[", "]", "<", ">", "!", "~", "*", "?", "'", "\"", "\\"}
+	for _, char := range dangerousChars {
+		if strings.Contains(command, char) {
+			return fmt.Errorf("command contains invalid character '%s'", char)
+		}
+	}
+
+	return nil
+}
+
+// buildSafeCommand builds a shell command string with properly escaped arguments.
+// Each argument is escaped to prevent shell injection.
+func buildSafeCommand(command string, args ...string) string {
+	if len(args) == 0 {
+		return command
+	}
+
+	var parts []string
+	parts = append(parts, command)
+	for _, arg := range args {
+		parts = append(parts, ShellEscape(arg))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// ShellEscape escapes a string for safe use as a shell argument.
+// It wraps the string in single quotes and escapes any embedded single quotes.
+//
+// Examples:
+//
+//	ShellEscape("hello world") -> "'hello world'"
+//	ShellEscape("it's fine") -> "'it'\\''s fine'"
+//	ShellEscape("$(whoami)") -> "'$(whoami)'"
+func ShellEscape(s string) string {
+	// If the string is empty, return empty quoted string
+	if s == "" {
+		return "''"
+	}
+
+	// Replace single quotes with the sequence: end quote, escaped quote, start quote
+	// 'it's' becomes 'it'\''s'
+	escaped := strings.ReplaceAll(s, "'", "'\\''")
+
+	return "'" + escaped + "'"
+}
+
+// SanitizePath validates and sanitizes a file path for use in commands.
+// Returns an error if the path contains dangerous patterns.
+func SanitizePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("path cannot be empty")
+	}
+
+	// Check for null bytes (can be used to truncate paths)
+	if strings.ContainsRune(path, 0) {
+		return "", fmt.Errorf("path contains null bytes")
+	}
+
+	// Check for path traversal BEFORE cleaning (to catch attempts like /var/lib/../etc)
+	if strings.Contains(path, "..") {
+		return "", fmt.Errorf("path contains directory traversal")
+	}
+
+	// Clean the path to normalize it
+	cleanPath := filepath.Clean(path)
+
+	return cleanPath, nil
 }

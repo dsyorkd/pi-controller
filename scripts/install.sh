@@ -3,7 +3,7 @@
 # Pi-Controller Quick Install Script
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/yourusername/pi-controller/main/scripts/install.sh | bash
+#   curl -sSL https://pi-controller.io/install.sh | bash
 #
 # Options (via environment variables):
 #   VERSION=v1.0.0        - Specific version to install (default: latest)

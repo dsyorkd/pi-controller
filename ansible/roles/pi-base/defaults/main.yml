@@ -1,0 +1,21 @@
+---
+# Pi Base Defaults
+
+# Directories
+data_dir: /var/lib/pi-controller
+config_dir: /etc/pi-controller
+log_dir: /var/log/pi-controller
+backup_dir: /var/lib/pi-controller/backups
+
+# Ports
+api_port: 8080
+grpc_port: 9090
+websocket_port: 8081
+cluster_port: 9091
+
+# Features
+enable_ip_forwarding: true
+enable_firewall: false
+
+# GPIO
+enable_gpio: true

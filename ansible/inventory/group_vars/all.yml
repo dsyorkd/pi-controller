@@ -1,0 +1,88 @@
+# Global Variables for All Hosts
+# ==============================
+
+# ----------------------
+# pi-controller settings
+# ----------------------
+pi_controller_version: "{{ lookup('env', 'PI_CONTROLLER_VERSION') | default('latest', true) }}"
+pi_controller_binary_url: "https://github.com/dsyorkd/pi-controller/releases/download/{{ pi_controller_version }}/pi-controller-linux-{{ pi_arch }}"
+
+# Service configuration
+pi_controller_mode: "on-device"
+pi_controller_log_level: "info"
+pi_controller_debug: false
+
+# ----------------------
+# Cluster configuration
+# ----------------------
+cluster_name: "pi-cluster"
+cluster_port: 9091
+
+# Bootstrap node address (set in inventory or override)
+bootstrap_address: "{{ hostvars[groups['bootstrap'][0]]['ansible_host'] | default(groups['bootstrap'][0]) }}"
+
+# ----------------------
+# API Configuration
+# ----------------------
+api_port: 8080
+api_read_timeout: 30
+api_write_timeout: 30
+api_max_request_size: "10MB"
+
+grpc_port: 9090
+grpc_max_message_size: "50MB"
+
+websocket_port: 8081
+websocket_max_connections: 100
+
+# ----------------------
+# Database settings
+# ----------------------
+database_path: "/var/lib/pi-controller/pi-controller.db"
+database_max_connections: 25
+database_connection_lifetime: "1h"
+
+# ----------------------
+# Directories
+# ----------------------
+data_dir: /var/lib/pi-controller
+config_dir: /etc/pi-controller
+log_dir: /var/log/pi-controller
+
+# ----------------------
+# Security
+# ----------------------
+enable_tls: false
+# tls_cert_path: /etc/pi-controller/certs/server.crt
+# tls_key_path: /etc/pi-controller/certs/server.key
+
+enable_auth: false
+# auth_token: "{{ lookup('env', 'PI_CONTROLLER_AUTH_TOKEN') }}"
+
+# ----------------------
+# K3s Configuration
+# ----------------------
+k3s_version: "v1.28.4+k3s1"
+k3s_install_script: "https://get.k3s.io"
+
+# K3s server options
+k3s_server_args: >-
+  --disable traefik
+  --disable servicelb
+  --write-kubeconfig-mode 644
+
+# K3s agent options
+k3s_agent_args: ""
+
+# ----------------------
+# Testing Configuration
+# ----------------------
+test_cluster_lock_file: /tmp/pi-controller-test.lock
+test_lock_timeout: 600  # 10 minutes max test duration
+test_cleanup_on_failure: true
+
+# ----------------------
+# Rollback Configuration
+# ----------------------
+keep_backup_count: 3
+backup_dir: /var/lib/pi-controller/backups

