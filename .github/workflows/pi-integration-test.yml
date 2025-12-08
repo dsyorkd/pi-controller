@@ -101,15 +101,15 @@ jobs:
             children:
               pis:
                 hosts:
-                  pi-node-1:
+                  pi-01:
                     ansible_host: ${{ secrets.PI_HOST }}
-                    ansible_port: 8002
-                  pi-node-2:
+                    ansible_port: 22
+                  pi-02:
                     ansible_host: ${{ secrets.PI_HOST }}
-                    ansible_port: 8003
-                  pi-node-3:
+                    ansible_port: 22
+                  pi-03:
                     ansible_host: ${{ secrets.PI_HOST }}
-                    ansible_port: 8004
+                    ansible_port: 22
                 vars:
                   ansible_user: pi
               bootstrap:
