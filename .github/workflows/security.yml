@@ -92,7 +92,7 @@ jobs:
   static-analysis:
     name: Static Code Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -123,6 +123,7 @@ jobs:
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -130,9 +131,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-v2
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-go-v2-
 
       - name: Run gosec security scanner
         run: |
