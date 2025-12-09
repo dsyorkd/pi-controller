@@ -10,7 +10,7 @@ on:
       reset_before_test:
         description: 'Reset cluster before running tests'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 # Only ONE run at a time against the Pi cluster
@@ -87,9 +87,9 @@ jobs:
           echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_cluster_key
           chmod 600 ~/.ssh/pi_cluster_key
           # Add known hosts to avoid prompts
-          ssh-keyscan -p 8002 ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          ssh-keyscan -p 8003 ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          ssh-keyscan -p 8004 ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p 22 ${{ secrets.PI_HOST_1 }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p 22 ${{ secrets.PI_HOST_2 }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p 22 ${{ secrets.PI_HOST_3 }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Create dynamic inventory
         run: |
@@ -102,25 +102,25 @@ jobs:
               pis:
                 hosts:
                   pi-01.local:
-                    ansible_host: ${{ secrets.PI_HOST }}
+                    ansible_host: ${{ secrets.PI_HOST_1 }}
                     ansible_port: 22
                   pi-02.local:
-                    ansible_host: ${{ secrets.PI_HOST }}
+                    ansible_host: ${{ secrets.PI_HOST_2 }}
                     ansible_port: 22
                   pi-03.local:
-                    ansible_host: ${{ secrets.PI_HOST }}
+                    ansible_host: ${{ secrets.PI_HOST_3 }}
                     ansible_port: 22
                 vars:
                   ansible_user: pi
               bootstrap:
                 hosts:
-                  pi-node-1:
+                  pi-01.local:
                 vars:
                   cluster_bootstrap: true
               workers:
                 hosts:
-                  pi-node-2:
-                  pi-node-3:
+                  pi-02.local:
+                  pi-03.local:
                 vars:
                   cluster_bootstrap: false
           EOF
