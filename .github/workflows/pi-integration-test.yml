@@ -74,9 +74,11 @@ jobs:
 
       - name: Install Ansible
         run: |
-          # Use system Python on self-hosted runner
-          pip3 install --user ansible ansible-lint
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          # Use virtual environment on self-hosted runner (Debian 12 requires this)
+          python3 -m venv ~/.ansible-venv
+          source ~/.ansible-venv/bin/activate
+          pip install ansible ansible-lint
+          echo "$HOME/.ansible-venv/bin" >> $GITHUB_PATH
 
       - name: Set up SSH key
         run: |
