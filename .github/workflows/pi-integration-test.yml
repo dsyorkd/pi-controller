@@ -103,10 +103,10 @@ jobs:
       - name: Deploy and test
         working-directory: ansible
         run: |
-          chmod +x ../build/pi-controller-linux-arm64
+          chmod +x $GITHUB_WORKSPACE/build/pi-controller-linux-arm64
           ansible-playbook playbooks/deploy-test.yml \
             -i inventory/hosts.yml \
-            -e pi_controller_local_binary="../build/pi-controller-linux-arm64"
+            -e pi_controller_local_binary="$GITHUB_WORKSPACE/build/pi-controller-linux-arm64"
 
       - name: Cleanup on failure
         if: failure()
