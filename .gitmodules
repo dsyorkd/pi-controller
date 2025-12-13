@@ -1,0 +1,3 @@
+[submodule "web/kubes-aura"]
+	path = web/kubes-aura
+	url = https://github.com/dsyorkd/kubes-aura.git
