@@ -72,13 +72,24 @@ jobs:
           name: pi-controller-linux-arm64
           path: build/
 
-      - name: Install Ansible
+      - name: Install Ansible (if needed)
         run: |
-          # Use virtual environment on self-hosted runner (Debian 12 requires this)
-          python3 -m venv ~/.ansible-venv
-          source ~/.ansible-venv/bin/activate
-          pip install ansible ansible-lint
-          echo "$HOME/.ansible-venv/bin" >> $GITHUB_PATH
+          # Check if Ansible is already installed in venv
+          if [ -x "$HOME/.ansible-venv/bin/ansible" ]; then
+            INSTALLED_VERSION=$("$HOME/.ansible-venv/bin/ansible" --version | head -1 | awk '{print $3}' | tr -d '[]')
+            echo "Ansible already installed: $INSTALLED_VERSION"
+            echo "$HOME/.ansible-venv/bin" >> $GITHUB_PATH
+          else
+            echo "Installing Ansible in virtual environment..."
+            # Use virtual environment on self-hosted runner (Debian 12 requires this)
+            python3 -m venv ~/.ansible-venv
+            source ~/.ansible-venv/bin/activate
+            pip install --upgrade pip
+            pip install ansible ansible-lint
+            echo "$HOME/.ansible-venv/bin" >> $GITHUB_PATH
+          fi
+          # Verify installation
+          ansible --version
 
       - name: Set up SSH key
         run: |

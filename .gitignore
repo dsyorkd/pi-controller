@@ -325,6 +325,7 @@ test-local*
 # Examples:
 # /custom-scripts/
 # /local-configs/
+web/kubes-aura/
 
 # Playwright
 /test-results/

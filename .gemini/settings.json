@@ -1,4 +1,9 @@
-{
+{	"telemetry": {
+			"enabled": true,
+			"target": "local",
+			"useCollector": true,
+			"otlpEndpoint": "http://localhost:4317"
+		},
 	"mcpServers": {
 		"task-master-ai": {
 			"command": "npx",
@@ -13,6 +18,20 @@
 				"MISTRAL_API_KEY": "YOUR_MISTRAL_KEY_HERE",
 				"AZURE_OPENAI_API_KEY": "YOUR_AZURE_KEY_HERE",
 				"OLLAMA_API_KEY": "YOUR_OLLAMA_API_KEY_HERE"
+			}
+		},
+		"github": {
+			"command": "docker",
+			"args": [
+				"run",
+				"-i",
+				"--rm",
+				"-e",
+				"GITHUB_PERSONAL_ACCESS_TOKEN",
+				"ghcr.io/github/github-mcp-server"
+			],
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 			}
 		}
 	}

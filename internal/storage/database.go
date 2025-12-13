@@ -11,7 +11,7 @@ import (
 	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/migrations"
 	"github.com/dsyorkd/pi-controller/internal/models"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -233,7 +233,7 @@ func (d *Database) BeginTx() *gorm.DB {
 }
 
 // WithTx executes a function within a transaction
-func (d *Database) WithTx(fn func(tx *gorm.DB) error) error {
+func (d *Database) WithTx(fn func(tx *gorm.DB) error) (err error) {
 	tx := d.db.Begin()
 	if tx.Error != nil {
 		return tx.Error
@@ -242,11 +242,11 @@ func (d *Database) WithTx(fn func(tx *gorm.DB) error) error {
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
-			panic(r)
+			err = fmt.Errorf("panic recovered: %v", r)
 		}
 	}()
 
-	if err := fn(tx); err != nil {
+	if err = fn(tx); err != nil {
 		tx.Rollback()
 		return err
 	}

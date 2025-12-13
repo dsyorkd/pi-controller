@@ -1,0 +1,47 @@
+# Local Development Inventory
+# ===========================
+# This inventory uses your local SSH aliases (pi-01, k3s-02)
+# instead of the CI/internal IPs.
+
+all:
+  vars:
+    # Development settings
+    pi_controller_environment: development
+    pi_controller_debug: true
+    pi_controller_log_level: debug
+
+    # Standard configuration (copied from hosts.yml)
+    pi_controller_version: "latest"
+    api_port: 8080
+    grpc_port: 9090
+    websocket_port: 8081
+    cluster_port: 9091
+    bootstrap_address: pi-01  # Using the alias here
+    data_dir: /var/lib/pi-controller
+    config_dir: /etc/pi-controller
+    test_timeout: 300
+
+  children:
+    pis:
+      hosts:
+        pi-01:
+          ansible_user: spenceryork
+        k3s-02:
+          ansible_user: spenceryork
+      vars:
+        # Use local SSH agent/config
+        ansible_connection: ssh
+        ansible_become: true  # Enable sudo for privileged tasks
+
+
+    bootstrap:
+      hosts:
+        pi-01:
+      vars:
+        cluster_bootstrap: true
+
+    workers:
+      hosts:
+        k3s-02:
+      vars:
+        cluster_bootstrap: false

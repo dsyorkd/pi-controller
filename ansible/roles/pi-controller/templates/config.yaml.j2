@@ -15,17 +15,22 @@ database:
   connection_max_lifetime: {{ database_connection_lifetime | default('1h') }}
 
 api:
+  host: "{{ ansible_default_ipv4.address }}"
   port: {{ api_port }}
   read_timeout: {{ api_read_timeout | default(30) }}
   write_timeout: {{ api_write_timeout | default(30) }}
   max_request_size: {{ api_max_request_size | default('10MB') }}
+  auth_enabled: false # Temporarily disable auth for Ansible testing
+
 
 grpc:
+  host: "{{ ansible_default_ipv4.address }}"
   port: {{ grpc_port }}
   max_recv_msg_size: {{ grpc_max_message_size | default('50MB') }}
   max_send_msg_size: {{ grpc_max_message_size | default('50MB') }}
 
 websocket:
+  host: "{{ ansible_default_ipv4.address }}"
   port: {{ websocket_port }}
   max_connections: {{ websocket_max_connections | default(100) }}
   read_buffer_size: 1024

@@ -139,7 +139,7 @@
 # ----------------------
 - name: Wait for pi-controller to be healthy
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ api_port }}/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ api_port }}/health"
     status_code: 200
   register: health_check
   retries: 30

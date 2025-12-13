@@ -28,6 +28,11 @@ DOCKER_TAG ?= $(VERSION)
 # Use existing ci-image from separate repository
 CI_IMAGE ?= ghcr.io/dsyorkd/ci-image/ci-go:v2.0
 
+# Web UI variables
+KUBES_AURA_REPO ?= https://github.com/dsyorkd/kubes-aura.git
+UI_DIR = web/kubes-aura
+UI_DIST = internal/ui/dist
+
 # Default target
 help: ## Show this help message
 	@echo "Pi Controller Build System"
@@ -57,6 +62,43 @@ proto: ## Generate protobuf code
 	else \
 		echo "Warning: protoc not found and proto files don't exist. Using committed proto files."; \
 	fi
+
+# Web UI
+ui: ## Build kubes-aura web interface
+	@echo "Building Web UI..."
+	@if ! command -v npm >/dev/null 2>&1; then \
+		echo "Error: npm is required to build the Web UI"; \
+		exit 1; \
+	fi
+	@mkdir -p web
+	@if [ -d "../kubes-aura" ]; then \
+		echo "Using local kubes-aura repository from ../kubes-aura..."; \
+		rm -rf $(UI_DIR); \
+		mkdir -p $(UI_DIR); \
+		rsync -av --exclude 'node_modules' --exclude 'dist' --exclude '.git' ../kubes-aura/ $(UI_DIR)/; \
+	elif [ ! -d "$(UI_DIR)" ]; then \
+		echo "Cloning kubes-aura repository..."; \
+		git clone $(KUBES_AURA_REPO) $(UI_DIR); \
+	else \
+		echo "Updating kubes-aura repository..."; \
+		cd $(UI_DIR) && git pull; \
+	fi
+	@echo "Installing UI dependencies..."
+	@cd $(UI_DIR) && npm install
+	@echo "Building UI..."
+	@cd $(UI_DIR) && VITE_API_BASE_URL=/api/v1 VITE_SOCKET_IO_URL=/ npm run build
+	@echo "Copying UI assets to embedded directory..."
+	@mkdir -p $(UI_DIST)
+	@rm -rf $(UI_DIST)/*
+	@cp -r $(UI_DIR)/dist/* $(UI_DIST)/
+	@touch $(UI_DIST)/.keep
+
+ui-clean: ## Clean Web UI build artifacts
+	@echo "Cleaning Web UI..."
+	rm -rf $(UI_DIR)
+	rm -rf $(UI_DIST)/*
+	@mkdir -p $(UI_DIST)
+	@echo "<html><body><h1>UI not built</h1><p>Please run 'make ui' to build the web interface.</p></body></html>" > $(UI_DIST)/index.html
 
 # Code quality
 fmt: ## Format Go code
@@ -143,7 +185,7 @@ test-comprehensive: test-all test-benchmarks test-security-verbose ## Run compre
 # Build targets
 build: build-controller ## Build all binaries
 
-build-controller: ## Build pi-controller binary
+build-controller: ui ## Build pi-controller binary (includes Web UI)
 	@echo "Building pi-controller for $(GOOS)/$(GOARCH)..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
@@ -388,7 +430,7 @@ config-example: ## Generate example configuration
 	@echo "Example configuration written to config/pi-controller.example.yaml"
 
 # Cleanup
-clean: ## Clean build artifacts
+clean: ui-clean ## Clean build artifacts
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)
 	rm -f coverage.out coverage.html

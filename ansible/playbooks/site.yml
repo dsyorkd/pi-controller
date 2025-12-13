@@ -36,7 +36,7 @@
   tasks:
     - name: Wait for cluster API to be available
       ansible.builtin.uri:
-        url: "http://127.0.0.1:{{ api_port }}/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ api_port }}/health"
         status_code: 200
       register: health
       retries: 30
@@ -58,7 +58,7 @@
   tasks:
     - name: Check all nodes joined
       ansible.builtin.uri:
-        url: "http://127.0.0.1:{{ api_port }}/api/v1/nodes"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ api_port }}/api/v1/nodes"
         status_code: 200
       register: nodes_response
       tags: [verify]

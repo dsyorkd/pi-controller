@@ -15,12 +15,13 @@ Group=root
 # Environment
 Environment=PI_CONTROLLER_MODE={{ pi_controller_mode }}
 Environment=PI_CONTROLLER_CONFIG={{ config_dir }}/config.yaml
+Environment=PI_CONTROLLER_ENVIRONMENT={{ pi_controller_environment }}
 {% if pi_controller_debug | default(false) %}
 Environment=PI_CONTROLLER_DEBUG=true
 {% endif %}
 
 # Execution
-ExecStart=/usr/local/bin/pi-controller serve --config {{ config_dir }}/config.yaml
+ExecStart=/usr/local/bin/pi-controller --config {{ config_dir }}/config.yaml
 ExecReload=/bin/kill -HUP $MAINPID
 
 # Restart policy

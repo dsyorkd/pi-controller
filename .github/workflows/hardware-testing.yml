@@ -135,7 +135,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check Go version
+        id: go_check
+        run: |
+          REQUIRED_VERSION="${{ env.GO_VERSION }}"
+          if command -v go &> /dev/null; then
+            INSTALLED_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+            echo "Installed Go version: $INSTALLED_VERSION"
+            echo "Required Go version: $REQUIRED_VERSION"
+            if [[ "$INSTALLED_VERSION" == "$REQUIRED_VERSION"* ]]; then
+              echo "go_installed=true" >> $GITHUB_OUTPUT
+            else
+              echo "go_installed=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "go_installed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Go
+        if: steps.go_check.outputs.go_installed != 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -271,12 +289,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install protobuf compiler (if needed)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          if command -v protoc &> /dev/null; then
+            echo "protoc already installed: $(protoc --version)"
+          else
+            echo "Installing protobuf-compiler..."
+            sudo apt-get update
+            sudo apt-get install -y protobuf-compiler
+          fi
+
+      - name: Check Go version
+        id: go_check
+        run: |
+          REQUIRED_VERSION="${{ env.GO_VERSION }}"
+          if command -v go &> /dev/null; then
+            INSTALLED_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+            echo "Installed Go version: $INSTALLED_VERSION"
+            echo "Required Go version: $REQUIRED_VERSION"
+            if [[ "$INSTALLED_VERSION" == "$REQUIRED_VERSION"* ]]; then
+              echo "go_installed=true" >> $GITHUB_OUTPUT
+            else
+              echo "go_installed=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "go_installed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Go
+        if: steps.go_check.outputs.go_installed != 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -360,12 +401,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
+      - name: Install protobuf compiler (if needed)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          if command -v protoc &> /dev/null; then
+            echo "protoc already installed: $(protoc --version)"
+          else
+            echo "Installing protobuf-compiler..."
+            sudo apt-get update
+            sudo apt-get install -y protobuf-compiler
+          fi
+
+      - name: Check Go version
+        id: go_check
+        run: |
+          REQUIRED_VERSION="${{ env.GO_VERSION }}"
+          if command -v go &> /dev/null; then
+            INSTALLED_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+            echo "Installed Go version: $INSTALLED_VERSION"
+            echo "Required Go version: $REQUIRED_VERSION"
+            if [[ "$INSTALLED_VERSION" == "$REQUIRED_VERSION"* ]]; then
+              echo "go_installed=true" >> $GITHUB_OUTPUT
+            else
+              echo "go_installed=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "go_installed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Go
+        if: steps.go_check.outputs.go_installed != 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}

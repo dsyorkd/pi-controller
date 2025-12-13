@@ -34,6 +34,7 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/dsyorkd/pi-controller/internal/ui"
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
@@ -318,6 +319,12 @@ func (s *Server) setupRoutes() {
 				raft.DELETE("/members/:id", s.requireRole("admin"), raftHandler.RemoveMember)
 			}
 		}
+	}
+
+	// Register UI routes (SPA catch-all)
+	// This must be registered last to ensure API routes take precedence
+	if err := ui.RegisterRoutes(s.router); err != nil {
+		s.logger.WithError(err).Warn("Failed to register UI routes - web interface may not be available")
 	}
 }
 
