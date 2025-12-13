@@ -71,17 +71,12 @@ ui: ## Build kubes-aura web interface
 		exit 1; \
 	fi
 	@mkdir -p web
-	@if [ -d "../kubes-aura" ]; then \
-		echo "Using local kubes-aura repository from ../kubes-aura..."; \
-		rm -rf $(UI_DIR); \
-		mkdir -p $(UI_DIR); \
-		rsync -av --exclude 'node_modules' --exclude 'dist' --exclude '.git' ../kubes-aura/ $(UI_DIR)/; \
-	elif [ ! -d "$(UI_DIR)" ]; then \
-		echo "Cloning kubes-aura repository..."; \
-		git clone $(KUBES_AURA_REPO) $(UI_DIR); \
+	@if [ ! -d "$(UI_DIR)/.git" ]; then \
+		echo "Initializing kubes-aura submodule..."; \
+		git submodule update --init --recursive $(UI_DIR); \
 	else \
-		echo "Updating kubes-aura repository..."; \
-		cd $(UI_DIR) && git pull; \
+		echo "Updating kubes-aura submodule..."; \
+		git submodule update --remote $(UI_DIR); \
 	fi
 	@echo "Installing UI dependencies..."
 	@cd $(UI_DIR) && npm install
