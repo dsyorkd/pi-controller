@@ -86,51 +86,13 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_cluster_key
           chmod 600 ~/.ssh/pi_cluster_key
-          # Add known hosts to avoid prompts
-          ssh-keyscan -p 22 ${{ secrets.PI_HOST_1 }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          ssh-keyscan -p 22 ${{ secrets.PI_HOST_2 }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          ssh-keyscan -p 22 ${{ secrets.PI_HOST_3 }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Create dynamic inventory
-        run: |
-          cat > ansible/inventory/ci-hosts.yml << 'EOF'
-          all:
-            vars:
-              ansible_ssh_private_key_file: ~/.ssh/pi_cluster_key
-              pi_controller_local_binary: "{{ playbook_dir }}/../../build/pi-controller-linux-arm64"
-            children:
-              pis:
-                hosts:
-                  pi-01.local:
-                    ansible_host: ${{ secrets.PI_HOST_1 }}
-                    ansible_port: 22
-                  pi-02.local:
-                    ansible_host: ${{ secrets.PI_HOST_2 }}
-                    ansible_port: 22
-                  pi-03.local:
-                    ansible_host: ${{ secrets.PI_HOST_3 }}
-                    ansible_port: 22
-                vars:
-                  ansible_user: pi
-              bootstrap:
-                hosts:
-                  pi-01.local:
-                vars:
-                  cluster_bootstrap: true
-              workers:
-                hosts:
-                  pi-02.local:
-                  pi-03.local:
-                vars:
-                  cluster_bootstrap: false
-          EOF
 
       - name: Reset cluster (if requested)
         if: github.event.inputs.reset_before_test == 'true'
         working-directory: ansible
         run: |
           ansible-playbook playbooks/reset-cluster.yml \
-            -i inventory/ci-hosts.yml \
+            -i inventory/hosts.yml \
             -e force_reset=true
 
       - name: Deploy and test
@@ -138,7 +100,7 @@ jobs:
         run: |
           chmod +x ../build/pi-controller-linux-arm64
           ansible-playbook playbooks/deploy-test.yml \
-            -i inventory/ci-hosts.yml \
+            -i inventory/hosts.yml \
             -e pi_controller_local_binary="../build/pi-controller-linux-arm64"
 
       - name: Cleanup on failure
@@ -147,7 +109,7 @@ jobs:
         run: |
           # Release lock if held
           ansible-playbook playbooks/release-lock.yml \
-            -i inventory/ci-hosts.yml || true
+            -i inventory/hosts.yml || true
           # Optionally reset cluster
           # ansible-playbook playbooks/reset-cluster.yml \
           #   -i inventory/ci-hosts.yml \
@@ -157,7 +119,7 @@ jobs:
         if: failure()
         working-directory: ansible
         run: |
-          ansible pis -i inventory/ci-hosts.yml -m shell \
+          ansible pis -i inventory/hosts.yml -m shell \
             -a "journalctl -u pi-controller --no-pager -n 100" \
             > ../pi-controller-logs.txt 2>&1 || true
 

@@ -5,6 +5,7 @@ on:
     - master
     - release-*
     - v*
+    - renovate/*
   pull_request:
   schedule:
     - cron: "10 0,12 * * *"
