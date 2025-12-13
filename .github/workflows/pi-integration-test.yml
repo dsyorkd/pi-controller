@@ -72,20 +72,23 @@ jobs:
           name: pi-controller-linux-arm64
           path: build/
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Install Ansible
         run: |
-          pip install ansible ansible-lint
+          # Use system Python on self-hosted runner
+          pip3 install --user ansible ansible-lint
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up SSH key
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_cluster_key
-          chmod 600 ~/.ssh/pi_cluster_key
+          # SSH key is pre-configured on the self-hosted runner at ~/.ssh/pi_cluster_key
+          # Only write from secret if key doesn't exist (for fresh runner setups)
+          if [ ! -f ~/.ssh/pi_cluster_key ]; then
+            mkdir -p ~/.ssh
+            echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_cluster_key
+            chmod 600 ~/.ssh/pi_cluster_key
+          fi
+          # Verify key exists
+          ls -la ~/.ssh/pi_cluster_key
 
       - name: Reset cluster (if requested)
         if: github.event.inputs.reset_before_test == 'true'
