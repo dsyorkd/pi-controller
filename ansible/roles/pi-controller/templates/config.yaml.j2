@@ -33,24 +33,22 @@ websocket:
 
 clustering:
   enabled: true
-  port: {{ cluster_port }}
-  node_name: {{ inventory_hostname }}
+  controller_id: {{ inventory_hostname }}
+  bind_addr: {{ ansible_default_ipv4.address | default(ansible_host) }}:{{ cluster_port }}
+  data_dir: {{ data_dir }}/raft
 {% if cluster_bootstrap | default(false) %}
   bootstrap: true
 {% else %}
   bootstrap: false
-  join_addresses:
+  initial_peers:
     - {{ bootstrap_address }}:{{ cluster_port }}
-{% endif %}
-{% if cluster_advertise_address is defined %}
-  advertise_address: {{ cluster_advertise_address }}
 {% endif %}
 
 discovery:
   enabled: true
-  mdns_enabled: true
-  mdns_service_name: _pi-controller._tcp
-  scan_interval: 30s
+  method: mdns
+  service_name: _pi-controller._tcp
+  interval: 30s
 
 gpio:
   enabled: {{ enable_gpio | default(true) | lower }}
