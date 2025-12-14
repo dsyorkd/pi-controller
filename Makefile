@@ -95,6 +95,23 @@ ui-clean: ## Clean Web UI build artifacts
 	@mkdir -p $(UI_DIST)
 	@echo "<html><body><h1>UI not built</h1><p>Please run 'make ui' to build the web interface.</p></body></html>" > $(UI_DIST)/index.html
 
+ui-from-release: ## Download and extract pre-built UI from GitHub release
+	@echo "Downloading pre-built Web UI from GitHub release..."
+	@if [ -z "$(UI_VERSION)" ]; then \
+		echo "Error: UI_VERSION is required. Example: make ui-from-release UI_VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@mkdir -p $(UI_DIST)
+	@rm -rf $(UI_DIST)/*
+	@echo "Fetching kubes-aura $(UI_VERSION)..."
+	@curl -L -o /tmp/kubes-aura.tar.gz \
+		"https://github.com/dsyorkd/kubes-aura/releases/download/$(UI_VERSION)/kubes-aura-$${UI_VERSION#v}.tar.gz"
+	@echo "Extracting UI assets..."
+	@tar -xzf /tmp/kubes-aura.tar.gz -C $(UI_DIST)/
+	@rm /tmp/kubes-aura.tar.gz
+	@touch $(UI_DIST)/.keep
+	@echo "Web UI $(UI_VERSION) installed successfully"
+
 # Code quality
 fmt: ## Format Go code
 	@echo "Formatting code..."
