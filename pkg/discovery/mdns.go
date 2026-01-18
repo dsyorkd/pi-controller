@@ -55,18 +55,30 @@ type Config struct {
 	StaticNodes []string `yaml:"static_nodes" mapstructure:"static_nodes"`
 	ServiceName string   `yaml:"service_name" mapstructure:"service_name"`
 	ServiceType string   `yaml:"service_type" mapstructure:"service_type"`
+
+	// Network scanning configuration
+	ScanRanges      []string `yaml:"scan_ranges" mapstructure:"scan_ranges"`           // IP ranges to scan in CIDR notation (e.g., "192.168.1.0/24")
+	ScanPorts       []int    `yaml:"scan_ports" mapstructure:"scan_ports"`             // Ports to scan on discovered hosts
+	ScanTimeout     string   `yaml:"scan_timeout" mapstructure:"scan_timeout"`         // Timeout for individual scan operations
+	ScanConcurrency int      `yaml:"scan_concurrency" mapstructure:"scan_concurrency"` // Number of concurrent scan workers
+	ScanRateLimit   int      `yaml:"scan_rate_limit" mapstructure:"scan_rate_limit"`   // Maximum scans per second to avoid network flooding
 }
 
 // DefaultConfig returns default discovery configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:     true,
-		Method:      "mdns",
-		Port:        9091,
-		Interval:    "30s",
-		Timeout:     "5s",
-		ServiceName: "pi-controller",
-		ServiceType: "_pi-controller._tcp",
+		Enabled:         true,
+		Method:          "mdns",
+		Port:            9091,
+		Interval:        "30s",
+		Timeout:         "5s",
+		ServiceName:     "pi-controller",
+		ServiceType:     "_pi-controller._tcp",
+		ScanRanges:      []string{},  // No default scan ranges - must be explicitly configured
+		ScanPorts:       []int{9091}, // Scan default agent port
+		ScanTimeout:     "2s",        // Timeout for individual host scans
+		ScanConcurrency: 10,          // Scan 10 hosts concurrently
+		ScanRateLimit:   100,         // Max 100 scans per second
 	}
 }
 
