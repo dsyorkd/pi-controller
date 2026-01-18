@@ -391,9 +391,10 @@ func (s *Service) createNodeFromEntry(entry *mdns.ServiceEntry) *Node {
 
 // processDiscoveredNodes updates the internal registry with discovered nodes
 func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// Collect events to emit while holding the lock, then emit after releasing
+	var events []NodeEvent
 
+	s.mu.Lock()
 	for _, node := range discoveredNodes {
 		existingNode, exists := s.nodes[node.ID]
 		if exists {
@@ -402,7 +403,7 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 			existingNode.TXTRecords = node.TXTRecords
 			existingNode.Capabilities = node.Capabilities
 
-			s.emitEvent(NodeEvent{
+			events = append(events, NodeEvent{
 				Type: NodeUpdated,
 				Node: *existingNode,
 			})
@@ -414,7 +415,7 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 		} else {
 			// New node discovered
 			s.nodes[node.ID] = node
-			s.emitEvent(NodeEvent{
+			events = append(events, NodeEvent{
 				Type: NodeDiscovered,
 				Node: *node,
 			})
@@ -426,6 +427,12 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 				"port":       node.Port,
 			}).Info("Discovered new node via mDNS")
 		}
+	}
+	s.mu.Unlock()
+
+	// Emit events after releasing the lock to avoid deadlock
+	for _, event := range events {
+		s.emitEvent(event)
 	}
 }
 
@@ -602,14 +609,19 @@ func (s *Service) cleanupStaleNodes() {
 
 // emitEvent emits a node event to all registered handlers
 func (s *Service) emitEvent(event NodeEvent) {
-	for _, handler := range s.eventHandlers {
-		go func(h NodeEventHandler) {
+	s.mu.RLock()
+	handlers := make([]NodeEventHandler, len(s.eventHandlers))
+	copy(handlers, s.eventHandlers)
+	s.mu.RUnlock()
+
+	for _, handler := range handlers {
+		go func(h NodeEventHandler, e NodeEvent) {
 			defer func() {
 				if r := recover(); r != nil {
 					s.logger.WithField("panic", r).Error("Event handler panicked")
 				}
 			}()
-			h(event)
-		}(handler)
+			h(e)
+		}(handler, event)
 	}
 }

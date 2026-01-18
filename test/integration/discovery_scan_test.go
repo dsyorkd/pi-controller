@@ -86,10 +86,13 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_BasicScan() {
 	require.NoError(suite.T(), err)
 
 	// Track discovered nodes
+	var mu sync.Mutex
 	var discoveredNodes []discovery.Node
 	service.AddEventHandler(func(event discovery.NodeEvent) {
 		if event.Type == discovery.NodeDiscovered {
+			mu.Lock()
 			discoveredNodes = append(discoveredNodes, event.Node)
+			mu.Unlock()
 		}
 	})
 
@@ -107,11 +110,17 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_BasicScan() {
 	time.Sleep(6 * time.Second)
 
 	// Verify that at least one node was discovered
-	assert.GreaterOrEqual(suite.T(), len(discoveredNodes), 1, "Expected at least one node to be discovered")
+	mu.Lock()
+	nodeCount := len(discoveredNodes)
+	var node discovery.Node
+	if nodeCount > 0 {
+		node = discoveredNodes[0]
+	}
+	mu.Unlock()
 
-	if len(discoveredNodes) > 0 {
-		node := discoveredNodes[0]
+	assert.GreaterOrEqual(suite.T(), nodeCount, 1, "Expected at least one node to be discovered")
 
+	if nodeCount > 0 {
 		// Verify node properties
 		assert.Equal(suite.T(), "network_scan", node.ServiceType, "Expected node to be discovered via network_scan")
 		assert.Equal(suite.T(), host, node.IPAddress, "Expected IP to match mock server")
@@ -189,10 +198,13 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_MultipleNodes(
 	require.NoError(suite.T(), err)
 
 	// Track discovered nodes
+	var mu sync.Mutex
 	var discoveredNodes []discovery.Node
 	service.AddEventHandler(func(event discovery.NodeEvent) {
 		if event.Type == discovery.NodeDiscovered {
+			mu.Lock()
 			discoveredNodes = append(discoveredNodes, event.Node)
+			mu.Unlock()
 		}
 	})
 
@@ -210,11 +222,17 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_MultipleNodes(
 	time.Sleep(6 * time.Second)
 
 	// Verify that all nodes were discovered
-	assert.GreaterOrEqual(suite.T(), len(discoveredNodes), 3, "Expected at least 3 nodes to be discovered")
+	mu.Lock()
+	nodeCount := len(discoveredNodes)
+	nodesCopy := make([]discovery.Node, len(discoveredNodes))
+	copy(nodesCopy, discoveredNodes)
+	mu.Unlock()
+
+	assert.GreaterOrEqual(suite.T(), nodeCount, 3, "Expected at least 3 nodes to be discovered")
 
 	// Verify each node has unique ID
 	nodeIDs := make(map[string]bool)
-	for _, node := range discoveredNodes {
+	for _, node := range nodesCopy {
 		assert.False(suite.T(), nodeIDs[node.ID], "Expected unique node IDs")
 		nodeIDs[node.ID] = true
 	}
@@ -258,10 +276,13 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_NoHealthEndpoi
 	require.NoError(suite.T(), err)
 
 	// Track discovered nodes
+	var mu sync.Mutex
 	var discoveredNodes []discovery.Node
 	service.AddEventHandler(func(event discovery.NodeEvent) {
 		if event.Type == discovery.NodeDiscovered {
+			mu.Lock()
 			discoveredNodes = append(discoveredNodes, event.Node)
+			mu.Unlock()
 		}
 	})
 
@@ -279,7 +300,10 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_NoHealthEndpoi
 	time.Sleep(6 * time.Second)
 
 	// Verify that no nodes were discovered (port is open but not a valid pi-controller agent)
-	assert.Equal(suite.T(), 0, len(discoveredNodes), "Expected no nodes to be discovered without valid health endpoint")
+	mu.Lock()
+	nodeCount := len(discoveredNodes)
+	mu.Unlock()
+	assert.Equal(suite.T(), 0, nodeCount, "Expected no nodes to be discovered without valid health endpoint")
 }
 
 // TestDiscoveryScanIntegration_InvalidHealthResponse tests scanning a host with invalid health response
@@ -328,10 +352,13 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_InvalidHealthR
 	require.NoError(suite.T(), err)
 
 	// Track discovered nodes
+	var mu sync.Mutex
 	var discoveredNodes []discovery.Node
 	service.AddEventHandler(func(event discovery.NodeEvent) {
 		if event.Type == discovery.NodeDiscovered {
+			mu.Lock()
 			discoveredNodes = append(discoveredNodes, event.Node)
+			mu.Unlock()
 		}
 	})
 
@@ -349,7 +376,10 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_InvalidHealthR
 	time.Sleep(6 * time.Second)
 
 	// Verify that no nodes were discovered (invalid health response)
-	assert.Equal(suite.T(), 0, len(discoveredNodes), "Expected no nodes to be discovered with invalid health response")
+	mu.Lock()
+	nodeCount := len(discoveredNodes)
+	mu.Unlock()
+	assert.Equal(suite.T(), 0, nodeCount, "Expected no nodes to be discovered with invalid health response")
 }
 
 // TestDiscoveryScanIntegration_EmptyScanRanges tests behavior with no scan ranges configured
@@ -372,10 +402,13 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_EmptyScanRange
 	require.NoError(suite.T(), err)
 
 	// Track discovered nodes
+	var mu sync.Mutex
 	var discoveredNodes []discovery.Node
 	service.AddEventHandler(func(event discovery.NodeEvent) {
 		if event.Type == discovery.NodeDiscovered {
+			mu.Lock()
 			discoveredNodes = append(discoveredNodes, event.Node)
+			mu.Unlock()
 		}
 	})
 
@@ -393,7 +426,10 @@ func (suite *DiscoveryScanTestSuite) TestDiscoveryScanIntegration_EmptyScanRange
 	time.Sleep(6 * time.Second)
 
 	// Verify that no nodes were discovered (no scan ranges configured)
-	assert.Equal(suite.T(), 0, len(discoveredNodes), "Expected no nodes to be discovered with empty scan ranges")
+	mu.Lock()
+	nodeCount := len(discoveredNodes)
+	mu.Unlock()
+	assert.Equal(suite.T(), 0, nodeCount, "Expected no nodes to be discovered with empty scan ranges")
 }
 
 // TestDiscoveryScanIntegration_RateLimit tests that rate limiting is enforced
