@@ -439,42 +439,101 @@ func (s *Service) runNetworkScan(ctx context.Context) {
 func (s *Service) performNetworkScan() {
 	s.logger.Debug("Performing network scan")
 
-	// TODO: Implement actual network scanning
-	// This would typically scan common subnets for the service port
-	// For now, this is a placeholder
-
-	// Get local network interfaces
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		s.logger.WithError(err).Error("Failed to get network interfaces")
+	// Check if scan ranges are configured
+	if len(s.config.ScanRanges) == 0 {
+		s.logger.Warn("Network scanning enabled but no scan ranges configured")
 		return
 	}
 
-	for _, iface := range interfaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-
-		for _, addr := range addrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
-				s.logger.WithFields(logrus.Fields{
-					"interface": iface.Name,
-					"network":   ipnet.String(),
-				}).Debug("Scanning network")
-
-				// TODO: Scan the network for nodes
-				// This would involve:
-				// 1. Generating IP ranges from the network
-				// 2. Port scanning for the service port
-				// 3. Attempting to connect and identify pi-controller agents
-			}
-		}
+	// Parse scan timeout
+	scanTimeout, err := time.ParseDuration(s.config.ScanTimeout)
+	if err != nil {
+		s.logger.WithError(err).Error("Invalid scan timeout")
+		return
 	}
+
+	// Create port scanner with rate limiting
+	scanner := NewPortScanner(s.config.ScanRateLimit, scanTimeout)
+
+	// Create context with timeout for the entire scan operation
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+
+	// Parse all configured IP ranges
+	var allIPs []net.IP
+	for _, cidr := range s.config.ScanRanges {
+		ips, err := parseIPRange(cidr)
+		if err != nil {
+			s.logger.WithFields(logrus.Fields{
+				"cidr":  cidr,
+				"error": err,
+			}).Warn("Failed to parse scan range")
+			continue
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"cidr":     cidr,
+			"ip_count": len(ips),
+		}).Debug("Parsed scan range")
+
+		allIPs = append(allIPs, ips...)
+	}
+
+	if len(allIPs) == 0 {
+		s.logger.Warn("No valid IP addresses to scan")
+		return
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"total_ips":   len(allIPs),
+		"ports":       s.config.ScanPorts,
+		"rate_limit":  s.config.ScanRateLimit,
+		"concurrency": s.config.ScanConcurrency,
+	}).Info("Starting network scan")
+
+	// Scan the IP ranges for configured ports
+	resultsCh := scanner.ScanRange(ctx, allIPs, s.config.ScanPorts)
+
+	// Collect discovered nodes
+	discoveredNodes := make([]*Node, 0)
+
+	// Process scan results
+	for result := range resultsCh {
+		if !result.Open {
+			continue
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"ip":   result.IP.String(),
+			"port": result.Port,
+		}).Debug("Found open port, attempting node identification")
+
+		// Attempt to identify if this is a pi-controller agent
+		node, err := identifyNode(result.IP, result.Port, scanTimeout)
+		if err != nil {
+			s.logger.WithFields(logrus.Fields{
+				"ip":    result.IP.String(),
+				"port":  result.Port,
+				"error": err,
+			}).Debug("Failed to identify node")
+			continue
+		}
+
+		discoveredNodes = append(discoveredNodes, node)
+
+		s.logger.WithFields(logrus.Fields{
+			"ip":   node.IPAddress,
+			"port": node.Port,
+			"id":   node.ID,
+		}).Info("Identified pi-controller agent via network scan")
+	}
+
+	// Update our internal node registry
+	s.processDiscoveredNodes(discoveredNodes)
+
+	s.logger.WithFields(logrus.Fields{
+		"nodes_found": len(discoveredNodes),
+	}).Info("Network scan completed")
 }
 
 // runCleanupRoutine runs the cleanup routine to remove stale nodes
