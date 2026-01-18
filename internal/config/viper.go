@@ -189,6 +189,11 @@ func setViperDefaults(v *viper.Viper) {
 	v.SetDefault("discovery.enabled", defaults.Discovery.Enabled)
 	v.SetDefault("discovery.method", defaults.Discovery.Method)
 	v.SetDefault("discovery.port", defaults.Discovery.Port)
+	v.SetDefault("discovery.scan_ranges", defaults.Discovery.ScanRanges)
+	v.SetDefault("discovery.scan_ports", defaults.Discovery.ScanPorts)
+	v.SetDefault("discovery.scan_timeout", defaults.Discovery.ScanTimeout)
+	v.SetDefault("discovery.scan_concurrency", defaults.Discovery.ScanConcurrency)
+	v.SetDefault("discovery.scan_rate_limit", defaults.Discovery.ScanRateLimit)
 
 	// WebUI defaults
 	v.SetDefault("webui.enabled", defaults.WebUI.Enabled)
@@ -324,6 +329,11 @@ func bindNestedEnvVars(v *viper.Viper) {
 	bindEnv(v, "discovery.enabled")
 	bindEnv(v, "discovery.method")
 	bindEnv(v, "discovery.port")
+	bindEnv(v, "discovery.scan_ranges")
+	bindEnv(v, "discovery.scan_ports")
+	bindEnv(v, "discovery.scan_timeout")
+	bindEnv(v, "discovery.scan_concurrency")
+	bindEnv(v, "discovery.scan_rate_limit")
 
 	// WebUI
 	bindEnv(v, "webui.enabled")
