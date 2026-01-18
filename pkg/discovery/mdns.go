@@ -93,6 +93,8 @@ type Service struct {
 	stopChan      chan struct{}
 	interval      time.Duration
 	timeout       time.Duration
+	scanner       *PortScanner
+	scanTimeout   time.Duration
 }
 
 // NewService creates a new discovery service
@@ -111,13 +113,23 @@ func NewService(config *Config, logger *logrus.Logger) (*Service, error) {
 		return nil, fmt.Errorf("invalid timeout: %w", err)
 	}
 
+	scanTimeout, err := time.ParseDuration(config.ScanTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("invalid scan timeout: %w", err)
+	}
+
+	// Create port scanner with rate limiting
+	scanner := NewPortScanner(config.ScanRateLimit, scanTimeout)
+
 	service := &Service{
-		config:   config,
-		logger:   logger.WithField("component", "discovery"),
-		nodes:    make(map[string]*Node),
-		interval: interval,
-		timeout:  timeout,
-		stopChan: make(chan struct{}),
+		config:      config,
+		logger:      logger.WithField("component", "discovery"),
+		nodes:       make(map[string]*Node),
+		interval:    interval,
+		timeout:     timeout,
+		scanTimeout: scanTimeout,
+		scanner:     scanner,
+		stopChan:    make(chan struct{}),
 	}
 
 	return service, nil

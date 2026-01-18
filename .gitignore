@@ -332,3 +332,6 @@ web/kubes-aura/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Auto Claude data directory
+.auto-claude/
