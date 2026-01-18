@@ -37,6 +37,23 @@ gpio:
 
 discovery:
   enabled: false
+  method: "mdns"
+  interface: ""
+  port: 9091
+  interval: "30s"
+  timeout: "5s"
+  service_name: "_pi-controller._tcp"
+  service_type: "_pi-controller._tcp"
+
+  # Static nodes configuration (when method: "static")
+  static_nodes: []
+
+  # Network scan configuration (when method: "scan" or combined with mdns)
+  scan_ranges: []             # Example: ["192.168.1.0/24", "10.0.0.0/16"]
+  scan_ports: [9091]          # Ports to scan on each host
+  scan_timeout: "2s"          # Timeout for individual port scans
+  scan_concurrency: 10        # Number of concurrent scan workers
+  scan_rate_limit: 100        # Maximum scans per second (prevents network flooding)
 
 websocket:
   host: "0.0.0.0"

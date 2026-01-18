@@ -505,11 +505,236 @@ Result:
 6. **Scalability:** Unlimited agent nodes for workload execution
 7. **Network Agnostic:** Works across subnets via manual entry
 
+### Flow 5: Network Scan Discovery
+
+**Scenario:** mDNS doesn't work in your network environment (corporate network, VLANs)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 1. User configures network scan in pi-controller config      │
+│    discovery:                                               │
+│      enabled: true                                          │
+│      method: "scan"                                         │
+│      scan_ranges:                                           │
+│        - "192.168.1.0/24"                                   │
+│      scan_ports: [9091]                                     │
+│      scan_timeout: "2s"                                     │
+│      scan_concurrency: 10                                   │
+│      scan_rate_limit: 100                                   │
+└──────────────────────────────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────────┐
+│ 2. pi-controller performs network scan                       │
+│    - Generates IP addresses from CIDR ranges                │
+│    - Scans configured ports with rate limiting              │
+│    - Identifies pi-controller/pi-agent via /health endpoint │
+└──────────────────────────────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────────┐
+│ 3. Open ports found on hosts                                 │
+│    - 192.168.1.10:9091 (open)                               │
+│    - 192.168.1.11:9091 (open)                               │
+│    - 192.168.1.15:9091 (open)                               │
+└──────────────────────────────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────────┐
+│ 4. pi-controller queries /health endpoint on each host       │
+│    GET http://192.168.1.10:9091/health                      │
+│    Response:                                                │
+│    {                                                        │
+│      "status": "ok",                                        │
+│      "version": "v1.0.0",                                   │
+│      "uptime": "3600s"                                      │
+│    }                                                        │
+└──────────────────────────────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────────┐
+│ 5. Nodes automatically registered                            │
+│    - Creates node entries:                                  │
+│      * discovery_method: network_scan                       │
+│      * node_type: controller or agent (from health response)│
+│      * version: v1.0.0 (from TXT records)                  │
+│      * status: discovered                                   │
+└──────────────────────────────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────────┐
+│ 6. User sees discovered nodes in web UI                     │
+│    - pi-1 (192.168.1.10, controller, network_scan)         │
+│    - pi-2 (192.168.1.11, controller, network_scan)         │
+│    - pi-3 (192.168.1.15, agent, network_scan)              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## Network Scan Configuration
+
+### Configuration Fields
+
+Network scanning provides a fallback discovery mechanism for environments where mDNS is blocked or unreliable.
+
+```yaml
+discovery:
+  enabled: true
+  method: "scan"                # Discovery method: mdns, scan, static
+
+  # Network scan settings
+  scan_ranges:                  # IP ranges to scan (CIDR notation)
+    - "192.168.1.0/24"          # Single subnet
+    - "10.0.0.0/16"             # Larger network range
+    - "172.16.0.0/12"           # Multiple ranges supported
+
+  scan_ports:                   # Ports to scan on each host
+    - 9091                      # Default pi-agent gRPC port
+    - 8080                      # Alternative port
+
+  scan_timeout: "2s"            # Timeout for individual port scans
+  scan_concurrency: 10          # Number of concurrent scan workers
+  scan_rate_limit: 100          # Maximum scans per second (prevents network flooding)
+  interval: "30s"               # Periodic scan interval
+```
+
+### IP Range Formats
+
+Network scanning supports CIDR notation for IP ranges:
+
+- **Single subnet:** `"192.168.1.0/24"` (192.168.1.1 - 192.168.1.254)
+- **Large range:** `"10.0.0.0/16"` (10.0.0.1 - 10.0.255.254)
+- **Very large range:** `"172.16.0.0/12"` (172.16.0.1 - 172.31.255.254)
+- **Single host:** `"192.168.1.100/32"` (only 192.168.1.100)
+
+### Rate Limiting
+
+Network scanning includes built-in rate limiting to prevent network flooding:
+
+- **scan_rate_limit**: Maximum number of port scan attempts per second
+- **scan_concurrency**: Number of parallel scan workers
+- **scan_timeout**: Timeout for each individual port scan
+
+**Recommended Values:**
+
+```yaml
+# Conservative (large networks, avoid detection)
+scan_concurrency: 5
+scan_rate_limit: 50
+scan_timeout: "5s"
+
+# Balanced (default, good for most environments)
+scan_concurrency: 10
+scan_rate_limit: 100
+scan_timeout: "2s"
+
+# Aggressive (small networks, fast discovery)
+scan_concurrency: 20
+scan_rate_limit: 200
+scan_timeout: "1s"
+```
+
+### Port Selection
+
+By default, network scanning checks the standard pi-agent gRPC port (9091). You can configure additional ports:
+
+```yaml
+scan_ports:
+  - 9091    # Standard pi-agent gRPC port
+  - 8080    # Alternative HTTP port
+  - 9090    # Alternative gRPC port
+```
+
+### Node Identification
+
+Network scanning identifies pi-controller and pi-agent nodes by querying the `/health` endpoint:
+
+1. Scanner detects open port on host
+2. Makes HTTP GET request to `http://{ip}:{port}/health`
+3. Validates response contains expected fields:
+   - `status`: Health status (should be "ok")
+   - `version`: pi-controller/pi-agent version
+   - `uptime`: Service uptime
+4. Creates node entry with `discovery_method: network_scan`
+
+### Best Practices
+
+**Use Appropriate Scan Ranges:**
+
+- Scan only networks where you expect to find nodes
+- Avoid scanning large public IP ranges
+- Use specific subnets when possible
+
+**Configure Rate Limits:**
+
+- Set `scan_rate_limit` based on network capacity
+- Lower values for shared/production networks
+- Higher values for dedicated/lab networks
+
+**Combine with mDNS:**
+
+- Use both mDNS and network scanning for redundancy
+- mDNS for fast local discovery
+- Network scanning for cross-subnet discovery
+
+**Security Considerations:**
+
+- Network scanning may trigger security alerts on corporate networks
+- Coordinate with network administrators before enabling
+- Consider using manual node entry in restricted environments
+- Monitor logs for failed connection attempts
+
+### Example Configurations
+
+**Single Subnet (Homelab):**
+
+```yaml
+discovery:
+  enabled: true
+  method: "scan"
+  scan_ranges:
+    - "192.168.1.0/24"
+  scan_ports:
+    - 9091
+  scan_timeout: "2s"
+  scan_concurrency: 10
+  scan_rate_limit: 100
+  interval: "30s"
+```
+
+**Multiple Subnets (Enterprise):**
+
+```yaml
+discovery:
+  enabled: true
+  method: "scan"
+  scan_ranges:
+    - "10.10.1.0/24"     # Development VLAN
+    - "10.10.2.0/24"     # Production VLAN
+    - "10.10.3.0/24"     # Testing VLAN
+  scan_ports:
+    - 9091
+  scan_timeout: "3s"
+  scan_concurrency: 5
+  scan_rate_limit: 50
+  interval: "60s"
+```
+
+**Combined mDNS + Network Scan:**
+
+```yaml
+discovery:
+  enabled: true
+  method: "mdns"        # Primary method
+  scan_ranges:          # Fallback scanning
+    - "192.168.1.0/24"
+  scan_ports:
+    - 9091
+  scan_timeout: "2s"
+  scan_concurrency: 10
+  scan_rate_limit: 100
+  interval: "30s"
+```
+
 ## Future Enhancements
 
 - DHCP lease scanning for automatic discovery
-- Network scanning (nmap integration)
 - Automatic provisioning workflows
 - Node templates for quick setup
 - Bulk operations (provision multiple nodes)
 - Health monitoring per discovery method
+- Network topology visualization
