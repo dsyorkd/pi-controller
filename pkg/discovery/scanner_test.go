@@ -806,3 +806,179 @@ func TestIdentifyNodeInvalidResponse(t *testing.T) {
 		})
 	}
 }
+
+// TestNetworkScanDiscovery verifies that nodes discovered via network scanning
+// have the correct ServiceType and ID format as per the network scan discovery specification
+func TestNetworkScanDiscovery(t *testing.T) {
+	// Start a mock pi-controller health endpoint
+	handler := http.NewServeMux()
+	handler.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]interface{}{
+			"status":    "ok",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"version":   "v1.0.0-test",
+			"uptime":    "2h15m30s",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	})
+
+	server := &http.Server{
+		Handler: handler,
+	}
+
+	// Start server on a random available port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to start test server: %v", err)
+	}
+	defer listener.Close()
+
+	addr := listener.Addr().(*net.TCPAddr)
+	testPort := addr.Port
+	testIP := "127.0.0.1"
+
+	// Start the server in a goroutine
+	go func() {
+		server.Serve(listener)
+	}()
+	defer server.Close()
+
+	// Give the server a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	t.Run("node has network_scan ServiceType", func(t *testing.T) {
+		ip := net.ParseIP(testIP)
+		node, err := identifyNode(ip, testPort, 2*time.Second)
+
+		if err != nil {
+			t.Fatalf("unexpected error identifying node: %v", err)
+		}
+
+		if node == nil {
+			t.Fatal("expected non-nil node")
+		}
+
+		// Verify ServiceType is "network_scan" for DiscoveryMethodNetworkScan
+		if node.ServiceType != "network_scan" {
+			t.Errorf("ServiceType = %q, want %q", node.ServiceType, "network_scan")
+		}
+	})
+
+	t.Run("node has correct ID format", func(t *testing.T) {
+		ip := net.ParseIP(testIP)
+		node, err := identifyNode(ip, testPort, 2*time.Second)
+
+		if err != nil {
+			t.Fatalf("unexpected error identifying node: %v", err)
+		}
+
+		if node == nil {
+			t.Fatal("expected non-nil node")
+		}
+
+		// Verify ID format is "scan-{ip}-{port}"
+		expectedID := fmt.Sprintf("scan-%s-%d", testIP, testPort)
+		if node.ID != expectedID {
+			t.Errorf("ID = %q, want %q", node.ID, expectedID)
+		}
+	})
+
+	t.Run("node contains health endpoint data", func(t *testing.T) {
+		ip := net.ParseIP(testIP)
+		node, err := identifyNode(ip, testPort, 2*time.Second)
+
+		if err != nil {
+			t.Fatalf("unexpected error identifying node: %v", err)
+		}
+
+		if node == nil {
+			t.Fatal("expected non-nil node")
+		}
+
+		// Verify TXT records contain health endpoint information
+		if node.TXTRecords["version"] != "v1.0.0-test" {
+			t.Errorf("TXTRecords[version] = %q, want %q", node.TXTRecords["version"], "v1.0.0-test")
+		}
+
+		if node.TXTRecords["uptime"] != "2h15m30s" {
+			t.Errorf("TXTRecords[uptime] = %q, want %q", node.TXTRecords["uptime"], "2h15m30s")
+		}
+	})
+
+	t.Run("node has correct IP and port", func(t *testing.T) {
+		ip := net.ParseIP(testIP)
+		node, err := identifyNode(ip, testPort, 2*time.Second)
+
+		if err != nil {
+			t.Fatalf("unexpected error identifying node: %v", err)
+		}
+
+		if node == nil {
+			t.Fatal("expected non-nil node")
+		}
+
+		// Verify IP address
+		if node.IPAddress != testIP {
+			t.Errorf("IPAddress = %q, want %q", node.IPAddress, testIP)
+		}
+
+		// Verify port
+		if node.Port != testPort {
+			t.Errorf("Port = %d, want %d", node.Port, testPort)
+		}
+	})
+
+	t.Run("multiple nodes have unique IDs", func(t *testing.T) {
+		// Start a second test server on a different port
+		listener2, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to start second test server: %v", err)
+		}
+		defer listener2.Close()
+
+		addr2 := listener2.Addr().(*net.TCPAddr)
+		testPort2 := addr2.Port
+
+		server2 := &http.Server{
+			Handler: handler,
+		}
+
+		go func() {
+			server2.Serve(listener2)
+		}()
+		defer server2.Close()
+
+		time.Sleep(100 * time.Millisecond)
+
+		// Identify both nodes
+		ip := net.ParseIP(testIP)
+		node1, err := identifyNode(ip, testPort, 2*time.Second)
+		if err != nil {
+			t.Fatalf("unexpected error identifying node1: %v", err)
+		}
+
+		node2, err := identifyNode(ip, testPort2, 2*time.Second)
+		if err != nil {
+			t.Fatalf("unexpected error identifying node2: %v", err)
+		}
+
+		// Verify IDs are unique
+		if node1.ID == node2.ID {
+			t.Errorf("nodes have duplicate IDs: %q", node1.ID)
+		}
+
+		// Verify both IDs follow the correct format
+		expectedID1 := fmt.Sprintf("scan-%s-%d", testIP, testPort)
+		expectedID2 := fmt.Sprintf("scan-%s-%d", testIP, testPort2)
+
+		if node1.ID != expectedID1 {
+			t.Errorf("node1.ID = %q, want %q", node1.ID, expectedID1)
+		}
+
+		if node2.ID != expectedID2 {
+			t.Errorf("node2.ID = %q, want %q", node2.ID, expectedID2)
+		}
+	})
+}
