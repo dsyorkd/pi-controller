@@ -71,17 +71,12 @@ ui: ## Build kubes-aura web interface
 		exit 1; \
 	fi
 	@mkdir -p web
-	@if [ -d "../kubes-aura" ]; then \
-		echo "Using local kubes-aura repository from ../kubes-aura..."; \
-		rm -rf $(UI_DIR); \
-		mkdir -p $(UI_DIR); \
-		rsync -av --exclude 'node_modules' --exclude 'dist' --exclude '.git' ../kubes-aura/ $(UI_DIR)/; \
-	elif [ ! -d "$(UI_DIR)" ]; then \
-		echo "Cloning kubes-aura repository..."; \
-		git clone $(KUBES_AURA_REPO) $(UI_DIR); \
+	@if [ ! -d "$(UI_DIR)/.git" ]; then \
+		echo "Initializing kubes-aura submodule..."; \
+		git submodule update --init --recursive $(UI_DIR); \
 	else \
-		echo "Updating kubes-aura repository..."; \
-		cd $(UI_DIR) && git pull; \
+		echo "Updating kubes-aura submodule..."; \
+		git submodule update --remote $(UI_DIR); \
 	fi
 	@echo "Installing UI dependencies..."
 	@cd $(UI_DIR) && npm install
@@ -99,6 +94,23 @@ ui-clean: ## Clean Web UI build artifacts
 	rm -rf $(UI_DIST)/*
 	@mkdir -p $(UI_DIST)
 	@echo "<html><body><h1>UI not built</h1><p>Please run 'make ui' to build the web interface.</p></body></html>" > $(UI_DIST)/index.html
+
+ui-from-release: ## Download and extract pre-built UI from GitHub release
+	@echo "Downloading pre-built Web UI from GitHub release..."
+	@if [ -z "$(UI_VERSION)" ]; then \
+		echo "Error: UI_VERSION is required. Example: make ui-from-release UI_VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@mkdir -p $(UI_DIST)
+	@rm -rf $(UI_DIST)/*
+	@echo "Fetching kubes-aura $(UI_VERSION)..."
+	@curl -L -o /tmp/kubes-aura.tar.gz \
+		"https://github.com/dsyorkd/kubes-aura/releases/download/$(UI_VERSION)/kubes-aura-$${UI_VERSION#v}.tar.gz"
+	@echo "Extracting UI assets..."
+	@tar -xzf /tmp/kubes-aura.tar.gz -C $(UI_DIST)/
+	@rm /tmp/kubes-aura.tar.gz
+	@touch $(UI_DIST)/.keep
+	@echo "Web UI $(UI_VERSION) installed successfully"
 
 # Code quality
 fmt: ## Format Go code
