@@ -3,8 +3,10 @@ package discovery
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -220,4 +222,68 @@ func (ps *PortScanner) ScanRange(ctx context.Context, ips []net.IP, ports []int)
 	}()
 
 	return results
+}
+
+// identifyNode attempts to identify a pi-controller agent at the given IP and port.
+// It makes an HTTP request to the /health endpoint to verify the node is a pi-controller agent.
+// Returns a Node struct with the discovered information, or an error if identification fails.
+func identifyNode(ip net.IP, port int, timeout time.Duration) (*Node, error) {
+	// Construct the health endpoint URL
+	url := fmt.Sprintf("http://%s:%d/health", ip.String(), port)
+
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
+	// Make HTTP GET request to health endpoint
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to health endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check if status code is 200 OK
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("health endpoint returned non-OK status: %d", resp.StatusCode)
+	}
+
+	// Parse JSON response
+	var healthResp struct {
+		Status    string `json:"status"`
+		Timestamp string `json:"timestamp"`
+		Version   string `json:"version"`
+		Uptime    string `json:"uptime"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&healthResp); err != nil {
+		return nil, fmt.Errorf("failed to parse health response: %w", err)
+	}
+
+	// Verify the status is "ok"
+	if healthResp.Status != "ok" {
+		return nil, fmt.Errorf("health check returned non-ok status: %s", healthResp.Status)
+	}
+
+	// Create Node struct with discovered information
+	node := &Node{
+		ID:           fmt.Sprintf("scan-%s-%d", ip.String(), port),
+		Name:         ip.String(), // Use IP as name since hostname is not available from /health
+		IPAddress:    ip.String(),
+		Port:         port,
+		ServiceType:  "network_scan",
+		TXTRecords:   make(map[string]string),
+		LastSeen:     time.Now(),
+		Capabilities: []string{},
+	}
+
+	// Add version and uptime to TXT records if available
+	if healthResp.Version != "" {
+		node.TXTRecords["version"] = healthResp.Version
+	}
+	if healthResp.Uptime != "" {
+		node.TXTRecords["uptime"] = healthResp.Uptime
+	}
+
+	return node, nil
 }

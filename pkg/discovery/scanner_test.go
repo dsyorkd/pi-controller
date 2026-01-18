@@ -2,8 +2,10 @@ package discovery
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -600,4 +602,207 @@ func TestScanRangeContextCancellation(t *testing.T) {
 	// With the timeout, we should not scan all 300 combinations (100 IPs * 3 ports)
 	// We're scanning unreachable IPs so we shouldn't get any open ports anyway
 	t.Logf("Scanned %d combinations before context cancellation", len(results))
+}
+
+func TestIdentifyNode(t *testing.T) {
+	// Start a test HTTP server that mimics the pi-controller health endpoint
+	handler := http.NewServeMux()
+	handler.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]interface{}{
+			"status":    "ok",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"version":   "v1.0.0",
+			"uptime":    "1h30m",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	})
+
+	server := &http.Server{
+		Handler: handler,
+	}
+
+	// Start server on a random available port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to start test server: %v", err)
+	}
+	defer listener.Close()
+
+	addr := listener.Addr().(*net.TCPAddr)
+	port := addr.Port
+
+	// Start the server in a goroutine
+	go func() {
+		server.Serve(listener)
+	}()
+	defer server.Close()
+
+	// Give the server a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	tests := []struct {
+		name        string
+		ip          string
+		port        int
+		timeout     time.Duration
+		expectError bool
+		checkNode   func(*testing.T, *Node)
+	}{
+		{
+			name:        "successful identification",
+			ip:          "127.0.0.1",
+			port:        port,
+			timeout:     2 * time.Second,
+			expectError: false,
+			checkNode: func(t *testing.T, node *Node) {
+				if node == nil {
+					t.Fatal("expected non-nil node")
+				}
+				expectedID := fmt.Sprintf("scan-127.0.0.1-%d", port)
+				if node.ID != expectedID {
+					t.Errorf("ID = %s, want %s", node.ID, expectedID)
+				}
+				if node.Name != "127.0.0.1" {
+					t.Errorf("Name = %s, want 127.0.0.1", node.Name)
+				}
+				if node.IPAddress != "127.0.0.1" {
+					t.Errorf("IPAddress = %s, want 127.0.0.1", node.IPAddress)
+				}
+				if node.Port != port {
+					t.Errorf("Port = %d, want %d", node.Port, port)
+				}
+				if node.ServiceType != "network_scan" {
+					t.Errorf("ServiceType = %s, want network_scan", node.ServiceType)
+				}
+				if node.TXTRecords["version"] != "v1.0.0" {
+					t.Errorf("TXTRecords[version] = %s, want v1.0.0", node.TXTRecords["version"])
+				}
+				if node.TXTRecords["uptime"] != "1h30m" {
+					t.Errorf("TXTRecords[uptime] = %s, want 1h30m", node.TXTRecords["uptime"])
+				}
+			},
+		},
+		{
+			name:        "unreachable host",
+			ip:          "192.0.2.1", // TEST-NET-1, should be unreachable
+			port:        80,
+			timeout:     100 * time.Millisecond,
+			expectError: true,
+		},
+		{
+			name:        "wrong port",
+			ip:          "127.0.0.1",
+			port:        65534, // Unlikely to be open
+			timeout:     100 * time.Millisecond,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ip := net.ParseIP(tt.ip)
+			if ip == nil {
+				t.Fatalf("failed to parse IP: %s", tt.ip)
+			}
+
+			node, err := identifyNode(ip, tt.port, tt.timeout)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+				if node != nil {
+					t.Error("expected nil node on error")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if tt.checkNode != nil {
+				tt.checkNode(t, node)
+			}
+		})
+	}
+}
+
+func TestIdentifyNodeInvalidResponse(t *testing.T) {
+	tests := []struct {
+		name        string
+		handlerFunc http.HandlerFunc
+		description string
+	}{
+		{
+			name: "non-200 status code",
+			handlerFunc: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+			},
+			description: "should fail when health endpoint returns non-200 status",
+		},
+		{
+			name: "invalid JSON",
+			handlerFunc: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("not json"))
+			},
+			description: "should fail when health endpoint returns invalid JSON",
+		},
+		{
+			name: "non-ok status",
+			handlerFunc: func(w http.ResponseWriter, r *http.Request) {
+				response := map[string]interface{}{
+					"status":    "error",
+					"timestamp": time.Now().Format(time.RFC3339),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(response)
+			},
+			description: "should fail when health status is not 'ok'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Start a test HTTP server with the custom handler
+			handler := http.NewServeMux()
+			handler.HandleFunc("/health", tt.handlerFunc)
+
+			server := &http.Server{
+				Handler: handler,
+			}
+
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatalf("failed to start test server: %v", err)
+			}
+			defer listener.Close()
+
+			addr := listener.Addr().(*net.TCPAddr)
+			port := addr.Port
+
+			go func() {
+				server.Serve(listener)
+			}()
+			defer server.Close()
+
+			// Give the server a moment to start
+			time.Sleep(100 * time.Millisecond)
+
+			ip := net.ParseIP("127.0.0.1")
+			node, err := identifyNode(ip, port, 2*time.Second)
+
+			if err == nil {
+				t.Errorf("%s: expected error but got none", tt.description)
+			}
+			if node != nil {
+				t.Errorf("%s: expected nil node on error", tt.description)
+			}
+		})
+	}
 }
