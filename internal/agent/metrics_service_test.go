@@ -20,7 +20,7 @@ func createTestMetricsService(t *testing.T) *MetricsService {
 	require.NoError(t, err)
 
 	// Create the metrics service
-	service := NewMetricsService(testLogger)
+	service := NewMetricsService(testLogger, nil, "test-node")
 	require.NotNil(t, service)
 
 	return service

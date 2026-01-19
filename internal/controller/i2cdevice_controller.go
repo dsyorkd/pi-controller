@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,7 @@ import (
 type I2CDeviceReconciler struct {
 	client.Client
 	Scheme      *runtime.Scheme
-	Logger      *logrus.Entry
+	Logger      logger.Interface
 	I2CService  services.I2CControllerService
 	NodeService services.NodeControllerService
 }
@@ -37,7 +37,7 @@ type I2CDeviceReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := r.Logger.WithFields(logrus.Fields{
+	logger := r.Logger.WithFields(map[string]interface{}{
 		"i2cdevice": req.NamespacedName,
 		"namespace": req.Namespace,
 	})
@@ -51,7 +51,7 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			logger.Info("I2CDevice resource not found, likely deleted")
 			return ctrl.Result{}, nil
 		}
-		logger.WithError(err).Error("Failed to get I2CDevice resource")
+		logger.Errorf("Failed to get I2CDevice resource: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -64,7 +64,7 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !controllerutil.ContainsFinalizer(&i2cDevice, "gpio.pi-controller.io/finalizer") {
 		controllerutil.AddFinalizer(&i2cDevice, "gpio.pi-controller.io/finalizer")
 		if err := r.Update(ctx, &i2cDevice); err != nil {
-			logger.WithError(err).Error("Failed to add finalizer")
+			logger.Errorf("Failed to add finalizer: %v", err)
 			return ctrl.Result{}, err
 		}
 		logger.Info("Added finalizer to I2CDevice")
@@ -74,7 +74,7 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Find the target node
 	targetNode, err := r.findTargetNode(ctx, &i2cDevice, logger)
 	if err != nil {
-		logger.WithError(err).Error("Failed to find target node")
+		logger.Errorf("Failed to find target node: %v", err)
 		return r.updateStatus(ctx, &i2cDevice, gpiov1.I2CPhaseFailed,
 			"Failed to find target node", err.Error(), logger)
 	}
@@ -88,7 +88,7 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Check if node is reachable
 	nodeReachable, err := r.checkNodeReachability(ctx, targetNode, logger)
 	if err != nil {
-		logger.WithError(err).Error("Failed to check node reachability")
+		logger.Errorf("Failed to check node reachability: %v", err)
 		return r.updateStatus(ctx, &i2cDevice, gpiov1.I2CPhaseFailed,
 			"Failed to check node reachability", err.Error(), logger)
 	}
@@ -110,7 +110,7 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Configure the I2C device on the target node
 	if err := r.configureI2CDevice(ctx, &i2cDevice, targetNode, logger); err != nil {
-		logger.WithError(err).Error("Failed to configure I2C device")
+		logger.Errorf("Failed to configure I2C device: %v", err)
 		return r.updateStatus(ctx, &i2cDevice, gpiov1.I2CPhaseFailed,
 			"Configuration failed", err.Error(), logger)
 	}
@@ -128,12 +128,12 @@ func (r *I2CDeviceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // findTargetNode finds the node that matches the nodeSelector
-func (r *I2CDeviceReconciler) findTargetNode(ctx context.Context, i2cDevice *gpiov1.I2CDevice, logger *logrus.Entry) (*corev1.Node, error) {
+func (r *I2CDeviceReconciler) findTargetNode(ctx context.Context, i2cDevice *gpiov1.I2CDevice, logger logger.Interface) (*corev1.Node, error) {
 	return FindNodeBySelector(ctx, r, i2cDevice.Spec.NodeSelector, "I2CDevice", logger)
 }
 
 // checkNodeReachability checks if the target node is reachable
-func (r *I2CDeviceReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
+func (r *I2CDeviceReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger logger.Interface) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
 	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
@@ -152,10 +152,10 @@ func (r *I2CDeviceReconciler) checkNodeReachability(ctx context.Context, node *c
 }
 
 // configureI2CDevice configures the I2C device on the target node via gRPC
-func (r *I2CDeviceReconciler) configureI2CDevice(ctx context.Context, i2cDevice *gpiov1.I2CDevice, node *corev1.Node, logger *logrus.Entry) error {
+func (r *I2CDeviceReconciler) configureI2CDevice(ctx context.Context, i2cDevice *gpiov1.I2CDevice, node *corev1.Node, logger logger.Interface) error {
 	// Convert I2CDevice spec to I2C service request
 	request := &services.I2CRequest{
-		NodeID:       node.Name,
+		NodeID:       node.Name, // Use node name as identifier
 		Address:      i2cDevice.Spec.Address,
 		DeviceType:   string(i2cDevice.Spec.DeviceType),
 		BusNumber:    i2cDevice.Spec.BusNumber,
@@ -174,28 +174,24 @@ func (r *I2CDeviceReconciler) configureI2CDevice(ctx context.Context, i2cDevice 
 		})
 	}
 
-	logger.WithFields(logrus.Fields{
-		"node_id":       request.NodeID,
-		"address":       request.Address,
-		"device_type":   request.DeviceType,
-		"bus_number":    request.BusNumber,
-		"data_format":   request.DataFormat,
-		"scan_interval": request.ScanInterval,
-		"registers":     len(request.Registers),
+	logger.WithFields(map[string]interface{}{
+		"node":        node.Name,
+		"address":     i2cDevice.Spec.Address,
+		"device_type": i2cDevice.Spec.DeviceType,
+		"bus_number":  i2cDevice.Spec.BusNumber,
 	}).Info("Configuring I2C device via service")
 
 	// Call the I2C service to configure the device
 	if err := r.I2CService.ConfigureDevice(ctx, request); err != nil {
-		return fmt.Errorf("failed to configure I2C device via service: %w", err)
+		return fmt.Errorf("failed to configure I2C device %s on node %s: %w", i2cDevice.Name, node.Name, err)
 	}
 
-	logger.Info("Successfully configured I2C device")
 	return nil
 }
 
 // updateStatus updates the I2CDevice status
 func (r *I2CDeviceReconciler) updateStatus(ctx context.Context, i2cDevice *gpiov1.I2CDevice,
-	phase gpiov1.I2CPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
+	phase gpiov1.I2CPhase, message, reason string, logger logger.Interface) (ctrl.Result, error) {
 	// Update basic status fields
 	now := metav1.Now()
 	i2cDevice.Status.Phase = phase
@@ -205,7 +201,7 @@ func (r *I2CDeviceReconciler) updateStatus(ctx context.Context, i2cDevice *gpiov
 	// If the device is ready and configured for scanning, read current data
 	if phase == gpiov1.I2CPhaseReady && i2cDevice.Spec.ScanInterval > 0 {
 		if err := r.readDeviceData(ctx, i2cDevice, logger); err != nil {
-			logger.WithError(err).Warn("Failed to read device data during status update")
+			logger.Warnf("Failed to read device data during status update: %v", err)
 		}
 	}
 
@@ -236,11 +232,11 @@ func (r *I2CDeviceReconciler) updateStatus(ctx context.Context, i2cDevice *gpiov
 
 	// Update the status
 	if err := r.Status().Update(ctx, i2cDevice); err != nil {
-		logger.WithError(err).Error("Failed to update I2CDevice status")
+		logger.Errorf("Failed to update I2CDevice status: %v", err)
 		return ctrl.Result{}, err
 	}
 
-	logger.WithFields(logrus.Fields{
+	logger.WithFields(map[string]interface{}{
 		"phase":   phase,
 		"message": message,
 	}).Info("Updated I2CDevice status")
@@ -259,7 +255,7 @@ func (r *I2CDeviceReconciler) updateStatus(ctx context.Context, i2cDevice *gpiov
 }
 
 // readDeviceData reads current data from the I2C device
-func (r *I2CDeviceReconciler) readDeviceData(ctx context.Context, i2cDevice *gpiov1.I2CDevice, logger *logrus.Entry) error {
+func (r *I2CDeviceReconciler) readDeviceData(ctx context.Context, i2cDevice *gpiov1.I2CDevice, logger logger.Interface) error {
 	// Create read request
 	readRequest := &services.I2CReadRequest{
 		NodeID:  i2cDevice.Status.NodeID,
@@ -272,9 +268,15 @@ func (r *I2CDeviceReconciler) readDeviceData(ctx context.Context, i2cDevice *gpi
 		return fmt.Errorf("failed to read I2C device data: %w", err)
 	}
 
+	// Convert data (map[string]interface{}) to map[string]string for storage
+	registerData := make(map[string]string)
+	for k, v := range data {
+		registerData[k] = fmt.Sprintf("%v", v)
+	}
+
 	// Update the register data in status
 	now := metav1.Now()
-	i2cDevice.Status.RegisterData = data
+	i2cDevice.Status.RegisterData = registerData
 	i2cDevice.Status.LastScan = &now
 
 	logger.WithField("data_keys", len(data)).Debug("Successfully read I2C device data")
@@ -310,7 +312,7 @@ func (r *I2CDeviceReconciler) setI2CCondition(status *gpiov1.I2CDeviceStatus,
 }
 
 // handleDeletion handles I2CDevice deletion
-func (r *I2CDeviceReconciler) handleDeletion(ctx context.Context, i2cDevice *gpiov1.I2CDevice, logger *logrus.Entry) (ctrl.Result, error) {
+func (r *I2CDeviceReconciler) handleDeletion(ctx context.Context, i2cDevice *gpiov1.I2CDevice, logger logger.Interface) (ctrl.Result, error) {
 	logger.Info("Handling I2CDevice deletion")
 
 	// Find the node that was managing this device
@@ -323,7 +325,7 @@ func (r *I2CDeviceReconciler) handleDeletion(ctx context.Context, i2cDevice *gpi
 		}
 
 		if err := r.I2CService.ConfigureDevice(ctx, cleanupRequest); err != nil {
-			logger.WithError(err).Warn("Failed to cleanup I2C device on node, continuing with deletion")
+			logger.Warnf("Failed to cleanup I2C device on node, continuing with deletion: %v", err)
 		} else {
 			logger.Info("Successfully cleaned up I2C device on node")
 		}
@@ -332,7 +334,7 @@ func (r *I2CDeviceReconciler) handleDeletion(ctx context.Context, i2cDevice *gpi
 	// Remove finalizer
 	controllerutil.RemoveFinalizer(i2cDevice, "gpio.pi-controller.io/finalizer")
 	if err := r.Update(ctx, i2cDevice); err != nil {
-		logger.WithError(err).Error("Failed to remove finalizer")
+		logger.Errorf("Failed to remove finalizer: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -358,7 +360,7 @@ func (r *I2CDeviceReconciler) mapNodeToI2CDevices(ctx context.Context, obj clien
 
 	var i2cDeviceList gpiov1.I2CDeviceList
 	if err := r.List(ctx, &i2cDeviceList); err != nil {
-		r.Logger.WithError(err).Error("Failed to list I2CDevices for node mapping")
+		r.Logger.Errorf("Failed to list I2CDevices for node mapping: %v", err)
 		return nil
 	}
 
@@ -376,7 +378,7 @@ func (r *I2CDeviceReconciler) mapNodeToI2CDevices(ctx context.Context, obj clien
 		}
 	}
 
-	r.Logger.WithFields(logrus.Fields{
+	r.Logger.WithFields(map[string]interface{}{
 		"node":            node.Name,
 		"i2cdevice_count": len(requests),
 	}).Debug("Mapped node change to I2CDevice reconcile requests")

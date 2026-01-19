@@ -18,7 +18,6 @@ import (
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
 	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,12 +36,12 @@ func setupBenchmarkEnvironment(b *testing.B) (*gin.Engine, *storage.Database, fu
 	// Initialize services
 	clusterService := services.NewClusterService(database, testLogger)
 	nodeService := services.NewNodeService(database, testLogger)
-	gpioService := services.NewGPIOService(database, testLogger)
+	gpioService := services.NewGPIOService(database, testLogger, nil)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(database)
 	clusterHandler := handlers.NewClusterHandler(clusterService, testLogger)
-	nodeHandler := handlers.NewNodeHandler(nodeService, testLogger)
+	nodeHandler := handlers.NewNodeHandler(nodeService, testLogger, "")
 	gpioHandler := handlers.NewGPIOHandler(gpioService, testLogger)
 
 	// Setup router
@@ -304,7 +303,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 		DefaultPullMode: gpio.PullNone,
 	}
 
-	gpioLogger := logrus.New()
+	gpioLogger := logger.Default()
 	securityConfig := gpio.DefaultSecurityConfig()
 	// Set high limit and short timeout for benchmarks
 	// The activeOps counter is only decremented after OperationTimeout,

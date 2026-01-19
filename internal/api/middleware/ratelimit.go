@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
 
@@ -38,14 +38,14 @@ func DefaultRateLimitConfig() *RateLimitConfig {
 // RateLimiter manages rate limiting for clients
 type RateLimiter struct {
 	config    *RateLimitConfig
-	logger    *logrus.Entry
+	logger    applogger.Interface
 	limiters  map[string]*rate.Limiter
 	mutex     sync.RWMutex
 	lastClean time.Time
 }
 
 // NewRateLimiter creates a new rate limiter
-func NewRateLimiter(config *RateLimitConfig, logger *logrus.Logger) *RateLimiter {
+func NewRateLimiter(config *RateLimitConfig, logger applogger.Interface) *RateLimiter {
 	if config == nil {
 		config = DefaultRateLimitConfig()
 	}
@@ -60,7 +60,7 @@ func NewRateLimiter(config *RateLimitConfig, logger *logrus.Logger) *RateLimiter
 	// Start cleanup goroutine
 	go rl.cleanupRoutine()
 
-	rl.logger.WithFields(logrus.Fields{
+	rl.logger.WithFields(map[string]interface{}{
 		"requests_per_minute": config.RequestsPerMinute,
 		"burst_size":          config.BurstSize,
 		"enable_by_user":      config.EnableByUser,
@@ -97,7 +97,7 @@ func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 
 		// Check if request is allowed
 		if !limiter.Allow() {
-			rl.logger.WithFields(logrus.Fields{
+			rl.logger.WithFields(map[string]interface{}{
 				"client_id":  sanitizeLogValue(clientID),
 				"client_ip":  sanitizeLogValue(c.ClientIP()),
 				"method":     sanitizeLogValue(c.Request.Method),

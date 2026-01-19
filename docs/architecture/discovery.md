@@ -28,7 +28,7 @@ const (
 
 **Agent Nodes:**
 
-- Run only the lightweight pi-agent binary
+- Run pi-controller in agent role
 - Managed by controller nodes
 - Execute workloads and provide hardware access (GPIO, sensors)
 - Unlimited scaling potential
@@ -36,7 +36,7 @@ const (
 **Generic Nodes:**
 
 - Raspberry Pi detected on the network
-- No pi-controller or pi-agent installed yet
+- No pi-controller installed yet
 - Available for provisioning
 
 ## Discovery Methods
@@ -390,7 +390,7 @@ TXT Records:
 Setup:
 - Pi-1: 192.168.1.10 - Will run pi-controller (bootstrap)
 - Pi-2: 192.168.1.11 - Will run pi-controller (join cluster)
-- Pi-3: 192.168.1.15 - Will run pi-agent
+- Pi-3: 192.168.1.15 - Will run pi-controller (agent role)
 - Pi-4: 192.168.1.20 - Generic, will provision later
 - Pi-5: 10.0.5.50    - On remote network, manual entry
 ```
@@ -445,13 +445,13 @@ Result:
 - Both controllers in sync
 ```
 
-**Step 6: Pi-3 with pi-agent auto-discovered**
+**Step 6: Pi-3 with pi-controller (agent role) auto-discovered**
 
 ```bash
 # On Pi-3
-wget https://github.com/your/pi-controller/releases/download/v1.0.0/pi-agent
-chmod +x pi-agent
-./pi-agent --controller-url https://192.168.1.10:8080
+wget https://github.com/your/pi-controller/releases/download/v1.0.0/pi-controller
+chmod +x pi-controller
+./pi-controller --config /etc/pi-controller/agent-config.yaml
 ```
 
 ```

@@ -1,0 +1,98 @@
+# PRD: Hardware Control & GPIO Testing
+
+## Product Overview
+Critical end-to-end testing of hardware control features, specifically GPIO pin management, system information display, and network configuration viewing.
+
+## Problem Statement
+Hardware control is a unique selling point but lacks:
+1. Automated testing of GPIO pin toggle operations
+2. Validation of read-only pin protection
+3. Pin state persistence verification
+4. System information accuracy testing
+5. Real-time hardware metrics validation
+
+## Goals & Success Metrics
+
+### Primary Goals
+- Achieve 100% test coverage of GPIO control
+- Validate all pin operations function correctly
+- Ensure read-only pins cannot be modified
+- Verify system information accuracy
+
+### Success Metrics
+- All GPIO tests pass consistently
+- Pin toggles complete in < 500ms
+- Read-only pins properly protected
+- System info displays accurately
+- No accidental pin state changes
+
+## Implementation Tasks
+
+### Task 2.5: Hardware Control Testing
+**Priority:** CRITICAL
+**Estimated Effort:** 5-6 hours
+
+**Subtasks:**
+1. Create `hardware.spec.ts` test file
+2. Implement node selection dropdown test
+3. Implement system overview cards test (CPU Temp, Memory, Load, Uptime)
+4. Implement tab switching test (GPIO, System Info, Network)
+5. Create `gpio-control.spec.ts` test file
+6. Implement GPIO pin list display test
+7. Implement pin status badges test (HIGH/LOW)
+8. Implement category badges test (LED, Button, Sensor, Relay)
+9. Implement pin toggle functionality test
+10. Implement pin state persistence test
+11. Implement read-only pin protection test
+12. Implement error handling test for failed operations
+13. Implement system info tab accuracy test
+14. Create comprehensive GPIO mock data
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication)
+
+## Test Scenarios
+
+### GPIO Pin Toggle
+```typescript
+test('should toggle GPIO pin state', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/hardware/node-1');
+  await page.click('button:has-text("GPIO Pins")');
+
+  // Get initial state
+  const pin17Toggle = page.locator('.gpio-pin[data-pin="17"] button');
+  const initialState = await pin17Toggle.getAttribute('aria-checked');
+
+  // Toggle pin
+  await pin17Toggle.click();
+
+  // Wait for API response
+  await page.waitForResponse(resp => resp.url().includes('/api/v1/gpio') && resp.status() === 200);
+
+  // Verify state changed
+  const newState = await pin17Toggle.getAttribute('aria-checked');
+  expect(initialState).not.toBe(newState);
+
+  // Verify badge updated
+  const badge = page.locator('.gpio-pin[data-pin="17"] [data-testid="pin-status"]');
+  await expect(badge).toContainText(newState === 'true' ? 'HIGH' : 'LOW');
+});
+```
+
+### Read-Only Pin Protection
+```typescript
+test('should prevent toggling read-only pins', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/hardware/node-1');
+
+  // Find a read-only (input mode) pin
+  const readOnlyPin = page.locator('.gpio-pin[data-mode="input"] button').first();
+
+  // Verify it's disabled
+  await expect(readOnlyPin).toBeDisabled();
+
+  // Verify tooltip explains why
+  await readOnlyPin.hover();
+  await expect(page.locator('[role="tooltip"]')).toContainText(/read-only/i);
+});
+```

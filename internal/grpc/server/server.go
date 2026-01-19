@@ -2,7 +2,11 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"net"
+	"os"
 
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/logger"
@@ -32,11 +36,30 @@ func NewWithAuth(cfg *config.GRPCConfig, logger logger.Interface, db *storage.Da
 
 	// Add TLS credentials if configured
 	if cfg.IsTLSEnabled() {
-		creds, err := credentials.NewServerTLSFromFile(cfg.TLSCertFile, cfg.TLSKeyFile)
+		cert, err := tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load server TLS key pair: %w", err)
 		}
+
+		caCertPool := x509.NewCertPool()
+		caPEM, err := os.ReadFile(cfg.TLSCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+		}
+		if !caCertPool.AppendCertsFromPEM(caPEM) {
+			return nil, fmt.Errorf("failed to append CA certificate to pool")
+		}
+
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			ClientCAs:    caCertPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		creds := credentials.NewTLS(tlsConfig)
 		opts = append(opts, grpc.Creds(creds))
+		logger.Info("gRPC server configured with mutual TLS (mTLS)")
 	}
 
 	// Build unary interceptor chain

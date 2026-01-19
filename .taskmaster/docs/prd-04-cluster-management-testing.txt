@@ -1,0 +1,104 @@
+# PRD: Cluster Management Testing
+
+## Product Overview
+End-to-end testing of cluster management functionality, including listing, searching, filtering, creating, and managing Kubernetes/Docker/Custom clusters in the pi-controller interface.
+
+## Problem Statement
+Cluster management is a core feature but lacks:
+1. Automated testing of cluster list and filtering
+2. Validation of multi-step cluster creation wizard
+3. Search functionality testing
+4. Cluster details page verification
+5. CRUD operation testing for clusters
+
+## Goals & Success Metrics
+
+### Primary Goals
+- Achieve 100% test coverage of cluster management features
+- Validate cluster creation wizard completes successfully
+- Ensure search and filtering work accurately
+- Verify cluster details display correctly
+
+### Success Metrics
+- All cluster management tests pass consistently
+- Cluster creation completes in < 10 seconds
+- Search returns results in < 1 second
+- Filter operations are instantaneous
+- No data loss during cluster operations
+
+## Implementation Tasks
+
+### Task 2.3: Cluster Management Testing
+**Priority:** HIGH
+**Estimated Effort:** 6-7 hours
+
+**Subtasks:**
+1. Create `clusters.spec.ts` test file
+2. Implement cluster list display test
+3. Implement search functionality test
+4. Implement filter tabs test (All, Kubernetes, Docker, Custom)
+5. Implement cluster card information test
+6. Implement "New Cluster" button test
+7. Create `cluster-creation.spec.ts` test file
+8. Implement multi-step wizard navigation test
+9. Implement form validation at each step test
+10. Implement cluster type selection test
+11. Implement node selection interface test
+12. Implement successful cluster creation test
+13. Implement cluster details page test
+14. Implement cluster edit/delete operations test
+15. Create mock cluster data in test-data.ts
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication)
+
+## Test Scenarios
+
+### Cluster List & Filtering
+```typescript
+test('should filter clusters by type', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/clusters');
+
+  // Click Kubernetes tab
+  await page.click('button:has-text("Kubernetes")');
+
+  // Verify only Kubernetes clusters shown
+  const clusters = await page.locator('.cluster-card').all();
+  for (const cluster of clusters) {
+    const type = await cluster.locator('[data-testid="cluster-type"]').textContent();
+    expect(type?.toLowerCase()).toBe('kubernetes');
+  }
+});
+```
+
+### Cluster Creation Wizard
+```typescript
+test('should create new cluster via wizard', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/clusters');
+  await page.click('button:has-text("New Cluster")');
+
+  // Step 1: Basic Information
+  await page.fill('input[name="name"]', 'Test Cluster');
+  await page.fill('textarea[name="description"]', 'Test cluster for QA');
+  await page.selectOption('select[name="type"]', 'kubernetes');
+  await page.click('button:has-text("Next")');
+
+  // Step 2: Node Selection
+  await page.check('input[value="node-1"]');
+  await page.check('input[value="node-2"]');
+  await page.click('button:has-text("Next")');
+
+  // Step 3: Configuration
+  await page.fill('input[name="version"]', 'v1.28.5');
+  await page.click('button:has-text("Next")');
+
+  // Step 4: Review & Create
+  await expect(page.locator('.review-summary')).toContainText('Test Cluster');
+  await page.click('button:has-text("Create")');
+
+  // Verify success
+  await expect(page.locator('.success-message')).toBeVisible();
+  await expect(page).toHaveURL(/\/pi-controller\/clusters/);
+});
+```

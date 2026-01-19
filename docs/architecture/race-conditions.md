@@ -251,7 +251,7 @@ func (c *SSHClient) releaseConnection(conn *SSHConnection) {
 
 **Location**: Migration logic needs to be implemented
 
-**Architecture Issue**: Per `ARCHITECTURE.md` lines 427-453:
+**Architecture Issue**: Per `index.md` lines 427-453:
 
 ```
 BEFORE: systemd on ports 9091 (Raft)

@@ -1,6 +1,6 @@
 # Multi-Architecture Docker Build Guide
 
-This directory contains Dockerfiles for building the pi-controller and pi-agent applications for multiple architectures.
+This directory contains Dockerfiles for building the pi-controller application for multiple architectures.
 
 ## Supported Architectures
 
@@ -16,17 +16,11 @@ Builds the pi-controller main application which includes:
 
 - SQLite database support (requires CGO)
 - REST API server
-- gRPC server
+- gRPC server (Controller & Agent)
 - WebSocket server
 - Kubernetes client functionality
-
-### Dockerfile.agent
-
-Builds the pi-agent application which includes:
-
 - Hardware access capabilities (GPIO, I2C, SPI)
 - System monitoring
-- gRPC client for controller communication
 
 ## Multi-Architecture Build Features
 
@@ -69,16 +63,6 @@ make docker-multiarch-test
 make docker-multiarch
 ```
 
-### Individual Components
-
-```bash
-# Build controller only
-make docker-multiarch-controller
-
-# Build agent only
-make docker-multiarch-agent
-```
-
 ## Image Tags
 
 - `pi-controller:latest` - Multi-arch manifest
@@ -116,9 +100,9 @@ All Dockerfiles support these build arguments:
 - Health checks included
 - Multi-stage builds to minimize attack surface
 
-## Hardware Access (pi-agent only)
+## Hardware Access
 
-The pi-agent image includes hardware access capabilities:
+The pi-controller image includes hardware access capabilities when running in agent mode:
 
 - GPIO pin control
 - I2C communication
@@ -143,7 +127,7 @@ spec:
         # Kubernetes will automatically select the correct architecture
 ```
 
-For the pi-agent DaemonSet, hardware access is required:
+For the Agent DaemonSet (hardware access), use the same image but with agent configuration:
 
 ```yaml
 apiVersion: apps/v1
@@ -157,7 +141,8 @@ spec:
       hostPID: true
       containers:
       - name: pi-agent
-        image: your-registry.com/pi-agent:latest
+        image: your-registry.com/pi-controller:latest
+        command: ["/usr/local/bin/pi-controller", "start", "--config", "/etc/pi-controller/agent-config.yaml"]
         securityContext:
           privileged: true
         volumeMounts:
@@ -192,7 +177,7 @@ If images don't run on target architecture:
 2. Check that the manifest includes all required architectures
 3. Ensure Kubernetes nodes are properly labeled with architecture
 
-### Hardware Access Issues (pi-agent)
+### Hardware Access Issues
 
 For GPIO/I2C access problems:
 

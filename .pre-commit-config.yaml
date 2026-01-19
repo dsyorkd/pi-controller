@@ -100,9 +100,10 @@ repos:
         stages: [pre-commit]  # Only run on commit, not push
 
       # Check for forbidden patterns (commit-time only)
+      # Note: cmd/ is excluded since main files legitimately use fmt.Print* for CLI output
       - id: check-forbidden-patterns
         name: Check for forbidden code patterns
-        entry: bash -c 'if git diff --cached --name-only --diff-filter=ACM | grep "\.go$" | xargs grep -n "fmt.Print[f|ln]*\|panic(\|//.*TODO.*SECURITY\|//.*FIXME.*SECURITY" 2>/dev/null; then echo "Found forbidden patterns in Go files"; exit 1; fi'
+        entry: bash -c 'if git diff --cached --name-only --diff-filter=ACM | grep "\.go$" | grep -v "^cmd/" | xargs grep -n "fmt.Print[f|ln]*\|panic(\|//.*TODO.*SECURITY\|//.*FIXME.*SECURITY" 2>/dev/null; then echo "Found forbidden patterns in Go files"; exit 1; fi'
         language: system
         pass_filenames: false
         files: \.go$

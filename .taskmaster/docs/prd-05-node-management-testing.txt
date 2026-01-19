@@ -1,0 +1,93 @@
+# PRD: Node Management Testing
+
+## Product Overview
+Comprehensive testing of node management features including node listing, discovery, adoption, monitoring, and real-time metrics display.
+
+## Problem Statement
+Node management is critical for cluster operations but lacks:
+1. Automated testing of node listing and filtering
+2. Validation of node discovery and adoption workflows
+3. Search functionality verification
+4. Real-time metrics update testing
+5. Node action button testing
+
+## Goals & Success Metrics
+
+### Primary Goals
+- Achieve 100% test coverage of node management
+- Validate node adoption workflow completes successfully
+- Ensure search and filtering work accurately
+- Verify real-time metrics display correctly
+
+### Success Metrics
+- All node management tests pass
+- Node adoption completes in < 5 seconds
+- Search returns accurate results instantly
+- Metrics update within refresh interval
+- Action buttons trigger correct operations
+
+## Implementation Tasks
+
+### Task 2.4: Node Management Testing
+**Priority:** HIGH
+**Estimated Effort:** 6-7 hours
+
+**Subtasks:**
+1. Create `nodes.spec.ts` test file
+2. Implement node list display test
+3. Implement statistics cards test (Total, Online, Warning, Offline)
+4. Implement search by hostname/IP test
+5. Implement status filter test
+6. Implement role filter test
+7. Implement node card metrics display test
+8. Create `node-adoption.spec.ts` test file
+9. Implement discovery panel test
+10. Implement manual node entry dialog test
+11. Implement node adoption workflow test
+12. Implement node action buttons test (Monitor, Hardware, Adopt)
+13. Implement real-time metrics update test
+14. Create comprehensive mock node data
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication)
+
+## Test Scenarios
+
+### Node Filtering
+```typescript
+test('should filter nodes by status', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/nodes');
+
+  await page.selectOption('select[name="status"]', 'online');
+
+  const nodes = await page.locator('.node-card').all();
+  for (const node of nodes) {
+    const status = await node.getAttribute('data-status');
+    expect(status).toBe('online');
+  }
+});
+```
+
+### Node Adoption
+```typescript
+test('should adopt discovered node', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/nodes');
+
+  // Open discovery panel
+  await page.click('[data-testid="discovery-panel-toggle"]');
+  await expect(page.locator('.discovery-panel')).toBeVisible();
+
+  // Adopt first discovered node
+  await page.click('.discovered-node:first-child button:has-text("Adopt")');
+
+  // Fill adoption form
+  await page.fill('input[name="ssh-user"]', 'pi');
+  await page.fill('input[name="ssh-password"]', 'raspberry');
+  await page.click('button:has-text("Confirm")');
+
+  // Verify success
+  await expect(page.locator('.success-toast')).toBeVisible();
+  await expect(page.locator('.success-toast')).toContainText(/adopted successfully/i);
+});
+```

@@ -166,10 +166,16 @@ func setViperDefaults(v *viper.Viper) {
 	v.SetDefault("api.write_timeout", defaults.API.WriteTimeout)
 	v.SetDefault("api.cors_enabled", defaults.API.CORSEnabled)
 	v.SetDefault("api.auth_enabled", defaults.API.AuthEnabled)
+	v.SetDefault("api.tls_cert_file", defaults.API.TLSCertFile)
+	v.SetDefault("api.tls_key_file", defaults.API.TLSKeyFile)
+	v.SetDefault("api.tls_ca_file", defaults.API.TLSCAFile)
 
 	// gRPC defaults
 	v.SetDefault("grpc.host", defaults.GRPC.Host)
 	v.SetDefault("grpc.port", defaults.GRPC.Port)
+	v.SetDefault("grpc.tls_cert_file", defaults.GRPC.TLSCertFile)
+	v.SetDefault("grpc.tls_key_file", defaults.GRPC.TLSKeyFile)
+	v.SetDefault("grpc.tls_ca_file", defaults.GRPC.TLSCAFile)
 
 	// WebSocket defaults
 	v.SetDefault("websocket.host", defaults.WebSocket.Host)
@@ -183,7 +189,19 @@ func setViperDefaults(v *viper.Viper) {
 
 	// GPIO defaults
 	v.SetDefault("gpio.enabled", defaults.GPIO.Enabled)
-	v.SetDefault("gpio.mock_mode", defaults.GPIO.MockMode)
+	v.SetDefault("agent_server.port", defaults.AgentServer.Port)
+	v.SetDefault("agent_server.enable_gpio", defaults.AgentServer.EnableGPIO)
+	v.SetDefault("agent_server.tls_cert_file", defaults.AgentServer.TLSCertFile)
+	v.SetDefault("agent_server.tls_key_file", defaults.AgentServer.TLSKeyFile)
+	v.SetDefault("agent_server.tls_ca_file", defaults.AgentServer.TLSCAFile)
+
+	// GRPC Client defaults
+	v.SetDefault("grpc_client.server_address", defaults.GRPCClient.ServerAddress)
+	v.SetDefault("grpc_client.server_port", defaults.GRPCClient.ServerPort)
+	v.SetDefault("grpc_client.insecure", defaults.GRPCClient.Insecure)
+	v.SetDefault("grpc_client.tls_cert_file", defaults.GRPCClient.TLSCert)
+	v.SetDefault("grpc_client.tls_key_file", defaults.GRPCClient.TLSKey)
+	v.SetDefault("grpc_client.tls_ca_file", defaults.GRPCClient.TLSCAFile)
 
 	// Discovery defaults
 	v.SetDefault("discovery.enabled", defaults.Discovery.Enabled)
@@ -299,12 +317,16 @@ func bindNestedEnvVars(v *viper.Viper) {
 	bindEnv(v, "api.port")
 	bindEnv(v, "api.read_timeout")
 	bindEnv(v, "api.write_timeout")
+	bindEnv(v, "api.tls_cert_file")
+	bindEnv(v, "api.tls_key_file")
+	bindEnv(v, "api.tls_ca_file")
 	bindEnv(v, "api.cors_enabled")
 	bindEnv(v, "api.auth_enabled")
 
 	// gRPC
 	bindEnv(v, "grpc.host")
-	bindEnv(v, "grpc.port")
+	bindEnv(v, "grpc.tls_key_file")
+	bindEnv(v, "grpc.tls_ca_file")
 
 	// WebSocket
 	bindEnv(v, "websocket.host")
@@ -319,11 +341,52 @@ func bindNestedEnvVars(v *viper.Viper) {
 	// GPIO
 	bindEnv(v, "gpio.enabled")
 	bindEnv(v, "gpio.mock_mode")
+	bindEnv(v, "gpio.sample_interval")
+	bindEnv(v, "gpio.retention_period")
+	bindEnv(v, "gpio.allowed_pins")
+	bindEnv(v, "gpio.restricted_pins")
+	bindEnv(v, "gpio.default_direction")
+	bindEnv(v, "gpio.default_pull_mode")
+
+	// Pi Agent gRPC server
+	bindEnv(v, "agent_server.address")
+	bindEnv(v, "agent_server.port")
+	bindEnv(v, "agent_server.enable_gpio")
+	bindEnv(v, "agent_server.tls_cert_file")
+	bindEnv(v, "agent_server.tls_key_file")
+	bindEnv(v, "agent_server.tls_ca_file")
+
+	// gRPC Client
+	bindEnv(v, "grpc_client.server_address")
+	bindEnv(v, "grpc_client.server_port")
+	bindEnv(v, "grpc_client.insecure")
+	bindEnv(v, "grpc_client.tls_cert_file")
+	bindEnv(v, "grpc_client.tls_key_file")
+	bindEnv(v, "grpc_client.tls_ca_file")
 
 	// Discovery
 	bindEnv(v, "discovery.enabled")
 	bindEnv(v, "discovery.method")
 	bindEnv(v, "discovery.port")
+	bindEnv(v, "discovery.interval")
+	bindEnv(v, "discovery.timeout")
+	bindEnv(v, "discovery.static_nodes")
+	bindEnv(v, "discovery.service_name")
+	bindEnv(v, "discovery.service_type")
+
+	// Cluster
+	bindEnv(v, "cluster.enabled")
+	bindEnv(v, "cluster.portable")
+	bindEnv(v, "cluster.controller_id")
+	bindEnv(v, "cluster.bind_addr")
+	bindEnv(v, "cluster.bootstrap")
+	bindEnv(v, "cluster.initial_peers")
+	bindEnv(v, "cluster.data_dir")
+	bindEnv(v, "cluster.heartbeat_timeout")
+	bindEnv(v, "cluster.election_timeout")
+	bindEnv(v, "cluster.snapshot_interval")
+	bindEnv(v, "cluster.snapshot_threshold")
+	bindEnv(v, "cluster.max_append_entries")
 
 	// WebUI
 	bindEnv(v, "webui.enabled")

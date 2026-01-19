@@ -178,7 +178,7 @@ func (h *CAHandler) IssueCertificate(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	certificate, err := h.caService.IssueCertificate(ctx, serviceReq)
+	certificate, privateKey, err := h.caService.IssueCertificate(ctx, serviceReq)
 	if err != nil {
 		h.handleServiceError(c, err, "Failed to issue certificate")
 		return
@@ -190,7 +190,10 @@ func (h *CAHandler) IssueCertificate(c *gin.Context) {
 		"serial_number": certificate.SerialNumber,
 	}).Info("Certificate issued successfully")
 
-	c.JSON(http.StatusCreated, certificate)
+	c.JSON(http.StatusCreated, gin.H{
+		"certificate": certificate,
+		"private_key": privateKey,
+	})
 }
 
 // GetCertificate retrieves a certificate by ID

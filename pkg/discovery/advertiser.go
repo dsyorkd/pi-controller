@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/hashicorp/mdns"
-	"github.com/sirupsen/logrus"
 )
 
 // AdvertiserConfig represents mDNS advertiser configuration
@@ -35,7 +35,7 @@ func DefaultAdvertiserConfig() *AdvertiserConfig {
 	return &AdvertiserConfig{
 		ServiceName: hostname,
 		ServiceType: "_pi-controller._tcp",
-		Domain:      "local",
+		Domain:      "local.",
 		Port:        9091,
 		HostName:    hostname,
 		TXTRecords: map[string]string{
@@ -49,7 +49,7 @@ func DefaultAdvertiserConfig() *AdvertiserConfig {
 // Advertiser provides mDNS advertisement functionality for Pi Agents
 type Advertiser struct {
 	config   *AdvertiserConfig
-	logger   *logrus.Entry
+	logger   applogger.Interface
 	server   *mdns.Server
 	mu       sync.Mutex
 	running  bool
@@ -57,7 +57,7 @@ type Advertiser struct {
 }
 
 // NewAdvertiser creates a new mDNS advertiser
-func NewAdvertiser(config *AdvertiserConfig, logger *logrus.Logger) *Advertiser {
+func NewAdvertiser(config *AdvertiserConfig, logger applogger.Interface) *Advertiser {
 	if config == nil {
 		config = DefaultAdvertiserConfig()
 	}
@@ -117,7 +117,7 @@ func (a *Advertiser) Start(ctx context.Context) error {
 	a.server = server
 	a.running = true
 
-	a.logger.WithFields(logrus.Fields{
+	a.logger.WithFields(map[string]interface{}{
 		"service_name": a.config.ServiceName,
 		"service_type": a.config.ServiceType,
 		"port":         a.config.Port,
@@ -148,7 +148,7 @@ func (a *Advertiser) Stop() error {
 	// Shutdown the mDNS server
 	if a.server != nil {
 		if err := a.server.Shutdown(); err != nil {
-			a.logger.WithError(err).Error("Failed to shutdown mDNS server")
+			a.logger.Errorf("Failed to shutdown mDNS server: %v", err)
 			return err
 		}
 		a.server = nil
@@ -216,7 +216,7 @@ func (a *Advertiser) monitorShutdown(ctx context.Context) {
 	case <-ctx.Done():
 		a.logger.Debug("Context cancelled, stopping advertiser")
 		if err := a.Stop(); err != nil {
-			a.logger.WithError(err).Error("Failed to stop advertiser on context cancellation")
+			a.logger.Errorf("Failed to stop advertiser on context cancellation: %v", err)
 		}
 	case <-a.stopChan:
 		// Already stopped

@@ -597,7 +597,7 @@ func TestDefaultAdminUser(t *testing.T) {
 		WriteTimeout: "30s",
 	}
 
-	server := api.New(apiConfig, testLogger, db, nil)
+	server := api.New(apiConfig, nil, testLogger, db, nil)
 
 	// Test default admin login
 	payload := map[string]interface{}{

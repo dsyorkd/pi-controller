@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,7 +22,7 @@ func FindNodeBySelector(
 	finder NodeFinder,
 	nodeSelector map[string]string,
 	resourceType string,
-	logger *logrus.Entry,
+	logger logger.Interface,
 ) (*corev1.Node, error) {
 	// List all nodes
 	var nodeList corev1.NodeList
@@ -46,7 +46,7 @@ func FindNodeBySelector(
 	}
 
 	// Return the first matching node (could be enhanced with more sophisticated selection)
-	logger.WithFields(logrus.Fields{
+	logger.WithFields(map[string]interface{}{
 		"selected_node":  matchingNodes[0].Name,
 		"matching_count": len(matchingNodes),
 		"resource_type":  resourceType,
@@ -57,7 +57,7 @@ func FindNodeBySelector(
 
 // CheckNodeReady checks if a node is in Ready state
 // This is a common helper to reduce duplication across GPIO, I2C, and PWM controllers
-func CheckNodeReady(node *corev1.Node, logger *logrus.Entry) bool {
+func CheckNodeReady(node *corev1.Node, logger logger.Interface) bool {
 	for _, condition := range node.Status.Conditions {
 		if condition.Type == corev1.NodeReady {
 			if condition.Status == corev1.ConditionTrue {

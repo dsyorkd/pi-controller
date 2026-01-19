@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sirupsen/logrus"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"go.etcd.io/bbolt"
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -42,13 +42,13 @@ func DefaultEncryptionConfig() *EncryptionConfig {
 // EncryptedStorage provides encrypted storage for sensitive data
 type EncryptedStorage struct {
 	config *EncryptionConfig
-	logger *logrus.Entry
+	logger applogger.Interface
 	db     *bbolt.DB
 	gcm    cipher.AEAD
 }
 
 // NewEncryptedStorage creates a new encrypted storage instance
-func NewEncryptedStorage(config *EncryptionConfig, logger *logrus.Logger) (*EncryptedStorage, error) {
+func NewEncryptedStorage(config *EncryptionConfig, logger applogger.Interface) (*EncryptedStorage, error) {
 	if config == nil {
 		config = DefaultEncryptionConfig()
 	}

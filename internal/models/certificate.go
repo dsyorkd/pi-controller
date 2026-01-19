@@ -30,7 +30,7 @@ type Certificate struct {
 	NotAfter    time.Time `json:"not_after"`
 	KeyUsage    string    `json:"key_usage"`
 	ExtKeyUsage string    `json:"ext_key_usage"`
-	SANs        string    `json:"sans"` // JSON array of Subject Alternative Names
+	SANs        string    `json:"sans" gorm:"column:sans"` // JSON array of Subject Alternative Names
 
 	// CA backend information
 	Backend   CertificateBackend `json:"backend" gorm:"not null"`
@@ -139,10 +139,10 @@ type CertificateRequest struct {
 	CSRPEM string `json:"-" gorm:"type:text;not null"`
 
 	// Request parameters
-	SANs           string `json:"sans"`            // JSON array of Subject Alternative Names
-	ValidityPeriod string `json:"validity_period"` // Duration string (e.g., "8760h")
-	KeyUsage       string `json:"key_usage"`       // Comma-separated key usage
-	ExtKeyUsage    string `json:"ext_key_usage"`   // Comma-separated extended key usage
+	SANs           string `json:"sans" gorm:"column:sans"` // JSON array of Subject Alternative Names
+	ValidityPeriod string `json:"validity_period"`         // Duration string (e.g., "8760h")
+	KeyUsage       string `json:"key_usage"`               // Comma-separated key usage
+	ExtKeyUsage    string `json:"ext_key_usage"`           // Comma-separated extended key usage
 
 	// Node association
 	NodeID *uint `json:"node_id,omitempty" gorm:"index"`

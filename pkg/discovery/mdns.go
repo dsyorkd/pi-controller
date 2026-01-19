@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/hashicorp/mdns"
-	"github.com/sirupsen/logrus"
 )
 
 // Node represents a discovered node
@@ -73,7 +73,7 @@ func DefaultConfig() *Config {
 // Service provides node discovery functionality
 type Service struct {
 	config        *Config
-	logger        *logrus.Entry
+	logger        applogger.Interface
 	mu            sync.RWMutex
 	nodes         map[string]*Node
 	eventHandlers []NodeEventHandler
@@ -84,7 +84,7 @@ type Service struct {
 }
 
 // NewService creates a new discovery service
-func NewService(config *Config, logger *logrus.Logger) (*Service, error) {
+func NewService(config *Config, logger applogger.Interface) (*Service, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -126,7 +126,7 @@ func (s *Service) Start(ctx context.Context) error {
 	s.running = true
 	s.mu.Unlock()
 
-	s.logger.WithFields(logrus.Fields{
+	s.logger.WithFields(map[string]interface{}{
 		"method":   s.config.Method,
 		"interval": s.config.Interval,
 	}).Info("Starting discovery service")
@@ -217,7 +217,7 @@ func (s *Service) loadStaticNodes() {
 	for i, nodeAddr := range s.config.StaticNodes {
 		host, portStr, err := net.SplitHostPort(nodeAddr)
 		if err != nil {
-			s.logger.WithFields(logrus.Fields{
+			s.logger.WithFields(map[string]interface{}{
 				"address": nodeAddr,
 				"error":   err,
 			}).Warn("Invalid static node address")
@@ -226,7 +226,7 @@ func (s *Service) loadStaticNodes() {
 
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
-			s.logger.WithFields(logrus.Fields{
+			s.logger.WithFields(map[string]interface{}{
 				"address": nodeAddr,
 				"error":   err,
 			}).Warn("Invalid static node port")
@@ -250,7 +250,7 @@ func (s *Service) loadStaticNodes() {
 			Node: *node,
 		})
 
-		s.logger.WithFields(logrus.Fields{
+		s.logger.WithFields(map[string]interface{}{
 			"id":         node.ID,
 			"ip_address": node.IPAddress,
 			"port":       node.Port,
@@ -294,7 +294,7 @@ func (s *Service) performMDNSDiscovery() {
 
 		// Perform the query
 		if err := mdns.Query(params); err != nil {
-			s.logger.WithError(err).Error("mDNS query failed")
+			s.logger.Errorf("mDNS query failed: %v", err)
 			return
 		}
 	}()
@@ -383,7 +383,7 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 				Node: *existingNode,
 			})
 
-			s.logger.WithFields(logrus.Fields{
+			s.logger.WithFields(map[string]interface{}{
 				"id":         node.ID,
 				"ip_address": node.IPAddress,
 			}).Debug("Updated existing node via mDNS")
@@ -395,7 +395,7 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 				Node: *node,
 			})
 
-			s.logger.WithFields(logrus.Fields{
+			s.logger.WithFields(map[string]interface{}{
 				"id":         node.ID,
 				"name":       node.Name,
 				"ip_address": node.IPAddress,
@@ -434,7 +434,7 @@ func (s *Service) performNetworkScan() {
 	// Get local network interfaces
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		s.logger.WithError(err).Error("Failed to get network interfaces")
+		s.logger.Errorf("Failed to get network interfaces: %v", err)
 		return
 	}
 
@@ -450,7 +450,7 @@ func (s *Service) performNetworkScan() {
 
 		for _, addr := range addrs {
 			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
-				s.logger.WithFields(logrus.Fields{
+				s.logger.WithFields(map[string]interface{}{
 					"interface": iface.Name,
 					"network":   ipnet.String(),
 				}).Debug("Scanning network")
@@ -510,7 +510,7 @@ func (s *Service) cleanupStaleNodes() {
 			Node: *node,
 		})
 
-		s.logger.WithFields(logrus.Fields{
+		s.logger.WithFields(map[string]interface{}{
 			"id":        id,
 			"last_seen": node.LastSeen,
 		}).Info("Removed stale node")
@@ -523,7 +523,7 @@ func (s *Service) emitEvent(event NodeEvent) {
 		go func(h NodeEventHandler) {
 			defer func() {
 				if r := recover(); r != nil {
-					s.logger.WithField("panic", r).Error("Event handler panicked")
+					s.logger.Errorf("Event handler panicked: %v", r)
 				}
 			}()
 			h(event)

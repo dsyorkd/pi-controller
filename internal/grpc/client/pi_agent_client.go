@@ -2,14 +2,16 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
-	pb "github.com/dsyorkd/pi-controller/proto"
+	proto "github.com/dsyorkd/pi-controller/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -19,6 +21,13 @@ type PiAgentClientInterface interface {
 	ConfigureGPIOPin(ctx context.Context, device *models.GPIODevice) error
 	ReadGPIOPin(ctx context.Context, pinNumber int) (int, error)
 	WriteGPIOPin(ctx context.Context, pinNumber int, value int) error
+	SPIExchange(ctx context.Context, channel int, data []byte) ([]byte, error)
+	SPIWrite(ctx context.Context, channel int, data []byte) error
+	SPIRead(ctx context.Context, channel int, length int) ([]byte, error)
+	I2CWrite(ctx context.Context, bus int, address int, data []byte) error
+	I2CRead(ctx context.Context, bus int, address int, length int) ([]byte, error)
+	I2CWriteRegister(ctx context.Context, bus int, address int, register int, data []byte) error
+	I2CReadRegister(ctx context.Context, bus int, address int, register int, length int) ([]byte, error)
 	Close() error
 }
 
@@ -32,7 +41,7 @@ type PiAgentClientManagerInterface interface {
 // PiAgentClient provides a gRPC client interface for communicating with Pi Agents
 type PiAgentClient struct {
 	conn    *grpc.ClientConn
-	client  pb.PiAgentServiceClient
+	client  proto.PiAgentServiceClient
 	logger  logger.Interface
 	nodeID  uint
 	address string
@@ -40,18 +49,20 @@ type PiAgentClient struct {
 
 // PiAgentClientManager manages connections to multiple Pi Agent nodes
 type PiAgentClientManager struct {
-	clients map[uint]*PiAgentClient // nodeID -> client
-	mu      sync.RWMutex
-	logger  logger.Interface
-	timeout time.Duration
+	clients   map[uint]*PiAgentClient // nodeID -> client
+	mu        sync.RWMutex
+	logger    logger.Interface
+	timeout   time.Duration
+	tlsConfig *tls.Config // TLS configuration for mTLS
 }
 
 // NewPiAgentClientManager creates a new Pi Agent client manager
-func NewPiAgentClientManager(logger logger.Interface) *PiAgentClientManager {
+func NewPiAgentClientManager(logger logger.Interface, tlsConfig *tls.Config) *PiAgentClientManager {
 	return &PiAgentClientManager{
-		clients: make(map[uint]*PiAgentClient),
-		logger:  logger.WithField("component", "pi_agent_client_manager"),
-		timeout: 30 * time.Second,
+		clients:   make(map[uint]*PiAgentClient),
+		logger:    logger.WithField("component", "pi_agent_client_manager"),
+		timeout:   30 * time.Second,
+		tlsConfig: tlsConfig,
 	}
 }
 
@@ -97,16 +108,20 @@ func (m *PiAgentClientManager) createClient(node *models.Node) (*PiAgentClient, 
 	}).Debug("Creating new Pi Agent client")
 
 	// Create connection (NewClient creates lazy connection)
-	conn, err := grpc.NewClient(address,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	var dialOpts []grpc.DialOption
+	if m.tlsConfig != nil {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(m.tlsConfig)))
+	} else {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+	conn, err := grpc.NewClient(address, dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Pi Agent at %s: %w", address, err)
 	}
 
 	client := &PiAgentClient{
 		conn:    conn,
-		client:  pb.NewPiAgentServiceClient(conn),
+		client:  proto.NewPiAgentServiceClient(conn),
 		logger:  m.logger.WithField("node_id", node.ID),
 		nodeID:  node.ID,
 		address: address,
@@ -165,13 +180,13 @@ func (c *PiAgentClient) IsConnected() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_, err := c.client.AgentHealth(ctx, &pb.AgentHealthRequest{})
+	_, err := c.client.AgentHealth(ctx, &proto.AgentHealthRequest{})
 	return err == nil
 }
 
 // ConfigureGPIOPin configures a GPIO pin on the agent
 func (c *PiAgentClient) ConfigureGPIOPin(ctx context.Context, device *models.GPIODevice) error {
-	req := &pb.ConfigureGPIOPinRequest{
+	req := &proto.ConfigureGPIOPinRequest{
 		Pin:       mustSafeIntToInt32(device.PinNumber), // #nosec G115 - safe conversion with overflow check
 		Direction: modelDirectionToProto(device.Direction),
 		PullMode:  modelPullModeToProto(device.PullMode),
@@ -203,7 +218,7 @@ func (c *PiAgentClient) ConfigureGPIOPin(ctx context.Context, device *models.GPI
 
 // ReadGPIOPin reads the current value of a GPIO pin
 func (c *PiAgentClient) ReadGPIOPin(ctx context.Context, pinNumber int) (int, error) {
-	req := &pb.ReadGPIOPinRequest{
+	req := &proto.ReadGPIOPinRequest{
 		Pin: mustSafeIntToInt32(pinNumber), // #nosec G115 - safe conversion with overflow check
 	}
 
@@ -222,7 +237,7 @@ func (c *PiAgentClient) ReadGPIOPin(ctx context.Context, pinNumber int) (int, er
 
 // WriteGPIOPin writes a value to a GPIO pin
 func (c *PiAgentClient) WriteGPIOPin(ctx context.Context, pinNumber int, value int) error {
-	req := &pb.WriteGPIOPinRequest{
+	req := &proto.WriteGPIOPinRequest{
 		Pin:   mustSafeIntToInt32(pinNumber), // #nosec G115 - safe conversion with overflow check
 		Value: mustSafeIntToInt32(value),     // #nosec G115 - safe conversion with overflow check
 	}
@@ -241,6 +256,112 @@ func (c *PiAgentClient) WriteGPIOPin(ctx context.Context, pinNumber int, value i
 	return nil
 }
 
+// SPIExchange performs an SPI exchange on the agent
+func (c *PiAgentClient) SPIExchange(ctx context.Context, channel int, data []byte) ([]byte, error) {
+	req := &proto.SPIExchangeRequest{
+		Channel: mustSafeIntToInt32(channel),
+		Data:    data,
+	}
+	resp, err := c.client.SPIExchange(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("gRPC call failed: %w", err)
+	}
+	return resp.Data, nil
+}
+
+// SPIWrite performs an SPI write on the agent
+func (c *PiAgentClient) SPIWrite(ctx context.Context, channel int, data []byte) error {
+	req := &proto.SPIWriteRequest{
+		Channel: mustSafeIntToInt32(channel),
+		Data:    data,
+	}
+	resp, err := c.client.SPIWrite(ctx, req)
+	if err != nil {
+		return fmt.Errorf("gRPC call failed: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("SPI write failed: %s", resp.Message)
+	}
+	return nil
+}
+
+// SPIRead performs an SPI read from the agent
+func (c *PiAgentClient) SPIRead(ctx context.Context, channel int, length int) ([]byte, error) {
+	req := &proto.SPIReadRequest{
+		Channel: mustSafeIntToInt32(channel),
+		Length:  mustSafeIntToInt32(length),
+	}
+	resp, err := c.client.SPIRead(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("gRPC call failed: %w", err)
+	}
+	return resp.Data, nil
+}
+
+// I2CWrite performs an I2C write on the agent
+func (c *PiAgentClient) I2CWrite(ctx context.Context, bus int, address int, data []byte) error {
+	req := &proto.I2CWriteRequest{
+		Bus:     mustSafeIntToInt32(bus),
+		Address: mustSafeIntToInt32(address),
+		Data:    data,
+	}
+	resp, err := c.client.I2CWrite(ctx, req)
+	if err != nil {
+		return fmt.Errorf("gRPC call failed: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("I2C write failed: %s", resp.Message)
+	}
+	return nil
+}
+
+// I2CRead performs an I2C read from the agent
+func (c *PiAgentClient) I2CRead(ctx context.Context, bus int, address int, length int) ([]byte, error) {
+	req := &proto.I2CReadRequest{
+		Bus:     mustSafeIntToInt32(bus),
+		Address: mustSafeIntToInt32(address),
+		Length:  mustSafeIntToInt32(length),
+	}
+	resp, err := c.client.I2CRead(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("gRPC call failed: %w", err)
+	}
+	return resp.Data, nil
+}
+
+// I2CWriteRegister performs an I2C write to a register on the agent
+func (c *PiAgentClient) I2CWriteRegister(ctx context.Context, bus int, address int, register int, data []byte) error {
+	req := &proto.I2CWriteRegisterRequest{
+		Bus:      mustSafeIntToInt32(bus),
+		Address:  mustSafeIntToInt32(address),
+		Register: mustSafeIntToInt32(register),
+		Data:     data,
+	}
+	resp, err := c.client.I2CWriteRegister(ctx, req)
+	if err != nil {
+		return fmt.Errorf("gRPC call failed: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("I2C write register failed: %s", resp.Message)
+	}
+	return nil
+}
+
+// I2CReadRegister performs an I2C read from a register on the agent
+func (c *PiAgentClient) I2CReadRegister(ctx context.Context, bus int, address int, register int, length int) ([]byte, error) {
+	req := &proto.I2CReadRegisterRequest{
+		Bus:      mustSafeIntToInt32(bus),
+		Address:  mustSafeIntToInt32(address),
+		Register: mustSafeIntToInt32(register),
+		Length:   mustSafeIntToInt32(length),
+	}
+	resp, err := c.client.I2CReadRegister(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("gRPC call failed: %w", err)
+	}
+	return resp.Data, nil
+}
+
 // Close closes the client connection
 func (c *PiAgentClient) Close() error {
 	if c.conn != nil {
@@ -254,26 +375,26 @@ func (c *PiAgentClient) Close() error {
 
 // Helper functions to convert between model types and protobuf types
 
-func modelDirectionToProto(direction models.GPIODirection) pb.AgentGPIODirection {
+func modelDirectionToProto(direction models.GPIODirection) proto.AgentGPIODirection {
 	switch direction {
 	case models.GPIODirectionInput:
-		return pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_INPUT
+		return proto.AgentGPIODirection_AGENT_GPIO_DIRECTION_INPUT
 	case models.GPIODirectionOutput:
-		return pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT
+		return proto.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT
 	default:
-		return pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_UNSPECIFIED
+		return proto.AgentGPIODirection_AGENT_GPIO_DIRECTION_UNSPECIFIED
 	}
 }
 
-func modelPullModeToProto(pullMode models.GPIOPullMode) pb.AgentGPIOPullMode {
+func modelPullModeToProto(pullMode models.GPIOPullMode) proto.AgentGPIOPullMode {
 	switch pullMode {
 	case models.GPIOPullNone:
-		return pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE
+		return proto.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE
 	case models.GPIOPullUp:
-		return pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_UP
+		return proto.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_UP
 	case models.GPIOPullDown:
-		return pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_DOWN
+		return proto.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_DOWN
 	default:
-		return pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_UNSPECIFIED
+		return proto.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_UNSPECIFIED
 	}
 }

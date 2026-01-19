@@ -4,10 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"time"
+	"os"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/pkg/k8s"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -21,11 +21,16 @@ func main() {
 	flag.Parse()
 
 	// Setup logger
-	logger := logrus.New()
-	logger.SetLevel(logrus.InfoLevel)
-	logger.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339,
+	log, err := applogger.New(applogger.Config{
+		Level:  "info",
+		Format: "json",
+		Output: "stdout",
 	})
+	if err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	applogger.SetDefault(log)
 
 	fmt.Println("🧪 Pi Controller Kubernetes Client Test")
 	fmt.Println("======================================")
@@ -38,9 +43,9 @@ func main() {
 	}
 
 	// Create Kubernetes client
-	client, err := k8s.NewClient(config, logger)
+	client, err := k8s.NewClient(config, log)
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to create Kubernetes client")
+		log.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
 
 	ctx := context.Background()
@@ -48,7 +53,7 @@ func main() {
 	// Test 1: Health Check
 	fmt.Println("\n1. 🔍 Testing Kubernetes API connectivity...")
 	if err := client.HealthCheck(ctx); err != nil {
-		logger.WithError(err).Error("Health check failed")
+		log.Errorf("Health check failed: %v", err)
 	} else {
 		fmt.Println("✅ Kubernetes API connectivity: OK")
 	}
@@ -57,7 +62,7 @@ func main() {
 	fmt.Println("\n2. 📋 Getting Kubernetes server version...")
 	version, err := client.GetServerVersion(ctx)
 	if err != nil {
-		logger.WithError(err).Error("Failed to get server version")
+		log.Errorf("Failed to get server version: %v", err)
 	} else {
 		fmt.Printf("✅ Kubernetes server version: %s\n", version)
 	}
@@ -66,7 +71,7 @@ func main() {
 	fmt.Printf("\n3. 📦 Listing pods in '%s' namespace...\n", *namespace)
 	pods, err := client.ListPods(ctx, *namespace)
 	if err != nil {
-		logger.WithError(err).Error("Failed to list pods")
+		log.Errorf("Failed to list pods: %v", err)
 	} else {
 		fmt.Printf("✅ Found %d pods in %s namespace:\n", len(pods), *namespace)
 		for i, pod := range pods {
@@ -82,7 +87,7 @@ func main() {
 	fmt.Println("\n4. 🖥️  Listing cluster nodes...")
 	nodes, err := client.ListNodes(ctx)
 	if err != nil {
-		logger.WithError(err).Error("Failed to list nodes")
+		log.Errorf("Failed to list nodes: %v", err)
 	} else {
 		fmt.Printf("✅ Found %d nodes in cluster:\n", len(nodes))
 		for _, node := range nodes {
@@ -98,7 +103,7 @@ func main() {
 	fmt.Println("\n5. 🌐 Getting cluster information...")
 	clusterInfo, err := client.GetClusterInfo(ctx)
 	if err != nil {
-		logger.WithError(err).Error("Failed to get cluster info")
+		log.Errorf("Failed to get cluster info: %v", err)
 	} else {
 		fmt.Printf("✅ Cluster information:\n")
 		fmt.Printf("   - Version: %s\n", clusterInfo.Version)
@@ -112,7 +117,7 @@ func main() {
 	fmt.Println("\n6. 🔧 Testing CRD client functionality...")
 	crdClient, err := client.NewCRDClient()
 	if err != nil {
-		logger.WithError(err).Error("Failed to create CRD client")
+		log.Errorf("Failed to create CRD client: %v", err)
 	} else {
 		fmt.Println("✅ CRD client created successfully")
 
@@ -120,7 +125,7 @@ func main() {
 		fmt.Println("\n   📋 Listing installed CRDs...")
 		crds, err := crdClient.ListCRDs(ctx)
 		if err != nil {
-			logger.WithError(err).Error("Failed to list CRDs")
+			log.Errorf("Failed to list CRDs: %v", err)
 		} else {
 			fmt.Printf("   ✅ Found %d CRDs installed\n", len(crds))
 
@@ -138,7 +143,7 @@ func main() {
 		fmt.Println("\n   🎯 Checking for Pi Controller CRDs...")
 		allPresent, missing, err := crdClient.CheckPiControllerCRDs(ctx)
 		if err != nil {
-			logger.WithError(err).Error("Failed to check Pi Controller CRDs")
+			log.Errorf("Failed to check Pi Controller CRDs: %v", err)
 		} else if allPresent {
 			fmt.Println("   ✅ All Pi Controller CRDs are installed and ready")
 		} else {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -20,7 +20,7 @@ import (
 type Client struct {
 	clientset kubernetes.Interface
 	config    *rest.Config
-	logger    *logrus.Entry
+	logger    applogger.Interface
 	namespace string
 }
 
@@ -43,7 +43,7 @@ func DefaultConfig() *Config {
 }
 
 // NewClient creates a new Kubernetes client
-func NewClient(config *Config, logger *logrus.Logger) (*Client, error) {
+func NewClient(config *Config, logger applogger.Interface) (*Client, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -144,7 +144,7 @@ type ResourceList struct {
 func (c *Client) ListNodes(ctx context.Context) ([]NodeInfo, error) {
 	nodes, err := c.clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to list nodes")
+		c.logger.Errorf("Failed to list nodes: %v", err)
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
@@ -153,7 +153,7 @@ func (c *Client) ListNodes(ctx context.Context) ([]NodeInfo, error) {
 		nodeInfos[i] = c.convertNodeToInfo(node)
 	}
 
-	c.logger.WithField("count", len(nodeInfos)).Debug("Listed Kubernetes nodes")
+	c.logger.Debugf("Listed Kubernetes nodes, count: %d", len(nodeInfos))
 	return nodeInfos, nil
 }
 
@@ -161,10 +161,7 @@ func (c *Client) ListNodes(ctx context.Context) ([]NodeInfo, error) {
 func (c *Client) GetNode(ctx context.Context, nodeName string) (*NodeInfo, error) {
 	node, err := c.clientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil {
-		c.logger.WithFields(logrus.Fields{
-			"node_name": nodeName,
-			"error":     err,
-		}).Error("Failed to get node")
+		c.logger.Errorf("Failed to get node %s: %v", nodeName, err)
 		return nil, fmt.Errorf("failed to get node %s: %w", nodeName, err)
 	}
 
@@ -249,10 +246,7 @@ func (c *Client) ListPods(ctx context.Context, namespace string) ([]PodInfo, err
 
 	pods, err := c.clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		c.logger.WithFields(logrus.Fields{
-			"namespace": namespace,
-			"error":     err,
-		}).Error("Failed to list pods")
+		c.logger.Errorf("Failed to list pods in namespace %s: %v", namespace, err)
 		return nil, fmt.Errorf("failed to list pods in namespace %s: %w", namespace, err)
 	}
 
@@ -277,10 +271,7 @@ func (c *Client) ListPods(ctx context.Context, namespace string) ([]PodInfo, err
 		}
 	}
 
-	c.logger.WithFields(logrus.Fields{
-		"namespace": namespace,
-		"count":     len(podInfos),
-	}).Debug("Listed Kubernetes pods")
+	c.logger.Debugf("Listed Kubernetes pods in namespace %s, count: %d", namespace, len(podInfos))
 
 	return podInfos, nil
 }
@@ -293,10 +284,7 @@ func (c *Client) ListPodsOnNode(ctx context.Context, nodeName string) ([]PodInfo
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
-		c.logger.WithFields(logrus.Fields{
-			"node_name": nodeName,
-			"error":     err,
-		}).Error("Failed to list pods on node")
+		c.logger.Errorf("Failed to list pods on node %s: %v", nodeName, err)
 		return nil, fmt.Errorf("failed to list pods on node %s: %w", nodeName, err)
 	}
 
@@ -321,10 +309,7 @@ func (c *Client) ListPodsOnNode(ctx context.Context, nodeName string) ([]PodInfo
 		}
 	}
 
-	c.logger.WithFields(logrus.Fields{
-		"node_name": nodeName,
-		"count":     len(podInfos),
-	}).Debug("Listed pods on Kubernetes node")
+	c.logger.Debugf("Listed pods on Kubernetes node %s, count: %d", nodeName, len(podInfos))
 
 	return podInfos, nil
 }
@@ -343,7 +328,7 @@ func (c *Client) DrainNode(ctx context.Context, nodeName string) error {
 	// 3. Waiting for pods to be terminated
 	// 4. Handling pods that cannot be evicted
 
-	c.logger.WithField("node_name", nodeName).Info("Node drained successfully")
+	c.logger.Infof("Node %s drained successfully", nodeName)
 	return nil
 }
 
@@ -355,21 +340,18 @@ func (c *Client) CordonNode(ctx context.Context, nodeName string) error {
 	}
 
 	if node.Spec.Unschedulable {
-		c.logger.WithField("node_name", nodeName).Info("Node is already cordoned")
+		c.logger.Infof("Node %s is already cordoned", nodeName)
 		return nil
 	}
 
 	node.Spec.Unschedulable = true
 	_, err = c.clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	if err != nil {
-		c.logger.WithFields(logrus.Fields{
-			"node_name": nodeName,
-			"error":     err,
-		}).Error("Failed to cordon node")
+		c.logger.Errorf("Failed to cordon node %s: %v", nodeName, err)
 		return fmt.Errorf("failed to cordon node: %w", err)
 	}
 
-	c.logger.WithField("node_name", nodeName).Info("Node cordoned successfully")
+	c.logger.Infof("Node %s cordoned successfully", nodeName)
 	return nil
 }
 
@@ -381,21 +363,18 @@ func (c *Client) UncordonNode(ctx context.Context, nodeName string) error {
 	}
 
 	if !node.Spec.Unschedulable {
-		c.logger.WithField("node_name", nodeName).Info("Node is already uncordoned")
+		c.logger.Infof("Node %s is already uncordoned", nodeName)
 		return nil
 	}
 
 	node.Spec.Unschedulable = false
 	_, err = c.clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	if err != nil {
-		c.logger.WithFields(logrus.Fields{
-			"node_name": nodeName,
-			"error":     err,
-		}).Error("Failed to uncordon node")
+		c.logger.Errorf("Failed to uncordon node %s: %v", nodeName, err)
 		return fmt.Errorf("failed to uncordon node: %w", err)
 	}
 
-	c.logger.WithField("node_name", nodeName).Info("Node uncordoned successfully")
+	c.logger.Infof("Node %s uncordoned successfully", nodeName)
 	return nil
 }
 

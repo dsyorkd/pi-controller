@@ -1099,7 +1099,6 @@ MCP server for managing Raspberry Pi K3s clusters via AI.
 ## 13. Related Projects
 
 - **kubes-aura**: Web UI for pi-controller (separate repo)
-- **pi-agent**: Node agent running on each Pi
 - **pi-controller**: Main control plane (this project)
 
 ## 14. Contributing

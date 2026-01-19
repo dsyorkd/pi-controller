@@ -1,0 +1,97 @@
+# PRD: Settings & Configuration Testing
+
+## Product Overview
+Comprehensive testing of the settings page, including form validation, YAML import/export, configuration persistence, and dual editor modes (form and YAML).
+
+## Problem Statement
+Settings management is complex but lacks:
+1. Automated testing of form validation
+2. YAML import/export verification
+3. Configuration persistence testing
+4. Sync between form and YAML editor modes
+5. Reset to defaults functionality testing
+
+## Goals & Success Metrics
+
+### Primary Goals
+- Achieve 100% test coverage of settings features
+- Validate all form inputs and validation rules
+- Ensure YAML import/export works correctly
+- Verify configuration changes persist
+
+### Success Metrics
+- All settings tests pass
+- Form validation catches all invalid inputs
+- YAML export generates valid configuration
+- Changes persist across sessions
+- Reset to defaults works correctly
+
+## Implementation Tasks
+
+### Task 2.6: Settings & Configuration Testing
+**Priority:** MEDIUM
+**Estimated Effort:** 5-6 hours
+
+**Subtasks:**
+1. Create `settings.spec.ts` test file
+2. Implement form editor tab display test
+3. Implement YAML editor tab display test
+4. Implement tab switching test
+5. Implement all configuration sections test
+6. Implement form validation tests (required fields, formats)
+7. Implement save changes functionality test
+8. Create `config-import-export.spec.ts` test file
+9. Implement export YAML button test
+10. Implement import YAML button test
+11. Implement YAML validation test
+12. Implement form/YAML sync test
+13. Implement reset to defaults test
+14. Create mock configuration data
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication)
+
+## Test Scenarios
+
+### Settings Update
+```typescript
+test('should update general settings', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/settings');
+
+  // Update hostname
+  await page.fill('input[name="hostname"]', 'new-controller-name');
+
+  // Update timezone
+  await page.selectOption('select[name="timezone"]', 'America/New_York');
+
+  // Save changes
+  await page.click('button:has-text("Save Changes")');
+
+  // Verify success
+  await expect(page.locator('.success-toast')).toBeVisible();
+
+  // Reload and verify persistence
+  await page.reload();
+  await expect(page.locator('input[name="hostname"]')).toHaveValue('new-controller-name');
+});
+```
+
+### YAML Export/Import
+```typescript
+test('should export configuration as YAML', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/settings');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('button:has-text("Export YAML")');
+
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/config.*\.yaml/);
+
+  // Verify YAML content
+  const path = await download.path();
+  const content = await fs.readFile(path, 'utf-8');
+  expect(content).toContain('hostname:');
+  expect(content).toContain('timezone:');
+});
+```

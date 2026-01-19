@@ -248,11 +248,11 @@ sudo systemctl daemon-reload
 
 ## Next Steps
 
-- [Architecture Overview](ARCHITECTURE.md)
-- [API Documentation](docs/rest.md)
-- [Configuration Reference](config/config.example.yaml)
-- [Development Guide](docs/getting-started.md)
-- [Contributing](CONTRIBUTING.md)
+- [Architecture Overview](../architecture/index.md)
+- [API Documentation](../reference/rest-api.md)
+- [Configuration Reference](../../config/config.example.yaml)
+- [Development Guide](../development/setup.md)
+- [Contributing](../../CONTRIBUTING.md)
 
 ## Support
 

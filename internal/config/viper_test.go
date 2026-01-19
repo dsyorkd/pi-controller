@@ -25,11 +25,12 @@ func TestLoadWithViper(t *testing.T) {
 			name: "load with defaults",
 			setupEnv: func() {
 				os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
+				os.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 			},
 			cleanupEnv: func() {
 				os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
-			},
-			want: func(t *testing.T, cfg *Config) {
+				os.Unsetenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL")
+			}, want: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "pi-controller", cfg.App.Name)
 				assert.Equal(t, true, cfg.WebUI.Enabled)
 				assert.Equal(t, 3000, cfg.WebUI.Port)
@@ -42,12 +43,14 @@ func TestLoadWithViper(t *testing.T) {
 				os.Setenv("PI_CONTROLLER_WEBUI_PORT", "4000")
 				os.Setenv("PI_CONTROLLER_API_PORT", "9090")
 				os.Setenv("PI_CONTROLLER_WEBUI_BACKEND_API_URL", "http://custom:8080")
+				os.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 			},
 			cleanupEnv: func() {
 				os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
 				os.Unsetenv("PI_CONTROLLER_WEBUI_PORT")
 				os.Unsetenv("PI_CONTROLLER_API_PORT")
 				os.Unsetenv("PI_CONTROLLER_WEBUI_BACKEND_API_URL")
+				os.Unsetenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL")
 			},
 			want: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, 4000, cfg.WebUI.Port)
@@ -74,6 +77,8 @@ webui:
   branding:
     title: "Test Controller"
     theme: "light"
+gpio:
+  sample_interval: "1s"
 `,
 			want: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "test-controller", cfg.App.Name)
@@ -87,15 +92,19 @@ webui:
 			setupEnv: func() {
 				os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
 				os.Setenv("PI_CONTROLLER_WEBUI_PORT", "6000")
+				os.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 			},
 			cleanupEnv: func() {
 				os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
 				os.Unsetenv("PI_CONTROLLER_WEBUI_PORT")
+				os.Unsetenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL")
 			},
 			createFile: true,
 			fileContent: `
 webui:
   port: 5000
+gpio:
+  sample_interval: "1s"
 `,
 			want: func(t *testing.T, cfg *Config) {
 				// Env var should override file
@@ -155,6 +164,8 @@ webui:
   port: 3000
   branding:
     title: "Initial Title"
+gpio:
+  sample_interval: "1s"
 `
 		err := os.WriteFile(configPath, []byte(initialContent), 0644)
 		require.NoError(t, err)
@@ -187,6 +198,8 @@ webui:
   port: 4000
   branding:
     title: "Updated Title"
+gpio:
+  sample_interval: "1s"
 `
 		err = os.WriteFile(configPath, []byte(updatedContent), 0644)
 		require.NoError(t, err)
@@ -270,6 +283,8 @@ webui:
   port: 3000
   features:
     gpio_control: false
+gpio:
+  sample_interval: "1s"
 `
 		err := os.WriteFile(configPath, []byte(fileContent), 0644)
 		require.NoError(t, err)
@@ -277,10 +292,12 @@ webui:
 		os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
 		os.Setenv("PI_CONTROLLER_WEBUI_PORT", "4000")
 		os.Setenv("PI_CONTROLLER_WEBUI_FEATURES_GPIO_CONTROL", "true")
+		os.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 		defer func() {
 			os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
 			os.Unsetenv("PI_CONTROLLER_WEBUI_PORT")
 			os.Unsetenv("PI_CONTROLLER_WEBUI_FEATURES_GPIO_CONTROL")
+			os.Unsetenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL")
 		}()
 
 		cfg, err := LoadWithViper(configPath)
@@ -353,7 +370,9 @@ func TestNestedEnvironmentVariables(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment to development for predictable defaults
 			os.Setenv("PI_CONTROLLER_ENVIRONMENT", "development")
+			os.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 			defer os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
+			defer os.Unsetenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL")
 
 			// Set environment variables
 			for key, value := range tt.env {
@@ -434,7 +453,9 @@ func TestEnvironmentDetection(t *testing.T) {
 			if tt.envVar != "" {
 				os.Setenv("PI_CONTROLLER_ENVIRONMENT", tt.envVar)
 			}
+			os.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 			defer os.Unsetenv("PI_CONTROLLER_ENVIRONMENT")
+			defer os.Unsetenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL")
 
 			cfg, err := LoadWithViper("")
 			require.NoError(t, err)

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"time"
 
 	"github.com/dsyorkd/pi-controller/internal/errors"
@@ -9,6 +10,13 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	"github.com/dsyorkd/pi-controller/internal/validation"
 	"gorm.io/gorm"
+)
+
+// Error message constants
+const (
+	errMsgFailedToFetchNode       = "failed to fetch node"
+	errMsgClusterNotFound         = "cluster with ID %d not found"
+	errMsgFailedToValidateCluster = "failed to validate cluster"
 )
 
 // NodeService handles node business logic
@@ -46,22 +54,24 @@ type CreateNodeRequest struct {
 
 // UpdateNodeRequest represents the request to update a node
 type UpdateNodeRequest struct {
-	Name          *string            `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
-	Hostname      *string            `json:"hostname,omitempty" validate:"omitempty,max=253"`
-	IPAddress     *string            `json:"ip_address,omitempty" validate:"omitempty,ip"`
-	MACAddress    *string            `json:"mac_address,omitempty" validate:"omitempty,mac"`
-	Status        *models.NodeStatus `json:"status,omitempty"`
-	Role          *models.NodeRole   `json:"role,omitempty" validate:"omitempty,oneof=master worker"`
-	ClusterID     *uint              `json:"cluster_id,omitempty"`
-	Architecture  *string            `json:"architecture,omitempty" validate:"omitempty,max=50"`
-	Model         *string            `json:"model,omitempty" validate:"omitempty,max=100"`
-	SerialNumber  *string            `json:"serial_number,omitempty" validate:"omitempty,max=100"`
-	CPUCores      *int               `json:"cpu_cores,omitempty" validate:"omitempty,min=1"`
-	Memory        *int64             `json:"memory,omitempty" validate:"omitempty,min=1"`
-	OSVersion     *string            `json:"os_version,omitempty" validate:"omitempty,max=100"`
-	KernelVersion *string            `json:"kernel_version,omitempty" validate:"omitempty,max=100"`
-	KubeVersion   *string            `json:"kube_version,omitempty" validate:"omitempty,max=50"`
-	NodeName      *string            `json:"node_name,omitempty" validate:"omitempty,max=100"`
+	Name            *string            `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
+	Hostname        *string            `json:"hostname,omitempty" validate:"omitempty,max=253"`
+	IPAddress       *string            `json:"ip_address,omitempty" validate:"omitempty,ip"`
+	MACAddress      *string            `json:"mac_address,omitempty" validate:"omitempty,mac"`
+	Status          *models.NodeStatus `json:"status,omitempty"`
+	Role            *models.NodeRole   `json:"role,omitempty" validate:"omitempty,oneof=master worker"`
+	ClusterID       *uint              `json:"cluster_id,omitempty"`
+	Architecture    *string            `json:"architecture,omitempty" validate:"omitempty,max=50"`
+	Model           *string            `json:"model,omitempty" validate:"omitempty,max=100"`
+	SerialNumber    *string            `json:"serial_number,omitempty" validate:"omitempty,max=100"`
+	CPUCores        *int               `json:"cpu_cores,omitempty" validate:"omitempty,min=1"`
+	Memory          *int64             `json:"memory,omitempty" validate:"omitempty,min=1"`
+	OSVersion       *string            `json:"os_version,omitempty" validate:"omitempty,max=100"`
+	KernelVersion   *string            `json:"kernel_version,omitempty" validate:"omitempty,max=100"`
+	KubeVersion     *string            `json:"kube_version,omitempty" validate:"omitempty,max=50"`
+	NodeName        *string            `json:"node_name,omitempty" validate:"omitempty,max=100"`
+	K3sClusterToken *string            `json:"k3s_cluster_token,omitempty"`
+	Kubeconfig      *string            `json:"kubeconfig,omitempty"`
 }
 
 // NodeListOptions represents options for listing nodes
@@ -151,7 +161,7 @@ func (s *NodeService) GetByID(id uint, includeGPIO bool) (*models.Node, error) {
 			"id":    id,
 			"error": err,
 		}).Error("Failed to fetch node")
-		return nil, errors.Wrapf(err, "failed to fetch node")
+		return nil, errors.Wrapf(err, errMsgFailedToFetchNode)
 	}
 
 	return &node, nil
@@ -169,7 +179,7 @@ func (s *NodeService) GetByName(name string) (*models.Node, error) {
 			"name":  name,
 			"error": err,
 		}).Error("Failed to fetch node by name")
-		return nil, errors.Wrapf(err, "failed to fetch node")
+		return nil, errors.Wrapf(err, errMsgFailedToFetchNode)
 	}
 
 	return &node, nil
@@ -187,7 +197,25 @@ func (s *NodeService) GetByIPAddress(ipAddress string) (*models.Node, error) {
 			"ip_address": ipAddress,
 			"error":      err,
 		}).Error("Failed to fetch node by IP address")
-		return nil, errors.Wrapf(err, "failed to fetch node")
+		return nil, errors.Wrapf(err, errMsgFailedToFetchNode)
+	}
+
+	return &node, nil
+}
+
+// GetByMAC retrieves a node by MAC address
+func (s *NodeService) GetByMAC(ctx context.Context, macAddress string) (*models.Node, error) {
+	var node models.Node
+
+	if err := s.db.DB().Preload("Cluster").Where("mac_address = ?", macAddress).First(&node).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, ErrNotFound
+		}
+		s.logger.WithFields(map[string]interface{}{
+			"mac_address": macAddress,
+			"error":       err,
+		}).Error("Failed to fetch node by MAC address")
+		return nil, errors.Wrapf(err, errMsgFailedToFetchNode)
 	}
 
 	return &node, nil
@@ -360,6 +388,12 @@ func (s *NodeService) Update(id uint, req UpdateNodeRequest) (*models.Node, erro
 	}
 	if req.NodeName != nil {
 		node.NodeName = *req.NodeName
+	}
+	if req.K3sClusterToken != nil {
+		node.K3sClusterToken = *req.K3sClusterToken
+	}
+	if req.Kubeconfig != nil {
+		node.Kubeconfig = *req.Kubeconfig
 	}
 
 	if err := s.db.DB().Save(node).Error; err != nil {

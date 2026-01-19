@@ -393,8 +393,8 @@ Read the [Contributing Guide](../CONTRIBUTING.md) for:
 
 ## Next Steps
 
-- Read [Architecture Overview](../ARCHITECTURE.md)
-- Explore [API Documentation](rest.md)
+- Read [Architecture Overview](../architecture/index.md)
+- Explore [API Documentation](../reference/rest-api.md)
 - Review [Testing Framework](../TESTING_FRAMEWORK_SUMMARY.md)
 - Check out [Example Projects](examples/)
 

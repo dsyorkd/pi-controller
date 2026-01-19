@@ -106,7 +106,7 @@ detect-secrets scan --baseline .secrets.baseline
 
 ## Help
 
-📖 Full docs: `docs/PRECOMMIT_HOOKS.md`
+📖 Full docs: `precommit-hooks.md`
 📖 Contributing: `CONTRIBUTING.md`
 🐛 Issues: Check troubleshooting section
 

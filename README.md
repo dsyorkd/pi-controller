@@ -1,147 +1,62 @@
 # Pi-Controller
 
-> Single-binary Raspberry Pi cluster management with optional Kubernetes integration
+> Single-binary Raspberry Pi cluster management with optional Kubernetes integration.
 
-Pi-Controller is a comprehensive cluster management platform for Raspberry Pi that provides automated discovery, Raft-based clustering, and GPIO-as-a-Service capabilities.
+[![CI Status](https://github.com/yourusername/pi-controller/workflows/CI/badge.svg)](https://github.com/yourusername/pi-controller/actions)
+[![Documentation](https://img.shields.io/badge/docs-pi--controller.io-blue)](https://pi-controller.io)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## Quick Start
+**Pi-Controller** is a comprehensive platform for managing Raspberry Pi clusters. It combines automated discovery, Raft-based distributed consensus, and GPIO-as-a-Service into a single, dependency-free binary.
 
-```bash
-curl -sSL https://pi-controller.io/install.sh | bash
-```
+## 🚀 Quick Start
 
-## Features
-
-- **Single Binary** - One executable runs everywhere, no separate agents
-- **Auto-Discovery** - mDNS-based automatic node detection
-- **Raft Clustering** - Distributed consensus for high availability
-- **GPIO Control** - Manage GPIO pins across your cluster via REST/gRPC/WebSocket APIs
-- **Optional Kubernetes** - Deploy K3s with CRD-based GPIO management
-- **Portable Mode** - Manage clusters remotely from your laptop
-- **Zero Dependencies** - Embedded SQLite, built-in CA, self-contained
-
-## Architecture
-
-Pi-Controller uses a **single-binary model** where all nodes run identical code. There are no separate control plane or agent binaries - only Raft leader/followers for distributed consensus.
-
-- **Portable Mode**: Run on your laptop to provision and manage remote Pis
-- **On-Device Mode**: Run on each Pi as a systemd service, forming a Raft cluster
-- **Kubernetes Mode**: Optionally deploy K3s and migrate to DaemonSet deployment
-
-Read the [Architecture Overview](ARCHITECTURE.md) for details.
-
-## Installation
-
-### Raspberry Pi (On-Device Mode)
+**Install on Raspberry Pi:**
 
 ```bash
 curl -sSL https://pi-controller.io/install.sh | bash
 sudo systemctl enable --now pi-controller
 ```
 
-### Laptop/Workstation (Portable Mode)
+**Install on Laptop (Portable Mode):**
 
 ```bash
 PORTABLE_MODE=true curl -sSL https://pi-controller.io/install.sh | bash
 ```
 
-See the [Installation Guide](INSTALLATION.md) for detailed instructions.
+[View the Full Quick Start Guide](docs/quickstart.md)
 
-## Usage
+## 📚 Documentation
 
-### Discover Nodes
+Complete documentation is available at [pi-controller.io](https://pi-controller.io) (or in the `docs/` folder).
 
-```bash
-pi-controller discover --scan
-```
+- **[Getting Started](docs/quickstart.md)**: Set up your first cluster.
+- **[Architecture](docs/architecture/index.md)**: Deep dive into the system design.
+- **[Operations](docs/operations/installation.md)**: Installation, Security, and K8s integration.
+- **[API Reference](docs/reference/rest-api.md)**: REST, gRPC, and WebSocket APIs.
+- **[Contributing](CONTRIBUTING.md)**: Guide for developers.
 
-### Provision a Cluster
+## ✨ Features
 
-```bash
-pi-controller install \
-  --nodes=192.168.1.10,192.168.1.11,192.168.1.12 \
-  --bootstrap \
-  --ssh-user=pi
-```
+- **Single Binary**: No complex dependencies (Python, Ruby, etc. not required).
+- **Auto-Discovery**: Nodes find each other automatically via mDNS.
+- **Raft Clustering**: High-availability consensus engine.
+- **GPIO Control**: Control hardware remotely via API or Kubernetes CRDs.
+- **Kubernetes Ready**: Optional one-click K3s deployment.
 
-### Control GPIO
-
-```bash
-# Set pin high
-pi-controller gpio set --node=pi-1 --pin=17 --value=high
-
-# Read pin value
-pi-controller gpio get --node=pi-1 --pin=17
-```
-
-### Check Cluster Status
+## 🛠️ Building from Source
 
 ```bash
-pi-controller cluster status
-```
-
-## Documentation
-
-- **[Installation Guide](INSTALLATION.md)** - Install and configure pi-controller
-- **[Architecture](ARCHITECTURE.md)** - System design and architecture
-- **[Getting Started](docs/getting-started.md)** - Development setup
-- **[REST API](docs/rest.md)** - HTTP API reference
-- **[WebSocket API](docs/websocket.md)** - Real-time event streaming
-- **[Configuration](config/config.example.yaml)** - Configuration reference
-- **[Contributing](CONTRIBUTING.md)** - Development guidelines
-
-## API Endpoints
-
-- **REST API**: `http://pi-controller:8080/api/v1`
-- **gRPC**: `pi-controller:9090`
-- **WebSocket**: `ws://pi-controller:8081/ws`
-- **Raft**: `pi-controller:9091` (internal)
-
-## Building from Source
-
-```bash
-# Clone repository
 git clone https://github.com/yourusername/pi-controller.git
 cd pi-controller
-
-# Install dependencies
-make deps
-
-# Build for your platform
 make build
-
-# Build for all platforms
-make build-all
-
-# Run tests
-make test-all
 ```
 
-See [Getting Started](docs/getting-started.md) for development details.
+See [Development Setup](docs/development/setup.md) for more details.
 
-## Contributing
+## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on our workflow and code standards.
 
-- Development workflow (GitFlow)
-- Commit message conventions (Conventional Commits)
-- Testing requirements
-- Code style guidelines
+## 📄 License
 
-## Security
-
-For security issues, please see [SECURITY.md](SECURITY.md).
-
-## License
-
-[Your License Here]
-
-## Support
-
-- **Documentation**: [pi-controller.io](https://pi-controller.io)
-- **GitHub Issues**: [github.com/yourusername/pi-controller/issues](https://github.com/yourusername/pi-controller/issues)
-- **Discussions**: [github.com/yourusername/pi-controller/discussions](https://github.com/yourusername/pi-controller/discussions)
-
----
-
-**Made with ❤️ for Raspberry Pi enthusiasts**
+MIT License - see [LICENSE](LICENSE) for details.

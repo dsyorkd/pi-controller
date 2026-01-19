@@ -85,6 +85,18 @@ func getAllMigrations() []MigrationDefinition {
 			Up:          addNodeDiscoveryFields,
 			Down:        dropNodeDiscoveryFields,
 		},
+		{
+			ID:          "20241201000014",
+			Description: "Add k3s cluster token and kubeconfig to nodes",
+			Up:          addNodeK3sFields,
+			Down:        dropNodeK3sFields,
+		},
+		{
+			ID:          "20241201000015",
+			Description: "Fix certificate expiring_soon index to remove datetime()",
+			Up:          fixCertificateExpiringIndex,
+			Down:        revertCertificateExpiringIndex,
+		},
 	}
 }
 
@@ -477,7 +489,7 @@ func addCertificateIndexes(db *gorm.DB) error {
 	-- Composite indexes for common queries
 	CREATE INDEX IF NOT EXISTS idx_certificates_node_status ON certificates(node_id, status) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_certificates_cluster_status ON certificates(cluster_id, status) WHERE deleted_at IS NULL;
-	CREATE INDEX IF NOT EXISTS idx_certificates_expiring_soon ON certificates(not_after, auto_renew) WHERE status = 'active' AND not_after < datetime('now', '+30 days');
+	CREATE INDEX IF NOT EXISTS idx_certificates_expiring_soon ON certificates(not_after, auto_renew) WHERE status = 'active';
 	`
 
 	return db.Exec(sql).Error
@@ -757,4 +769,47 @@ func dropNodeDiscoveryFields(db *gorm.DB) error {
 	`
 
 	return db.Exec(sql).Error
+}
+
+// addNodeK3sFields adds K3s-specific fields to nodes table
+func addNodeK3sFields(db *gorm.DB) error {
+	migrations := []string{
+		"ALTER TABLE nodes ADD COLUMN k3s_cluster_token TEXT",
+		"ALTER TABLE nodes ADD COLUMN kubeconfig TEXT",
+	}
+
+	for _, sql := range migrations {
+		if err := db.Exec(sql).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// dropNodeK3sFields removes K3s-specific fields from nodes table
+func dropNodeK3sFields(db *gorm.DB) error {
+	// SQLite doesn't support DROP COLUMN directly
+	// In a rollback scenario, we'll just set them to NULL
+	sql := "UPDATE nodes SET k3s_cluster_token = NULL, kubeconfig = NULL"
+	return db.Exec(sql).Error
+}
+
+// fixCertificateExpiringIndex recreates the certificate expiring_soon index without datetime()
+func fixCertificateExpiringIndex(db *gorm.DB) error {
+	sql := `
+	-- Drop the old index with datetime()
+	DROP INDEX IF EXISTS idx_certificates_expiring_soon;
+
+	-- Recreate without the datetime() function in WHERE clause
+	CREATE INDEX IF NOT EXISTS idx_certificates_expiring_soon ON certificates(not_after, auto_renew) WHERE status = 'active';
+	`
+	return db.Exec(sql).Error
+}
+
+// revertCertificateExpiringIndex reverts the certificate expiring_soon index fix
+func revertCertificateExpiringIndex(db *gorm.DB) error {
+	// This would recreate the index with datetime(), but that's problematic
+	// So we'll just keep the fixed version
+	return nil
 }

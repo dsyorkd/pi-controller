@@ -3,8 +3,9 @@ syntax = "proto3";
 package pi_controller;
 
 import "google/protobuf/timestamp.proto";
+import "proto/pi_agent.proto";
 
-option go_package = "github.com/spenceryork/pi-controller/proto";
+option go_package = "github.com/dsyorkd/pi-controller/proto";
 
 // PiControllerService provides gRPC API for managing Pi clusters
 service PiControllerService {
@@ -61,6 +62,9 @@ service PiControllerService {
   // Health and status
   rpc Health(HealthRequest) returns (HealthResponse);
   rpc GetSystemInfo(SystemInfoRequest) returns (SystemInfoResponse);
+
+  // Agent Metrics Streaming
+  rpc StreamAgentMetrics(stream AgentMetricsRequest) returns (StreamAgentMetricsResponse);
 }
 
 // Cluster messages
@@ -409,6 +413,17 @@ message SystemInfoResponse {
   GCInfo gc = 7;
   google.protobuf.Timestamp timestamp = 8;
   string uptime = 9;
+}
+
+// Agent Metrics Streaming messages
+message AgentMetricsRequest {
+  string node_id = 1;
+  pi_agent.SystemMetrics metrics = 2;
+}
+
+message StreamAgentMetricsResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message MemoryInfo {

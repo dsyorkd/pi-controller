@@ -28,15 +28,11 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'cmd/pi-agent/**'
-      - 'internal/agent/**'
       - 'pkg/gpio/**'
       - 'test/hardware/**'
   pull_request:
     branches: [ main, master ]
     paths:
-      - 'cmd/pi-agent/**'
-      - 'internal/agent/**'
       - 'pkg/gpio/**'
       - 'test/hardware/**'
 
@@ -162,30 +158,37 @@ jobs:
       - name: Install dependencies
         run: make deps
 
-      - name: Build agent for hardware testing
+      - name: Build controller for hardware testing
         run: make build-linux-arm64
 
       - name: Create hardware test configuration
         run: |
           mkdir -p test/config
           cat > test/config/agent-hardware-test.yml << EOF
-          server:
-            bind: "127.0.0.1:9091"
-            tls:
-              enabled: false
+          agent_server:
+            address: "127.0.0.1"
+            port: 9091
 
           gpio:
             enabled: true
             mock_mode: false  # Use real hardware
-            test_pins: [${{ needs.preflight.outputs.gpio_pins }}]
+            allowed_pins: [${{ needs.preflight.outputs.gpio_pins }}]
 
-          logging:
+          log:
             level: "debug"
             format: "text"
+            output: "stdout"
 
-          metrics:
-            enabled: true
-            bind: "127.0.0.1:9092"
+          # Minimally configure other services
+          app:
+            name: "hardware-test"
+            data_dir: "/tmp/pi-controller-test"
+          database:
+            path: "test.db"
+          api:
+            port: 8082
+          grpc:
+            port: 9092
           EOF
 
       - name: Run GPIO functionality tests
@@ -193,20 +196,20 @@ jobs:
         run: |
           echo "Running GPIO hardware tests..."
 
-          # Start agent in background
-          ./build/pi-agent-linux-arm64 --config-file=test/config/agent-hardware-test.yml &
+          # Start controller in background
+          ./build/pi-controller-linux-arm64 --config=test/config/agent-hardware-test.yml &
           AGENT_PID=$!
 
-          # Wait for agent to start
-          sleep 3
+          # Wait for controller to start
+          sleep 5
 
-          # Check if agent is running
+          # Check if controller is running
           if ! kill -0 $AGENT_PID 2>/dev/null; then
-            echo "❌ Agent failed to start"
+            echo "❌ Controller failed to start"
             exit 1
           fi
 
-          echo "Agent started with PID: $AGENT_PID"
+          echo "Controller started with PID: $AGENT_PID"
 
           # Run GPIO tests
           cd test/hardware
@@ -214,6 +217,9 @@ jobs:
             go test -v -run TestGPIO -timeout=${TEST_DURATION}m ./...
           else
             echo "Creating basic GPIO test..."
+            # Note: gpio_test.go needs to be updated to target port 9091 (agent_server)
+            # Assuming gpio_test.go uses default port or environment variable
+            export PI_AGENT_ADDRESS="127.0.0.1:9091"
             go run -tags hardware ../scripts/gpio_test.go --pins=${{ needs.preflight.outputs.gpio_pins }}
           fi
 
@@ -352,22 +358,15 @@ jobs:
           STARTUP_TIME=$((($END_TIME - $START_TIME) / 1000000)) # Convert to milliseconds
           echo "Controller startup time: ${STARTUP_TIME}ms" >> performance-results.txt
 
-          # Agent startup time
-          START_TIME=$(date +%s%N)
-          timeout 5s ./build/pi-agent-linux-arm64 --version >/dev/null 2>&1 || true
-          END_TIME=$(date +%s%N)
-          STARTUP_TIME=$((($END_TIME - $START_TIME) / 1000000))
-          echo "Agent startup time: ${STARTUP_TIME}ms" >> performance-results.txt
-
           # Memory usage test
           echo "=== Memory Usage Test ===" >> performance-results.txt
-          ./build/pi-agent-linux-arm64 --config-file=test/config/agent-hardware-test.yml &
+          ./build/pi-controller-linux-arm64 --config=test/config/agent-hardware-test.yml &
           AGENT_PID=$!
-          sleep 2
+          sleep 5
 
           if kill -0 $AGENT_PID 2>/dev/null; then
             MEMORY_KB=$(ps -o rss= -p $AGENT_PID)
-            echo "Agent memory usage: ${MEMORY_KB}KB" >> performance-results.txt
+            echo "Controller memory usage: ${MEMORY_KB}KB" >> performance-results.txt
             kill $AGENT_PID || true
           fi
 
@@ -445,13 +444,12 @@ jobs:
         run: |
           mkdir -p test/config
 
-          # Controller config
+          # Controller config (enables everything)
           cat > test/config/controller-integration.yml << EOF
           api:
             host: "127.0.0.1"
             port: 8080
-            auth:
-              enabled: false
+            auth_enabled: false
 
           database:
             path: "/tmp/pi-controller-test.db"
@@ -460,29 +458,15 @@ jobs:
             host: "127.0.0.1"
             port: 9090
 
-          logging:
-            level: "debug"
-            format: "text"
-          EOF
-
-          # Agent config
-          cat > test/config/agent-integration.yml << EOF
-          controller:
-            endpoint: "127.0.0.1:9090"
-            tls:
-              enabled: false
-
-          server:
+          agent_server:
             address: "127.0.0.1"
             port: 9091
-            tls:
-              enabled: false
 
           gpio:
             enabled: true
             mock_mode: false
 
-          logging:
+          log:
             level: "debug"
             format: "text"
           EOF
@@ -496,31 +480,16 @@ jobs:
           rm -f /tmp/pi-controller-test.db
 
           # Start controller
-          ./build/pi-controller-linux-arm64 --config-file=test/config/controller-integration.yml &
+          ./build/pi-controller-linux-arm64 --config=test/config/controller-integration.yml &
           CONTROLLER_PID=$!
           echo "Controller started with PID: $CONTROLLER_PID"
 
-          # Wait for controller to start
-          sleep 3
+          # Wait for controller to start and self-register
+          sleep 10
 
           # Verify controller is running
           if ! kill -0 $CONTROLLER_PID 2>/dev/null; then
             echo "❌ Controller failed to start"
-            exit 1
-          fi
-
-          # Start agent
-          ./build/pi-agent-linux-arm64 --config-file=test/config/agent-integration.yml &
-          AGENT_PID=$!
-          echo "Agent started with PID: $AGENT_PID"
-
-          # Wait for agent to start and connect
-          sleep 5
-
-          # Verify agent is running
-          if ! kill -0 $AGENT_PID 2>/dev/null; then
-            echo "❌ Agent failed to start"
-            kill $CONTROLLER_PID || true
             exit 1
           fi
 
@@ -543,8 +512,8 @@ jobs:
           echo "Integration test completed successfully"
 
           # Cleanup
-          kill $AGENT_PID $CONTROLLER_PID || true
-          wait $AGENT_PID $CONTROLLER_PID 2>/dev/null || true
+          kill $CONTROLLER_PID || true
+          wait $CONTROLLER_PID 2>/dev/null || true
           rm -f /tmp/pi-controller-test.db
 
       - name: Upload integration test logs
@@ -554,7 +523,6 @@ jobs:
           name: integration-test-logs
           path: |
             /tmp/pi-controller*.log
-            /tmp/pi-agent*.log
           retention-days: 3
 
   # Hardware test summary

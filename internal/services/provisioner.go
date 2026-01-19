@@ -346,7 +346,7 @@ func (s *ProvisioningService) ProvisionNode(ctx context.Context, req ProvisionNo
 	if success {
 		finalStatus = models.NodeStatusReady
 		// Update node with Kubernetes information
-		s.updateNodeKubeInfo(req.NodeID, node.Name)
+		s.updateNodeKubeInfo(req.NodeID, node.Name, clusterToken, kubeConfig)
 	} else {
 		finalStatus = models.NodeStatusFailed
 	}
@@ -569,13 +569,15 @@ func (s *ProvisioningService) updateNodeStatus(nodeID uint, status models.NodeSt
 }
 
 // updateNodeKubeInfo updates node with Kubernetes-related information
-func (s *ProvisioningService) updateNodeKubeInfo(nodeID uint, nodeName string) {
+func (s *ProvisioningService) updateNodeKubeInfo(nodeID uint, nodeName string, clusterToken, kubeConfig string) {
 	// TODO: In a real implementation, we might want to query the node for actual K3s version
 	kubeVersion := "v1.28.2+k3s1" // Default, should be detected
 
 	updateReq := UpdateNodeRequest{
-		NodeName:    &nodeName,
-		KubeVersion: &kubeVersion,
+		NodeName:        &nodeName,
+		KubeVersion:     &kubeVersion,
+		K3sClusterToken: &clusterToken,
+		Kubeconfig:      &kubeConfig,
 	}
 	if _, err := s.nodeService.Update(nodeID, updateReq); err != nil {
 		s.logger.WithError(err).WithField("node_id", nodeID).Error("Failed to update node Kubernetes info")

@@ -2,11 +2,12 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +25,7 @@ import (
 type GPIOPinReconciler struct {
 	client.Client
 	Scheme      *runtime.Scheme
-	Logger      *logrus.Entry
+	Logger      logger.Interface
 	GPIOService services.GPIOControllerService
 	NodeService services.NodeControllerService
 }
@@ -37,7 +38,7 @@ type GPIOPinReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { // nolint:dupl // Kubernetes controller pattern, extracting would require complex generics
-	logger := r.Logger.WithFields(logrus.Fields{
+	logger := r.Logger.WithFields(map[string]interface{}{
 		"gpiopin":   req.NamespacedName,
 		"namespace": req.Namespace,
 	})
@@ -51,7 +52,7 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Info("GPIOPin resource not found, likely deleted")
 			return ctrl.Result{}, nil
 		}
-		logger.WithError(err).Error("Failed to get GPIOPin resource")
+		logger.Errorf("Failed to get GPIOPin resource: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -64,7 +65,7 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !controllerutil.ContainsFinalizer(&gpioPin, "gpio.pi-controller.io/finalizer") {
 		controllerutil.AddFinalizer(&gpioPin, "gpio.pi-controller.io/finalizer")
 		if err := r.Update(ctx, &gpioPin); err != nil {
-			logger.WithError(err).Error("Failed to add finalizer")
+			logger.Errorf("Failed to add finalizer: %v", err)
 			return ctrl.Result{}, err
 		}
 		logger.Info("Added finalizer to GPIOPin")
@@ -74,7 +75,7 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Find the target node
 	targetNode, err := r.findTargetNode(ctx, &gpioPin, logger)
 	if err != nil {
-		logger.WithError(err).Error("Failed to find target node")
+		logger.Errorf("Failed to find target node: %v", err)
 		return r.updateStatus(ctx, &gpioPin, gpiov1.GPIOPhaseFailed,
 			"Failed to find target node", err.Error(), logger)
 	}
@@ -88,7 +89,7 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Check if node is reachable
 	nodeReachable, err := r.checkNodeReachability(ctx, targetNode, logger)
 	if err != nil {
-		logger.WithError(err).Error("Failed to check node reachability")
+		logger.Errorf("Failed to check node reachability: %v", err)
 		return r.updateStatus(ctx, &gpioPin, gpiov1.GPIOPhaseFailed,
 			"Failed to check node reachability", err.Error(), logger)
 	}
@@ -110,7 +111,7 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Configure the GPIO pin on the target node
 	if err := r.configureGPIOPin(ctx, &gpioPin, targetNode, logger); err != nil {
-		logger.WithError(err).Error("Failed to configure GPIO pin")
+		logger.Errorf("Failed to configure GPIO pin: %v", err)
 		return r.updateStatus(ctx, &gpioPin, gpiov1.GPIOPhaseFailed,
 			"Configuration failed", err.Error(), logger)
 	}
@@ -121,12 +122,12 @@ func (r *GPIOPinReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // findTargetNode finds the node that matches the nodeSelector
-func (r *GPIOPinReconciler) findTargetNode(ctx context.Context, gpioPin *gpiov1.GPIOPin, logger *logrus.Entry) (*corev1.Node, error) {
+func (r *GPIOPinReconciler) findTargetNode(ctx context.Context, gpioPin *gpiov1.GPIOPin, logger logger.Interface) (*corev1.Node, error) {
 	return FindNodeBySelector(ctx, r, gpioPin.Spec.NodeSelector, "GPIOPin", logger)
 }
 
 // checkNodeReachability checks if the target node is reachable
-func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
+func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger logger.Interface) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
 	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
@@ -145,28 +146,51 @@ func (r *GPIOPinReconciler) checkNodeReachability(ctx context.Context, node *cor
 }
 
 // configureGPIOPin configures the GPIO pin on the target node via gRPC
-func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov1.GPIOPin, node *corev1.Node, logger *logrus.Entry) error { // nolint:unparam // error return reserved for gRPC communication implementation
-	_ = ctx // TODO: Use context for gRPC timeout and cancellation
-	// Convert GPIOPin spec to GPIO service request
-	// TODO: Fix GPIORequest struct definition
-	_ = node.Name
-	_ = gpioPin.Spec.PinNumber
-	_ = string(gpioPin.Spec.Mode)
+func (r *GPIOPinReconciler) configureGPIOPin(ctx context.Context, gpioPin *gpiov1.GPIOPin, node *corev1.Node, logger logger.Interface) error {
+	// Convert GPIOPinSpec to services.GPIORequest
+	req := &services.GPIORequest{
+		NodeID:    node.Name, // Use node name as identifier
+		PinNumber: gpioPin.Spec.PinNumber,
+		Mode:      services.GPIOPinMode(gpioPin.Spec.Mode),
+	}
 
-	// TODO: Implement GPIO pin configuration logic
-	logger.WithFields(logrus.Fields{
-		"pin_number": gpioPin.Spec.PinNumber,
-		"mode":       string(gpioPin.Spec.Mode),
-	}).Info("GPIO pin configuration would be performed here")
+	if gpioPin.Spec.Direction != nil {
+		req.Direction = string(*gpioPin.Spec.Direction)
+	}
+	if gpioPin.Spec.PullMode != nil {
+		req.PullMode = string(*gpioPin.Spec.PullMode)
+	}
+	if gpioPin.Spec.DebounceMs != nil {
+		req.DebounceMs = *gpioPin.Spec.DebounceMs
+	}
+	if gpioPin.Spec.PWMFrequency != nil {
+		req.PWMFrequency = *gpioPin.Spec.PWMFrequency
+	}
+	if gpioPin.Spec.PWMDutyCycle != nil {
+		req.PWMDutyCycle = *gpioPin.Spec.PWMDutyCycle
+	}
 
-	// Temporary stub - return success for now
-	logger.Info("Successfully configured GPIO pin")
+	if gpioPin.Spec.InitialValue != nil {
+		req.Value = string(*gpioPin.Spec.InitialValue)
+	}
+
+	logger.WithFields(map[string]interface{}{
+		"node":      node.Name,
+		"pin":       gpioPin.Spec.PinNumber,
+		"mode":      gpioPin.Spec.Mode,
+		"direction": req.Direction,
+	}).Info("Configuring GPIO pin via GPIO service")
+
+	if err := r.GPIOService.ConfigurePin(ctx, req); err != nil {
+		return fmt.Errorf("failed to configure GPIO pin %d on node %s: %w", gpioPin.Spec.PinNumber, node.Name, err)
+	}
+
 	return nil
 }
 
 // updateStatus updates the GPIOPin status
 func (r *GPIOPinReconciler) updateStatus(ctx context.Context, gpioPin *gpiov1.GPIOPin,
-	phase gpiov1.GPIOPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
+	phase gpiov1.GPIOPhase, message, reason string, logger logger.Interface) (ctrl.Result, error) {
 	// Update basic status fields
 	now := metav1.Now()
 	gpioPin.Status.Phase = phase
@@ -199,11 +223,11 @@ func (r *GPIOPinReconciler) updateStatus(ctx context.Context, gpioPin *gpiov1.GP
 
 	// Update the status
 	if err := r.Status().Update(ctx, gpioPin); err != nil {
-		logger.WithError(err).Error("Failed to update GPIOPin status")
+		logger.Errorf("Failed to update GPIOPin status: %v", err)
 		return ctrl.Result{}, err
 	}
 
-	logger.WithFields(logrus.Fields{
+	logger.WithFields(map[string]interface{}{
 		"phase":   phase,
 		"message": message,
 	}).Info("Updated GPIOPin status")
@@ -250,7 +274,7 @@ func (r *GPIOPinReconciler) setCondition(status *gpiov1.GPIOPinStatus,
 }
 
 // handleDeletion handles GPIOPin deletion
-func (r *GPIOPinReconciler) handleDeletion(ctx context.Context, gpioPin *gpiov1.GPIOPin, logger *logrus.Entry) (ctrl.Result, error) {
+func (r *GPIOPinReconciler) handleDeletion(ctx context.Context, gpioPin *gpiov1.GPIOPin, logger logger.Interface) (ctrl.Result, error) {
 	logger.Info("Handling GPIOPin deletion")
 
 	// Find the node that was managing this pin
@@ -263,7 +287,7 @@ func (r *GPIOPinReconciler) handleDeletion(ctx context.Context, gpioPin *gpiov1.
 		}
 
 		if err := r.GPIOService.ConfigurePin(ctx, cleanupRequest); err != nil {
-			logger.WithError(err).Warn("Failed to cleanup GPIO pin on node, continuing with deletion")
+			logger.Warnf("Failed to cleanup GPIO pin on node, continuing with deletion: %v", err)
 		} else {
 			logger.Info("Successfully cleaned up GPIO pin on node")
 		}
@@ -272,7 +296,7 @@ func (r *GPIOPinReconciler) handleDeletion(ctx context.Context, gpioPin *gpiov1.
 	// Remove finalizer
 	controllerutil.RemoveFinalizer(gpioPin, "gpio.pi-controller.io/finalizer")
 	if err := r.Update(ctx, gpioPin); err != nil {
-		logger.WithError(err).Error("Failed to remove finalizer")
+		logger.Errorf("Failed to remove finalizer: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -298,7 +322,7 @@ func (r *GPIOPinReconciler) mapNodeToGPIOPins(ctx context.Context, obj client.Ob
 
 	var gpioPinList gpiov1.GPIOPinList
 	if err := r.List(ctx, &gpioPinList); err != nil {
-		r.Logger.WithError(err).Error("Failed to list GPIOPins for node mapping")
+		r.Logger.Errorf("Failed to list GPIOPins for node mapping: %v", err)
 		return nil
 	}
 
@@ -316,7 +340,7 @@ func (r *GPIOPinReconciler) mapNodeToGPIOPins(ctx context.Context, obj client.Ob
 		}
 	}
 
-	r.Logger.WithFields(logrus.Fields{
+	r.Logger.WithFields(map[string]interface{}{
 		"node":          node.Name,
 		"gpiopin_count": len(requests),
 	}).Debug("Mapped node change to GPIOPin reconcile requests")

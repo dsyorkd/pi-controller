@@ -60,7 +60,7 @@ func (suite *APIIntegrationTestSuite) SetupSuite() {
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(suite.db)
 	clusterHandler := handlers.NewClusterHandler(suite.clusterService, testLogger)
-	nodeHandler := handlers.NewNodeHandler(suite.nodeService, testLogger)
+	nodeHandler := handlers.NewNodeHandler(suite.nodeService, testLogger, "")
 	gpioHandler := handlers.NewGPIOHandler(suite.gpioService, testLogger)
 
 	// Setup router

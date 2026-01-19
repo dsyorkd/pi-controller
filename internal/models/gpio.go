@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -123,7 +124,28 @@ type GPIOReading struct {
 	Device GPIODevice `json:"device,omitempty" gorm:"foreignKey:DeviceID"`
 }
 
-// TableName returns the table name for the GPIOReading model
-func (GPIOReading) TableName() string {
-	return "gpio_readings"
+// ParseGPIODirection parses a string into a GPIODirection
+func ParseGPIODirection(s string) (GPIODirection, error) {
+	switch s {
+	case "input", "in":
+		return GPIODirectionInput, nil
+	case "output", "out":
+		return GPIODirectionOutput, nil
+	default:
+		return "", fmt.Errorf("invalid GPIO direction: %s", s)
+	}
+}
+
+// ParseGPIOPullMode parses a string into a GPIOPullMode
+func ParseGPIOPullMode(s string) (GPIOPullMode, error) {
+	switch s {
+	case "none", "off":
+		return GPIOPullNone, nil
+	case "up":
+		return GPIOPullUp, nil
+	case "down":
+		return GPIOPullDown, nil
+	default:
+		return "", fmt.Errorf("invalid GPIO pull mode: %s", s)
+	}
 }

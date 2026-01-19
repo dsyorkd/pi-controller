@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/dsyorkd/pi-controller/internal/storage"
-	"github.com/sirupsen/logrus"
+	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 )
 
@@ -92,7 +92,7 @@ type ClusterConfig struct {
 
 // AppConfig contains general application settings
 type AppConfig struct {
-	Name        string `yaml:"name" mapstructure:"name"`
+	Name        string `yaml:"name" mapstructure:"name" validate:"required"`
 	Version     string `yaml:"version" mapstructure:"version"`
 	Environment string `yaml:"environment" mapstructure:"environment"`
 	DataDir     string `yaml:"data_dir" mapstructure:"data_dir"`
@@ -102,11 +102,12 @@ type AppConfig struct {
 // APIConfig contains REST API server settings
 type APIConfig struct {
 	Host         string `yaml:"host" mapstructure:"host"`
-	Port         int    `yaml:"port" mapstructure:"port"`
+	Port         int    `yaml:"port" mapstructure:"port" validate:"min=1,max=65535"`
 	ReadTimeout  string `yaml:"read_timeout" mapstructure:"read_timeout"`
 	WriteTimeout string `yaml:"write_timeout" mapstructure:"write_timeout"`
 	TLSCertFile  string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
 	TLSKeyFile   string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
+	TLSCAFile    string `yaml:"tls_ca_file" mapstructure:"tls_ca_file"`
 	CORSEnabled  bool   `yaml:"cors_enabled" mapstructure:"cors_enabled"`
 	AuthEnabled  bool   `yaml:"auth_enabled" mapstructure:"auth_enabled"`
 }
@@ -117,6 +118,7 @@ type GRPCConfig struct {
 	Port        int    `yaml:"port" mapstructure:"port"`
 	TLSCertFile string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
 	TLSKeyFile  string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
+	TLSCAFile   string `yaml:"tls_ca_file" mapstructure:"tls_ca_file"`
 }
 
 // WebSocketConfig contains WebSocket server settings
@@ -131,7 +133,7 @@ type WebSocketConfig struct {
 
 // LogConfig contains logging configuration
 type LogConfig struct {
-	Level      string `yaml:"level" mapstructure:"level"`
+	Level      string `yaml:"level" mapstructure:"level" validate:"oneof=debug info warn error panic fatal"`
 	Format     string `yaml:"format" mapstructure:"format"`
 	Output     string `yaml:"output" mapstructure:"output"`
 	File       string `yaml:"file" mapstructure:"file"`
@@ -143,6 +145,7 @@ type LogConfig struct {
 
 // KubernetesConfig contains Kubernetes client settings
 type KubernetesConfig struct {
+	Enabled        bool   `yaml:"enabled" mapstructure:"enabled"`
 	ConfigPath     string `yaml:"config_path" mapstructure:"config_path"`
 	InCluster      bool   `yaml:"in_cluster" mapstructure:"in_cluster"`
 	Namespace      string `yaml:"namespace" mapstructure:"namespace"`
@@ -153,7 +156,7 @@ type KubernetesConfig struct {
 type GPIOConfig struct {
 	Enabled          bool   `yaml:"enabled" mapstructure:"enabled"`
 	MockMode         bool   `yaml:"mock_mode" mapstructure:"mock_mode"`
-	SampleInterval   string `yaml:"sample_interval" mapstructure:"sample_interval"`
+	SampleInterval   string `yaml:"sample_interval" mapstructure:"sample_interval" validate:"required"`
 	RetentionPeriod  string `yaml:"retention_period" mapstructure:"retention_period"`
 	AllowedPins      []int  `yaml:"allowed_pins" mapstructure:"allowed_pins"`
 	RestrictedPins   []int  `yaml:"restricted_pins" mapstructure:"restricted_pins"`
@@ -172,6 +175,10 @@ type DiscoveryConfig struct {
 	StaticNodes []string `yaml:"static_nodes" mapstructure:"static_nodes"`
 	ServiceName string   `yaml:"service_name" mapstructure:"service_name"`
 	ServiceType string   `yaml:"service_type" mapstructure:"service_type"`
+
+	// Node trust token for verifying discovered nodes
+	// This shared secret is used to authenticate nodes during adoption
+	TrustToken string `yaml:"trust_token" mapstructure:"trust_token"`
 }
 
 // GRPCClientConfig contains gRPC client settings for Pi Agent
@@ -200,9 +207,10 @@ type GRPCClientConfig struct {
 	KeepAliveTimeout string `yaml:"keepalive_timeout" mapstructure:"keepalive_timeout"`
 
 	// Security
-	Insecure bool   `yaml:"insecure" mapstructure:"insecure"`
-	TLSCert  string `yaml:"tls_cert" mapstructure:"tls_cert"`
-	TLSKey   string `yaml:"tls_key" mapstructure:"tls_key"`
+	Insecure  bool   `yaml:"insecure" mapstructure:"insecure"`
+	TLSCert   string `yaml:"tls_cert" mapstructure:"tls_cert"`
+	TLSKey    string `yaml:"tls_key" mapstructure:"tls_key"`
+	TLSCAFile string `yaml:"tls_ca_file" mapstructure:"tls_ca_file"`
 
 	// Node information
 	NodeID   string `yaml:"node_id" mapstructure:"node_id"`
@@ -342,6 +350,7 @@ type AgentServerConfig struct {
 	// Security
 	TLSCertFile string `yaml:"tls_cert_file" mapstructure:"tls_cert_file"`
 	TLSKeyFile  string `yaml:"tls_key_file" mapstructure:"tls_key_file"`
+	TLSCAFile   string `yaml:"tls_ca_file" mapstructure:"tls_ca_file"`
 }
 
 // SentryConfig contains Sentry error tracking and performance monitoring settings
@@ -608,6 +617,12 @@ func Load(configPath string) (*Config, error) {
 
 // validate validates the configuration and sets derived values
 func (c *Config) validate() error {
+	// Use struct tags for validation
+	validate := validator.New()
+	if err := validate.Struct(c); err != nil {
+		return fmt.Errorf("config validation failed: %w", err)
+	}
+
 	// Ensure data directory exists
 	if c.App.DataDir != "" {
 		if err := os.MkdirAll(c.App.DataDir, 0750); err != nil { // #nosec G301 - secure directory permissions
@@ -618,22 +633,6 @@ func (c *Config) validate() error {
 		if !filepath.IsAbs(c.Database.Path) {
 			c.Database.Path = filepath.Join(c.App.DataDir, c.Database.Path)
 		}
-	}
-
-	// Validate log level
-	if _, err := logrus.ParseLevel(c.Log.Level); err != nil {
-		return fmt.Errorf("invalid log level '%s': %w", c.Log.Level, err)
-	}
-
-	// Validate port ranges
-	if c.API.Port < 1 || c.API.Port > 65535 {
-		return fmt.Errorf("invalid API port: %d", c.API.Port)
-	}
-	if c.GRPC.Port < 1 || c.GRPC.Port > 65535 {
-		return fmt.Errorf("invalid gRPC port: %d", c.GRPC.Port)
-	}
-	if c.WebSocket.Port < 1 || c.WebSocket.Port > 65535 {
-		return fmt.Errorf("invalid WebSocket port: %d", c.WebSocket.Port)
 	}
 
 	// Set default Sentry environment and release if not specified
@@ -718,6 +717,7 @@ func getProductionDefaults() Config {
 			WriteTimeout: "30s",
 			TLSCertFile:  "/etc/pi-controller/tls/server.crt", // Default TLS cert path for production
 			TLSKeyFile:   "/etc/pi-controller/tls/server.key", // Default TLS key path for production
+			TLSCAFile:    "/etc/pi-controller/tls/ca.crt",     // Default CA cert path for mTLS
 			CORSEnabled:  true,
 			AuthEnabled:  true, // Enable authentication by default for security
 		},
@@ -726,6 +726,7 @@ func getProductionDefaults() Config {
 			Port:        9090,
 			TLSCertFile: "/etc/pi-controller/tls/server.crt", // Default TLS cert path for production
 			TLSKeyFile:  "/etc/pi-controller/tls/server.key", // Default TLS key path for production
+			TLSCAFile:   "/etc/pi-controller/tls/ca.crt",     // Default CA cert path for mTLS
 		},
 		WebSocket: WebSocketConfig{
 			Host:            "0.0.0.0",
@@ -745,6 +746,7 @@ func getProductionDefaults() Config {
 			Compress:   true,
 		},
 		Kubernetes: KubernetesConfig{
+			Enabled:        false, // Disabled by default - enable when K8s cluster is available
 			InCluster:      false,
 			Namespace:      "default",
 			ResyncInterval: "30s",
@@ -767,6 +769,7 @@ func getProductionDefaults() Config {
 			Timeout:     "5s",
 			ServiceName: "pi-controller",
 			ServiceType: "_pi-controller._tcp",
+			TrustToken:  "", // Empty by default - must be set for secure node adoption
 		},
 		GRPCClient: GRPCClientConfig{
 			ServerAddress:     "localhost",
@@ -1045,12 +1048,12 @@ func (c *WebSocketConfig) GetAddress() string {
 
 // IsTLSEnabled returns true if TLS is configured for API
 func (c *APIConfig) IsTLSEnabled() bool {
-	return c.TLSCertFile != "" && c.TLSKeyFile != ""
+	return c.TLSCertFile != "" && c.TLSKeyFile != "" && c.TLSCAFile != ""
 }
 
 // IsTLSEnabled returns true if TLS is configured for gRPC
 func (c *GRPCConfig) IsTLSEnabled() bool {
-	return c.TLSCertFile != "" && c.TLSKeyFile != ""
+	return c.TLSCertFile != "" && c.TLSKeyFile != "" && c.TLSCAFile != ""
 }
 
 // GetAddress returns the formatted address for WebUI service

@@ -23,7 +23,11 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
@@ -38,12 +42,12 @@ import (
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 // Server represents the REST API server
 type Server struct {
 	config              *config.APIConfig
+	discoveryConfig     *config.DiscoveryConfig
 	logger              logger.Interface
 	database            *storage.Database
 	clusterService      *services.ClusterService
@@ -63,7 +67,7 @@ type Server struct {
 }
 
 // New creates a new API server instance
-func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
+func New(cfg *config.APIConfig, discoveryCfg *config.DiscoveryConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
 	// Set Gin mode based on environment
 	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
 
@@ -72,7 +76,7 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	// Initialize services
 	clusterService := services.NewClusterService(db, log)
 	nodeService := services.NewNodeService(db, log)
-	gpioService := services.NewGPIOService(db, log)
+	gpioService := services.NewGPIOService(db, log, nil) // TODO: Pass TLS config for mTLS
 	provisioningService := services.NewProvisioningService(nodeService, log)
 
 	// Set dependencies after all services are created
@@ -93,17 +97,17 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caSe
 	validator := middleware.NewValidator(middleware.DefaultValidationConfig(), log)
 
 	// Initialize rate limiter with default secure configuration
-	logrusLogger := logrus.New()
-	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), logrusLogger)
+	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), log)
 
 	// Initialize GPIO-specific rate limiter with stricter limits
-	gpioRateLimiter := middleware.NewGPIORateLimiter(middleware.DefaultGPIORateLimitConfig(), logrusLogger)
+	gpioRateLimiter := middleware.NewGPIORateLimiter(middleware.DefaultGPIORateLimitConfig(), log)
 
 	// Initialize security middleware for HTTP security headers
-	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), logrusLogger)
+	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), log)
 
 	s := &Server{
 		config:              cfg,
+		discoveryConfig:     discoveryCfg,
 		logger:              log,
 		database:            db,
 		clusterService:      clusterService,
@@ -173,6 +177,11 @@ func (s *Server) setupRoutes() {
 	// API v1 routes
 	v1 := s.router.Group("/api/v1")
 	{
+		// Health check endpoints (no auth required) - register before auth middleware
+		healthHandler := handlers.NewHealthHandler(s.database)
+		v1.GET("/health", healthHandler.Health)
+		v1.GET("/ready", healthHandler.Ready)
+
 		// Authentication middleware for protected routes
 		if s.config.AuthEnabled && s.authManager != nil {
 			v1.Use(s.authManager.Auth())
@@ -202,17 +211,23 @@ func (s *Server) setupRoutes() {
 		}
 
 		// Node management
-		nodeHandler := handlers.NewNodeHandler(s.nodeService, s.logger)
+		trustToken := ""
+		if s.discoveryConfig != nil {
+			trustToken = s.discoveryConfig.TrustToken
+		}
+		nodeHandler := handlers.NewNodeHandler(s.nodeService, s.logger, trustToken)
 		nodes := v1.Group("/nodes")
 		{
 			// Read operations - require viewer role
 			nodes.GET("", s.requireRole("viewer"), nodeHandler.List)
 			nodes.GET("/:id", s.requireRole("viewer"), nodeHandler.Get)
 			nodes.GET("/:id/gpio", s.requireRole("viewer"), nodeHandler.ListGPIO)
+			nodes.GET("/:id/system", s.requireRole("viewer"), nodeHandler.GetSystemMetrics)
 
 			// Write operations - require operator role
 			nodes.POST("", s.requireRole("operator"), nodeHandler.Create)
 			nodes.PUT("/:id", s.requireRole("operator"), nodeHandler.Update)
+			nodes.POST("/:id/adopt", s.requireRole("operator"), nodeHandler.Adopt)
 
 			// Delete operations - require admin role
 			nodes.DELETE("/:id", s.requireRole("admin"), nodeHandler.Delete)
@@ -364,8 +379,33 @@ func (s *Server) Start() error {
 		s.logger.WithFields(map[string]interface{}{
 			"cert_file": s.config.TLSCertFile,
 			"key_file":  s.config.TLSKeyFile,
-		}).Info("Starting HTTPS server with TLS enabled")
-		return s.server.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
+			"ca_file":   s.config.TLSCAFile,
+		}).Info("Starting HTTPS server with mutual TLS (mTLS) enabled")
+
+		// Load server cert and key
+		serverCert, err := tls.LoadX509KeyPair(s.config.TLSCertFile, s.config.TLSKeyFile)
+		if err != nil {
+			return fmt.Errorf("failed to load server TLS key pair: %w", err)
+		}
+
+		// Load client CA cert for mutual TLS
+		caCertPool := x509.NewCertPool()
+		caPEM, err := os.ReadFile(s.config.TLSCAFile)
+		if err != nil {
+			return fmt.Errorf("failed to read CA certificate for mTLS: %w", err)
+		}
+		if !caCertPool.AppendCertsFromPEM(caPEM) {
+			return fmt.Errorf("failed to append CA certificate to pool for mTLS")
+		}
+
+		s.server.TLSConfig = &tls.Config{
+			Certificates: []tls.Certificate{serverCert},
+			ClientCAs:    caCertPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		return s.server.ListenAndServeTLS("", "") // Cert and Key are handled by TLSConfig
 	}
 
 	s.logger.Warn("⚠️  Starting HTTP server without TLS - not recommended for production!")
@@ -422,6 +462,8 @@ func (s *Server) requireRole(role string) gin.HandlerFunc {
 
 // NewForTest creates a new API server instance with rate limiting disabled for testing
 func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
+	// Use empty discovery config for tests
+	discoveryCfg := &config.DiscoveryConfig{}
 	// Set Gin mode based on environment
 	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
 
@@ -430,7 +472,7 @@ func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Databas
 	// Initialize services
 	clusterService := services.NewClusterService(db, log)
 	nodeService := services.NewNodeService(db, log)
-	gpioService := services.NewGPIOService(db, log)
+	gpioService := services.NewGPIOService(db, log, nil)
 	provisioningService := services.NewProvisioningService(nodeService, log)
 
 	// Set dependencies after all services are created
@@ -451,20 +493,20 @@ func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Databas
 	validator := middleware.NewValidator(middleware.DefaultValidationConfig(), log)
 
 	// Initialize rate limiters with disabled configuration for testing
-	logrusLogger := logrus.New()
 	disabledConfig := middleware.DefaultRateLimitConfig()
 	disabledConfig.Enabled = false
-	rateLimiter := middleware.NewRateLimiter(disabledConfig, logrusLogger)
+	rateLimiter := middleware.NewRateLimiter(disabledConfig, log)
 
 	disabledGPIOConfig := middleware.DefaultGPIORateLimitConfig()
 	disabledGPIOConfig.Enabled = false
-	gpioRateLimiter := middleware.NewGPIORateLimiter(disabledGPIOConfig, logrusLogger)
+	gpioRateLimiter := middleware.NewGPIORateLimiter(disabledGPIOConfig, log)
 
 	// Initialize security middleware for HTTP security headers
-	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), logrusLogger)
+	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), log)
 
 	s := &Server{
 		config:              cfg,
+		discoveryConfig:     discoveryCfg,
 		logger:              log,
 		database:            db,
 		clusterService:      clusterService,

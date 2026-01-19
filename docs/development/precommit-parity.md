@@ -264,6 +264,6 @@ Every minute spent fixing parity issues saves hours of CI debugging and develope
 **Maintained By**: DevOps/Security Team
 **Related Docs**:
 
-- [PRECOMMIT_HOOKS.md](./PRECOMMIT_HOOKS.md) - Hook installation and usage
+- [Pre-commit Hooks](precommit-hooks.md) - Hook installation and usage
 - [CI_STRATEGY.md](../CI_STRATEGY.md) - Overall CI/CD approach
 - [SECURITY_IMPLEMENTATION.md](./SECURITY_IMPLEMENTATION.md) - Security tooling details

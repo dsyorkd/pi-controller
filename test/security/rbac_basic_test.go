@@ -45,7 +45,7 @@ func TestBasicRBAC(t *testing.T) {
 		WriteTimeout: "30s",
 	}
 
-	server := api.New(apiConfig, testLogger, db, nil)
+	server := api.New(apiConfig, nil, testLogger, db, nil)
 
 	t.Run("Default Admin Login", func(t *testing.T) {
 		// Test default admin login

@@ -20,24 +20,65 @@ import (
 // MetricsService handles system metrics collection and reporting
 type MetricsService struct {
 	logger logger.Interface
-	pb.UnimplementedPiAgentServiceServer
+	client pb.PiControllerServiceClient // gRPC client to controller
+	nodeID string                       // ID of the current agent node
 }
 
 // NewMetricsService creates a new metrics service instance
-func NewMetricsService(logger logger.Interface) *MetricsService {
+func NewMetricsService(logger logger.Interface, client pb.PiControllerServiceClient, nodeID string) *MetricsService {
 	return &MetricsService{
 		logger: logger.WithField("component", "metrics-service"),
+		client: client,
+		nodeID: nodeID,
 	}
 }
 
-// GetSystemMetrics returns current system metrics
-func (m *MetricsService) GetSystemMetrics(ctx context.Context, req *pb.GetSystemMetricsRequest) (*pb.GetSystemMetricsResponse, error) {
-	m.logger.Debug("collecting system metrics")
+// StreamMetricsToController streams system metrics to the controller
+func (m *MetricsService) StreamMetricsToController(ctx context.Context, interval time.Duration) error {
+	if interval <= 0 {
+		interval = 5 * time.Second // Default to 5 seconds
+	}
 
+	m.logger.Info("starting system metrics stream to controller", "interval", interval)
+
+	stream, err := m.client.StreamAgentMetrics(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to open metrics stream to controller: %w", err)
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Debug("metrics stream context cancelled")
+			return stream.CloseSend()
+		case <-ticker.C:
+			metrics, err := m.collectMetrics(ctx)
+			if err != nil {
+				m.logger.Error("failed to collect metrics for stream", "error", err)
+				continue
+			}
+
+			req := &pb.AgentMetricsRequest{
+				NodeId:  m.nodeID,
+				Metrics: metrics,
+			}
+
+			if err := stream.Send(req); err != nil {
+				m.logger.Error("failed to send metrics to controller", "error", err)
+				return fmt.Errorf("failed to send metrics to controller: %w", err)
+			}
+		}
+	}
+}
+
+// GetSystemMetrics implements the PiAgentService GetSystemMetrics RPC
+func (m *MetricsService) GetSystemMetrics(ctx context.Context, req *pb.GetSystemMetricsRequest) (*pb.GetSystemMetricsResponse, error) {
 	metrics, err := m.collectMetrics(ctx)
 	if err != nil {
-		m.logger.Error("failed to collect system metrics", "error", err)
-		return nil, fmt.Errorf("failed to collect system metrics: %w", err)
+		return nil, err
 	}
 
 	return &pb.GetSystemMetricsResponse{
@@ -46,14 +87,12 @@ func (m *MetricsService) GetSystemMetrics(ctx context.Context, req *pb.GetSystem
 	}, nil
 }
 
-// StreamSystemMetrics streams system metrics at regular intervals
+// StreamSystemMetrics implements the PiAgentService StreamSystemMetrics RPC
 func (m *MetricsService) StreamSystemMetrics(req *pb.StreamSystemMetricsRequest, stream pb.PiAgentService_StreamSystemMetricsServer) error {
 	interval := time.Duration(req.IntervalSeconds) * time.Second
 	if interval <= 0 {
-		interval = 5 * time.Second // Default to 5 seconds
+		interval = 5 * time.Second
 	}
-
-	m.logger.Info("starting system metrics stream", "interval", interval)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -61,23 +100,21 @@ func (m *MetricsService) StreamSystemMetrics(req *pb.StreamSystemMetricsRequest,
 	for {
 		select {
 		case <-stream.Context().Done():
-			m.logger.Debug("metrics stream context cancelled")
-			return stream.Context().Err()
+			return nil
 		case <-ticker.C:
 			metrics, err := m.collectMetrics(stream.Context())
 			if err != nil {
-				m.logger.Error("failed to collect metrics for stream", "error", err)
+				m.logger.Error("failed to collect metrics", "error", err)
 				continue
 			}
 
-			response := &pb.SystemMetricsResponse{
+			resp := &pb.SystemMetricsResponse{
 				Metrics:   metrics,
 				Timestamp: timestamppb.Now(),
 			}
 
-			if err := stream.Send(response); err != nil {
-				m.logger.Error("failed to send metrics to stream", "error", err)
-				return fmt.Errorf("failed to send metrics: %w", err)
+			if err := stream.Send(resp); err != nil {
+				return err
 			}
 		}
 	}

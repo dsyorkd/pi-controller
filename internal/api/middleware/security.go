@@ -6,8 +6,14 @@ import (
 	"net/http"
 	"strings"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+)
+
+// Error message constants
+const (
+	errMsgBadRequest  = "Bad Request"
+	errMsgInvalidHost = "Invalid host"
 )
 
 // SecurityConfig holds security middleware configuration
@@ -47,11 +53,11 @@ func DefaultSecurityConfig() *SecurityConfig {
 // SecurityMiddleware handles security headers and HTTPS enforcement
 type SecurityMiddleware struct {
 	config *SecurityConfig
-	logger *logrus.Entry
+	logger applogger.Interface
 }
 
 // NewSecurityMiddleware creates a new security middleware
-func NewSecurityMiddleware(config *SecurityConfig, logger *logrus.Logger) *SecurityMiddleware {
+func NewSecurityMiddleware(config *SecurityConfig, logger applogger.Interface) *SecurityMiddleware {
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
@@ -61,7 +67,7 @@ func NewSecurityMiddleware(config *SecurityConfig, logger *logrus.Logger) *Secur
 		logger: logger.WithField("component", "security"),
 	}
 
-	sm.logger.WithFields(logrus.Fields{
+	sm.logger.WithFields(map[string]interface{}{
 		"enforce_https":  config.EnforceHTTPS,
 		"hsts_enabled":   config.StrictTransportSec,
 		"frame_options":  config.FrameOptions,
@@ -93,7 +99,7 @@ func (sm *SecurityMiddleware) EnforceHTTPS() gin.HandlerFunc {
 
 		// Check if request is HTTPS
 		if !sm.isHTTPS(c) {
-			sm.logger.WithFields(logrus.Fields{
+			sm.logger.WithFields(map[string]interface{}{
 				"client_ip":  sanitizeLogValue(c.ClientIP()),
 				"method":     sanitizeLogValue(c.Request.Method),
 				"path":       sanitizeLogValue(c.Request.URL.Path),
@@ -126,15 +132,15 @@ func (sm *SecurityMiddleware) HostValidation() gin.HandlerFunc {
 
 		host := sm.getHost(c)
 		if !sm.isAllowedHost(host) {
-			sm.logger.WithFields(logrus.Fields{
+			sm.logger.WithFields(map[string]interface{}{
 				"client_ip":  sanitizeLogValue(c.ClientIP()),
 				"host":       sanitizeLogValue(host),
 				"user_agent": sanitizeLogValue(c.GetHeader("User-Agent")),
 			}).Warn("Request blocked: host not allowed")
 
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "Bad Request",
-				"message": "Invalid host",
+				"error":   errMsgBadRequest,
+				"message": errMsgInvalidHost,
 			})
 			c.Abort()
 			return

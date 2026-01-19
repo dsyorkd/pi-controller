@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
 
@@ -39,14 +39,14 @@ func DefaultGPIORateLimitConfig() *GPIORateLimitConfig {
 // GPIORateLimiter manages rate limiting specifically for GPIO endpoints
 type GPIORateLimiter struct {
 	config    *GPIORateLimitConfig
-	logger    *logrus.Entry
+	logger    applogger.Interface
 	limiters  map[string]*rate.Limiter
 	mutex     sync.RWMutex
 	lastClean time.Time
 }
 
 // NewGPIORateLimiter creates a new GPIO-specific rate limiter
-func NewGPIORateLimiter(config *GPIORateLimitConfig, logger *logrus.Logger) *GPIORateLimiter {
+func NewGPIORateLimiter(config *GPIORateLimitConfig, logger applogger.Interface) *GPIORateLimiter {
 	if config == nil {
 		config = DefaultGPIORateLimitConfig()
 	}
@@ -61,7 +61,7 @@ func NewGPIORateLimiter(config *GPIORateLimitConfig, logger *logrus.Logger) *GPI
 	// Start cleanup goroutine
 	go rl.cleanupRoutine()
 
-	rl.logger.WithFields(logrus.Fields{
+	rl.logger.WithFields(map[string]interface{}{
 		"requests_per_second": config.RequestsPerSecond,
 		"burst_size":          config.BurstSize,
 		"enable_by_user":      config.EnableByUser,
@@ -99,7 +99,7 @@ func (rl *GPIORateLimiter) RateLimit() gin.HandlerFunc {
 
 		// Check if request is allowed
 		if !limiter.Allow() {
-			rl.logger.WithFields(logrus.Fields{
+			rl.logger.WithFields(map[string]interface{}{
 				"client_id":  sanitizeLogValue(clientID),
 				"client_ip":  sanitizeLogValue(c.ClientIP()),
 				"method":     sanitizeLogValue(c.Request.Method),

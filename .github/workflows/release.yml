@@ -156,7 +156,7 @@ jobs:
 
           # Copy binaries with proper naming
           cd build
-          for binary in pi-controller-* pi-agent-*; do
+          for binary in pi-controller-*; do
             if [[ -f "$binary" ]]; then
               base_name=${binary%-*}
               if [[ "${{ matrix.goos }}" == "windows" ]]; then
@@ -180,9 +180,6 @@ jobs:
           if [[ -f "../../config/controller.example.yml" ]]; then
             cp ../../config/controller.example.yml config/
           fi
-          if [[ -f "../../config/agent.example.yml" ]]; then
-            cp ../../config/agent.example.yml config/
-          fi
 
           # Create systemd service files for Linux builds
           if [[ "${{ matrix.goos }}" == "linux" ]]; then
@@ -202,22 +199,6 @@ jobs:
           [Install]
           WantedBy=multi-user.target
           EOF
-
-            cat > systemd/pi-agent.service << 'EOF'
-          [Unit]
-          Description=Pi Agent Service
-          After=network.target
-
-          [Service]
-          Type=simple
-          User=pi-agent
-          ExecStart=/usr/local/bin/pi-agent
-          Restart=always
-          RestartSec=5
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
           fi
 
           # Create installation script
@@ -230,8 +211,8 @@ jobs:
 
           echo "Installing Pi Controller binaries to ${PREFIX}/bin/"
           $SUDO mkdir -p ${PREFIX}/bin
-          $SUDO cp pi-controller pi-agent ${PREFIX}/bin/
-          $SUDO chmod +x ${PREFIX}/bin/pi-controller ${PREFIX}/bin/pi-agent
+          $SUDO cp pi-controller ${PREFIX}/bin/
+          $SUDO chmod +x ${PREFIX}/bin/pi-controller
 
           echo "Installing configuration files to /etc/pi-controller/"
           $SUDO mkdir -p /etc/pi-controller
@@ -243,7 +224,7 @@ jobs:
             echo "Installing systemd service files..."
             $SUDO cp systemd/*.service /etc/systemd/system/
             $SUDO systemctl daemon-reload
-            echo "Enable services with: sudo systemctl enable pi-controller pi-agent"
+            echo "Enable services with: sudo systemctl enable pi-controller"
           fi
 
           echo "Installation complete!"
@@ -309,18 +290,6 @@ jobs:
           build-args: |
             VERSION=${{ needs.validate-release.outputs.version }}
 
-      - name: Build and push agent image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile.agent
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}-agent
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            VERSION=${{ needs.validate-release.outputs.version }}
-
   # Test release artifacts on actual Raspberry Pi hardware
   test-release-hardware:
     name: Test Release on Pi Hardware
@@ -342,7 +311,6 @@ jobs:
 
           # Test binaries run without errors
           ./pi-controller --version
-          ./pi-agent --version
 
           # Test installation script
           bash install.sh --dry-run || echo "Install script validation complete"
@@ -397,12 +365,11 @@ jobs:
           1. Download the appropriate binary for your platform
           2. Extract the archive: \`tar -xzf pi-controller-*.tar.gz\`
           3. Run the installation script: \`sudo ./install.sh\`
-          4. Enable and start services: \`sudo systemctl enable --now pi-controller pi-agent\`
+          4. Enable and start services: \`sudo systemctl enable --now pi-controller\`
 
           ### Docker Images
 
           - Controller: \`ghcr.io/${{ github.repository }}:${{ needs.validate-release.outputs.version }}-controller\`
-          - Agent: \`ghcr.io/${{ github.repository }}:${{ needs.validate-release.outputs.version }}-agent\`
 
           ### Supported Platforms
 

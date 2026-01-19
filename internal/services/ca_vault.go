@@ -61,8 +61,8 @@ func (v *VaultCABackend) GetCACertificate(ctx context.Context) (*x509.Certificat
 }
 
 // IssueCertificate issues a new certificate using Vault PKI
-func (v *VaultCABackend) IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (string, error) {
-	return "", fmt.Errorf("Vault CA backend not yet implemented")
+func (v *VaultCABackend) IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (string, string, error) {
+	return "", "", fmt.Errorf("Vault CA backend not yet implemented")
 }
 
 // RevokeCertificate revokes a certificate in Vault

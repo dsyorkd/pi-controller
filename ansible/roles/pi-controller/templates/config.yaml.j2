@@ -21,6 +21,9 @@ api:
   write_timeout: {{ api_write_timeout | default(30) }}
   max_request_size: {{ api_max_request_size | default('10MB') }}
   auth_enabled: false # Temporarily disable auth for Ansible testing
+  tls_cert_file: ""
+  tls_key_file: ""
+  tls_ca_file: ""
 
 
 grpc:
@@ -28,6 +31,9 @@ grpc:
   port: {{ grpc_port }}
   max_recv_msg_size: {{ grpc_max_message_size | default('50MB') }}
   max_send_msg_size: {{ grpc_max_message_size | default('50MB') }}
+  tls_cert_file: ""
+  tls_key_file: ""
+  tls_ca_file: ""
 
 websocket:
   host: "{{ ansible_default_ipv4.address }}"
@@ -36,7 +42,7 @@ websocket:
   read_buffer_size: 1024
   write_buffer_size: 1024
 
-clustering:
+cluster:
   enabled: true
   controller_id: {{ inventory_hostname }}
   bind_addr: {{ ansible_default_ipv4.address | default(ansible_host) }}:{{ cluster_port }}
@@ -53,13 +59,26 @@ discovery:
   enabled: true
   method: mdns
   service_name: _pi-controller._tcp
+  service_type: _pi-controller._tcp
   interval: 30s
+  trust_token: "{{ discovery_trust_token | default('') }}"
+
+agent_server:
+  address: "0.0.0.0"
+  port: 9091
+  enable_gpio: {{ enable_gpio | default(true) | lower }}
+  tls_cert_file: ""
+  tls_key_file: ""
+  tls_ca_file: ""
 
 gpio:
   enabled: {{ enable_gpio | default(true) | lower }}
   mock_mode: {{ gpio_mock_mode | default(false) | lower }}
 
-logging:
+kubernetes:
+  enabled: false
+
+log:
   level: {{ pi_controller_log_level | default('info') }}
   format: json
   output: stdout

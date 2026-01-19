@@ -2,7 +2,10 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -10,6 +13,7 @@ import (
 	pb "github.com/dsyorkd/pi-controller/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 )
@@ -65,9 +69,10 @@ type Config struct {
 	KeepAliveTimeout time.Duration `yaml:"keepalive_timeout"`
 
 	// Security
-	Insecure bool   `yaml:"insecure"`
-	TLSCert  string `yaml:"tls_cert"`
-	TLSKey   string `yaml:"tls_key"`
+	Insecure  bool   `yaml:"insecure"`
+	TLSCert   string `yaml:"tls_cert"`
+	TLSKey    string `yaml:"tls_key"`
+	TLSCAFile string `yaml:"tls_ca_file"`
 }
 
 // NodeInfo contains information about the current node
@@ -206,8 +211,35 @@ func (c *Client) Connect(ctx context.Context) error {
 	// Add security options
 	if c.config.Insecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else if c.config.TLSCert != "" && c.config.TLSKey != "" && c.config.TLSCAFile != "" {
+		// Load client cert and key
+		clientCert, err := tls.LoadX509KeyPair(c.config.TLSCert, c.config.TLSKey)
+		if err != nil {
+			return fmt.Errorf("failed to load client TLS key pair: %w", err)
+		}
+
+		// Load CA cert
+		caCertPool := x509.NewCertPool()
+		caPEM, err := os.ReadFile(c.config.TLSCAFile)
+		if err != nil {
+			return fmt.Errorf("failed to read CA certificate: %w", err)
+		}
+		if !caCertPool.AppendCertsFromPEM(caPEM) {
+			return fmt.Errorf("failed to append CA certificate to pool")
+		}
+
+		// Configure TLS
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{clientCert},
+			RootCAs:      caCertPool,
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		creds := credentials.NewTLS(tlsConfig)
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else {
+		return fmt.Errorf("TLS configuration missing (client cert, key, and CA cert required) or insecure not explicitly enabled")
 	}
-	// TODO: Add TLS credentials when TLS is configured
 
 	// Establish connection (NewClient creates lazy connection)
 	conn, err := grpc.NewClient(c.getServerAddress(), opts...)

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,7 @@ func TestNewClient(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create a new client
-		logger := logrus.New()
+		logger := applogger.Default()
 		client, err := NewClient(&Config{ConfigPath: kubeconfig.Name()}, logger)
 		assert.NoError(t, err)
 		assert.NotNil(t, client)
@@ -52,7 +52,7 @@ func TestNewClient(t *testing.T) {
 		clientset := fake.NewSimpleClientset()
 
 		// Create a new client
-		logger := logrus.New()
+		logger := applogger.Default()
 		client := &Client{
 			clientset: clientset,
 			logger:    logger.WithField("component", "k8s-client"),
@@ -81,7 +81,7 @@ func TestNewClient(t *testing.T) {
 		})
 
 		// Create a new client
-		logger := logrus.New()
+		logger := applogger.Default()
 		client := &Client{
 			clientset: clientset,
 			logger:    logger.WithField("component", "k8s-client"),
@@ -112,7 +112,7 @@ func TestNewClient(t *testing.T) {
 		})
 
 		// Create a new client
-		logger := logrus.New()
+		logger := applogger.Default()
 		client := &Client{
 			clientset: clientset,
 			logger:    logger.WithField("component", "k8s-client"),
@@ -142,7 +142,7 @@ func TestNewClient(t *testing.T) {
 		})
 
 		// Create a new client
-		logger := logrus.New()
+		logger := applogger.Default()
 		client := &Client{
 			clientset: clientset,
 			logger:    logger.WithField("component", "k8s-client"),

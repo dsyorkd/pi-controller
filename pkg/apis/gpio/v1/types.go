@@ -399,7 +399,9 @@ type I2CDeviceStatus struct {
 	NodeID string `json:"nodeId,omitempty"`
 
 	// RegisterData contains the latest data read from device registers
-	RegisterData map[string]interface{} `json:"registerData,omitempty"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Type=object
+	RegisterData map[string]string `json:"registerData,omitempty"`
 
 	// LastScan is the timestamp of the last successful device scan
 	LastScan *metav1.Time `json:"lastScan,omitempty"`

@@ -125,7 +125,7 @@ The current configuration will work, but with:
 
 - `renovate.json` - Complete GitFlow configuration
 - `docs/DOCKER_SETUP_RUNNERS.md` - Docker installation guide (new)
-- `docs/WORKFLOW_FIXES_SUMMARY.md` - This summary (new)
+- `workflow-fixes-summary.md` - This summary
 
 ### Backup Files
 

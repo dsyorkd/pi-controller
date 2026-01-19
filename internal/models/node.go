@@ -33,9 +33,11 @@ type Node struct {
 	Memory       int64  `json:"memory"` // Memory in bytes
 
 	// Kubernetes Information
-	ClusterID   *uint  `json:"cluster_id,omitempty"`
-	KubeVersion string `json:"kube_version"`
-	NodeName    string `json:"node_name"` // Kubernetes node name
+	ClusterID       *uint  `json:"cluster_id,omitempty"`
+	KubeVersion     string `json:"kube_version"`
+	NodeName        string `json:"node_name"`                   // Kubernetes node name
+	K3sClusterToken string `json:"k3s_cluster_token,omitempty"` // K3s cluster secret token (for joining worker nodes)
+	Kubeconfig      string `json:"kubeconfig,omitempty"`        // Kubeconfig for the cluster (retrieved from master)
 
 	// System Information
 	OSVersion     string    `json:"os_version"`

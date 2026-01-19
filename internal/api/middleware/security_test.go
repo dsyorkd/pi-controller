@@ -5,16 +5,20 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSecurityMiddleware_SecurityHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	logger := logrus.New()
-	logger.SetLevel(logrus.ErrorLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "error",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	tests := []struct {
 		name            string
@@ -91,8 +95,12 @@ func TestSecurityMiddleware_SecurityHeaders(t *testing.T) {
 
 func TestSecurityMiddleware_ContentSecurityPolicy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	logger := logrus.New()
-	logger.SetLevel(logrus.ErrorLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "error",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	config := DefaultSecurityConfig()
 	sm := NewSecurityMiddleware(config, logger)
@@ -117,8 +125,12 @@ func TestSecurityMiddleware_ContentSecurityPolicy(t *testing.T) {
 
 func TestSecurityMiddleware_EnforceHTTPS(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	logger := logrus.New()
-	logger.SetLevel(logrus.ErrorLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "error",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	tests := []struct {
 		name           string
@@ -187,8 +199,12 @@ func TestSecurityMiddleware_EnforceHTTPS(t *testing.T) {
 
 func TestSecurityMiddleware_HSTSHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	logger := logrus.New()
-	logger.SetLevel(logrus.ErrorLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "error",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	config := &SecurityConfig{
 		EnforceHTTPS:       true,
@@ -223,8 +239,12 @@ func TestSecurityMiddleware_HSTSHeader(t *testing.T) {
 
 func TestSecurityMiddleware_HostValidation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	logger := logrus.New()
-	logger.SetLevel(logrus.ErrorLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "error",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	tests := []struct {
 		name         string
@@ -310,8 +330,12 @@ func TestGetSecureTLSConfig(t *testing.T) {
 }
 
 func TestSecurityMiddleware_GetSecurityStats(t *testing.T) {
-	logger := logrus.New()
-	logger.SetLevel(logrus.ErrorLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "error",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	config := DefaultSecurityConfig()
 	sm := NewSecurityMiddleware(config, logger)

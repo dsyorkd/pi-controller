@@ -40,6 +40,41 @@ func (m *MockPiAgentClient) WriteGPIOPin(ctx context.Context, pinNumber int, val
 	return args.Error(0)
 }
 
+func (m *MockPiAgentClient) SPIExchange(ctx context.Context, channel int, data []byte) ([]byte, error) {
+	args := m.Called(ctx, channel, data)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
+func (m *MockPiAgentClient) SPIWrite(ctx context.Context, channel int, data []byte) error {
+	args := m.Called(ctx, channel, data)
+	return args.Error(0)
+}
+
+func (m *MockPiAgentClient) SPIRead(ctx context.Context, channel int, length int) ([]byte, error) {
+	args := m.Called(ctx, channel, length)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
+func (m *MockPiAgentClient) I2CWrite(ctx context.Context, bus int, address int, data []byte) error {
+	args := m.Called(ctx, bus, address, data)
+	return args.Error(0)
+}
+
+func (m *MockPiAgentClient) I2CRead(ctx context.Context, bus int, address int, length int) ([]byte, error) {
+	args := m.Called(ctx, bus, address, length)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
+func (m *MockPiAgentClient) I2CWriteRegister(ctx context.Context, bus int, address int, register int, data []byte) error {
+	args := m.Called(ctx, bus, address, register, data)
+	return args.Error(0)
+}
+
+func (m *MockPiAgentClient) I2CReadRegister(ctx context.Context, bus int, address int, register int, length int) ([]byte, error) {
+	args := m.Called(ctx, bus, address, register, length)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
 func (m *MockPiAgentClient) Close() error {
 	args := m.Called()
 	return args.Error(0)

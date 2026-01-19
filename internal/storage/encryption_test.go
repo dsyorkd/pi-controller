@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +26,12 @@ func TestNewEncryptedStorage_Disabled(t *testing.T) {
 	config := &EncryptionConfig{
 		Enabled: false,
 	}
-	logger := logrus.New()
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 
@@ -45,8 +50,12 @@ func TestNewEncryptedStorage_WithGeneratedKey(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -85,8 +94,12 @@ func TestNewEncryptedStorage_FromEnv(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: false,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -116,8 +129,12 @@ func TestNewEncryptedStorage_FromFile(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: false,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -136,8 +153,12 @@ func TestEncryptedStorage_StoreAndRetrieve(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -166,8 +187,12 @@ func TestEncryptedStorage_Delete(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -199,8 +224,12 @@ func TestEncryptedStorage_List(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -232,8 +261,12 @@ func TestEncryptedStorage_ListEmptyBucket(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -258,8 +291,12 @@ func TestEncryptedStorage_DeriveKeyFromPassword(t *testing.T) {
 		GenerateKeyIfMissing: true,
 		PBKDF2Iterations:     10000,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -293,8 +330,12 @@ func TestEncryptedStorage_GetStats(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -318,8 +359,12 @@ func TestEncryptedStorage_EncryptDecrypt(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -351,8 +396,12 @@ func TestEncryptedStorage_RetrieveNonExistent(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: true,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	require.NoError(t, err)
@@ -383,8 +432,12 @@ func TestEncryptedStorage_InvalidKeySize(t *testing.T) {
 		EncryptedDBPath:      filepath.Join(tmpDir, "test.db"),
 		GenerateKeyIfMissing: false,
 	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.WarnLevel)
+	logger, err := applogger.New(applogger.Config{
+		Level:  "warn",
+		Format: "text",
+		Output: "stdout",
+	})
+	require.NoError(t, err)
 
 	storage, err := NewEncryptedStorage(config, logger)
 	assert.Error(t, err)

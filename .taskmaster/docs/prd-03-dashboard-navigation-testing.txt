@@ -1,0 +1,156 @@
+# PRD: Dashboard & Navigation Testing
+
+## Product Overview
+Comprehensive testing of the pi-controller dashboard interface, including overview metrics, node detail views, sidebar navigation, and real-time data updates using Playwright.
+
+## Problem Statement
+The dashboard is the primary interface for users but currently lacks:
+1. Automated testing of overview metrics display and accuracy
+2. Validation of node selector and detail view functionality
+3. Tab switching and content loading verification
+4. Navigation and sidebar interaction testing
+5. Real-time metric update validation
+
+## Goals & Success Metrics
+
+### Primary Goals
+- Achieve 100% test coverage of dashboard UI components
+- Validate all metrics display correctly with accurate data
+- Ensure smooth navigation and tab switching
+- Verify real-time updates function properly
+
+### Success Metrics
+- All dashboard tests pass consistently
+- Metrics display updates within 5 seconds
+- Tab switching completes in < 500ms
+- Sidebar navigation works across all routes
+- No broken links or navigation errors
+
+## User Stories
+
+### Story 1: Dashboard Overview
+**As a** system administrator
+**I want** to see cluster-wide metrics at a glance
+**So that** I can quickly assess system health
+
+**Acceptance Criteria:**
+- Total nodes count displayed accurately
+- Total clusters count displayed accurately
+- Average CPU/temperature calculated correctly
+- Top 5 nodes list shows highest resource usage
+- System health status indicators functional
+- Quick action buttons navigate correctly
+
+### Story 2: Node Detail View
+**As a** system administrator
+**I want** to view detailed metrics for a specific node
+**So that** I can monitor and troubleshoot individual nodes
+
+**Acceptance Criteria:**
+- Node selector dropdown displays all available nodes
+- Selecting a node loads its detailed metrics
+- Three tabs switch correctly (Overview, GPIO, Monitoring)
+- Node status and role badges display accurately
+- Metrics show with progress bars and values
+- Action buttons trigger appropriate operations
+
+### Story 3: Sidebar Navigation
+**As a** user
+**I want** intuitive navigation across all sections
+**So that** I can efficiently access different features
+
+**Acceptance Criteria:**
+- Sidebar expands and collapses correctly
+- Active route highlighted in sidebar
+- All menu items navigate to correct pages
+- Sidebar state persists across sessions
+- Navigation doesn't cause data loss
+- Breadcrumbs show correct hierarchy
+
+## Implementation Tasks
+
+### Task 2.2: Dashboard & Navigation Testing
+**Priority:** HIGH
+**Estimated Effort:** 5-6 hours
+
+**Subtasks:**
+1. Create `dashboard.spec.ts` test file
+2. Implement overview metrics display tests
+3. Implement metrics calculation accuracy tests
+4. Implement top nodes list test
+5. Implement quick action buttons test
+6. Create `navigation.spec.ts` test file
+7. Implement sidebar expand/collapse test
+8. Implement active route highlighting test
+9. Implement all menu navigation tests
+10. Implement node detail view tests
+11. Implement node selector dropdown test
+12. Implement tab switching tests (Overview, GPIO, Monitoring)
+13. Implement metrics progress bar tests
+14. Create mock dashboard data in test-data.ts
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication - need to be logged in)
+
+## Test Scenarios
+
+### Overview Metrics Tests
+```typescript
+test('should display overview cards with correct data', async ({ page, authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller');
+
+  // Verify total nodes card
+  const totalNodes = await page.locator('[data-testid="total-nodes"]').textContent();
+  expect(parseInt(totalNodes!)).toBe(mockNodes.length);
+
+  // Verify total clusters card
+  const totalClusters = await page.locator('[data-testid="total-clusters"]').textContent();
+  expect(parseInt(totalClusters!)).toBe(mockClusters.length);
+
+  // Verify average CPU
+  const avgCpu = await page.locator('[data-testid="avg-cpu"]').textContent();
+  expect(parseFloat(avgCpu!)).toBeCloseTo(calculateAvgCpu(mockNodes), 1);
+});
+```
+
+### Node Detail View Tests
+```typescript
+test('should switch between node detail tabs', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/nodes/node-1');
+
+  // Overview tab should be active by default
+  await expect(page.locator('button:has-text("Overview")[aria-selected="true"]')).toBeVisible();
+
+  // Click GPIO Control tab
+  await page.click('button:has-text("GPIO Control")');
+  await expect(page.locator('[data-testid="gpio-pins"]')).toBeVisible();
+  await expect(page.locator('button:has-text("GPIO Control")[aria-selected="true"]')).toBeVisible();
+
+  // Click Monitoring tab
+  await page.click('button:has-text("Monitoring")');
+  await expect(page.locator('[data-testid="monitoring-panel"]')).toBeVisible();
+});
+```
+
+### Navigation Tests
+```typescript
+test('should navigate through all sidebar menu items', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller');
+
+  const menuItems = [
+    { label: 'Dashboard', route: '/pi-controller' },
+    { label: 'Clusters', route: '/pi-controller/clusters' },
+    { label: 'Nodes', route: '/pi-controller/nodes' },
+    { label: 'Hardware', route: '/pi-controller/hardware' },
+    { label: 'Settings', route: '/pi-controller/settings' },
+    { label: 'Documentation', route: '/pi-controller/documentation' },
+  ];
+
+  for (const item of menuItems) {
+    await page.click(`nav a:has-text("${item.label}")`);
+    await expect(page).toHaveURL(new RegExp(item.route));
+    await expect(page.locator(`nav a:has-text("${item.label}")`)).toHaveClass(/active/);
+  }
+});
+```

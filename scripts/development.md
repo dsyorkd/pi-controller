@@ -113,7 +113,7 @@ For each file that needs implementation:
 1. **Create comprehensive task covering all changes needed:**
 
    ```bash
-   task-master add-task --prompt="Complete pi-agent GPIO implementation in cmd/pi-agent/main.go - add hardware interface, gRPC communication, system monitoring, configuration handling, graceful shutdown" --research
+   task-master add-task --prompt="Complete GPIO implementation in internal/agent/gpio_service.go - add hardware interface, gRPC communication, system monitoring, configuration handling, graceful shutdown" --research
    ```
 
 2. **Expand into specific subtasks:**
@@ -149,8 +149,8 @@ task-master list --status=pending | grep -i "code quality\|foundation\|infrastru
 ### Phase 2.2: Hardware Control (High Priority)
 
 ```bash
-# Focus on GPIO and pi-agent implementation:
-task-master list --status=pending | grep -i "gpio\|pi-agent\|hardware"
+# Focus on GPIO and agent implementation:
+task-master list --status=pending | grep -i "gpio\|agent\|hardware"
 ```
 
 ### Phase 2.3: Discovery Service (High Priority)
@@ -191,7 +191,7 @@ For cross-component functionality:
 1. **Create integration test tasks:**
 
    ```bash
-   task-master add-task --prompt="Integration test for pi-agent to controller GPIO communication via gRPC"
+   task-master add-task --prompt="Integration test for agent to controller GPIO communication via gRPC"
    ```
 
 2. **Run integration tests:**

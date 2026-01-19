@@ -11,7 +11,7 @@ import (
 
 func TestPiAgentClientManager_GetClient(t *testing.T) {
 	log := logger.Default()
-	manager := NewPiAgentClientManager(log)
+	manager := NewPiAgentClientManager(log, nil)
 
 	node := &models.Node{
 		ID:        1,
@@ -35,7 +35,7 @@ func TestPiAgentClientManager_GetClient(t *testing.T) {
 
 func TestPiAgentClientManager_CloseAll(t *testing.T) {
 	log := logger.Default()
-	manager := NewPiAgentClientManager(log)
+	manager := NewPiAgentClientManager(log, nil)
 
 	// Should not error when closing with no connections
 	err := manager.CloseAll()
@@ -90,7 +90,7 @@ func TestPiAgentClient_IsConnected(t *testing.T) {
 
 func TestPiAgentClientManager_CloseClient(t *testing.T) {
 	log := logger.Default()
-	manager := NewPiAgentClientManager(log)
+	manager := NewPiAgentClientManager(log, nil)
 
 	// Should not error when closing non-existent client
 	err := manager.CloseClient(999)

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // Critical system pins that must be protected
@@ -55,7 +55,7 @@ type Controller struct {
 	config         *Config
 	securityConfig *SecurityConfig
 	impl           FullInterface
-	logger         *logrus.Entry
+	logger         applogger.Interface
 	available      bool
 	activePins     map[int]*PinState
 	activeOps      int
@@ -64,7 +64,7 @@ type Controller struct {
 }
 
 // NewController creates a new GPIO controller with enhanced security
-func NewController(config *Config, securityConfig *SecurityConfig, logger *logrus.Logger) *Controller {
+func NewController(config *Config, securityConfig *SecurityConfig, logger applogger.Interface) *Controller {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -94,7 +94,7 @@ func NewController(config *Config, securityConfig *SecurityConfig, logger *logru
 		controller.logger.Info("Initialized GPIO controller with periph.io implementation")
 	}
 
-	controller.logger.WithFields(logrus.Fields{
+	controller.logger.WithFields(map[string]interface{}{
 		"security_level":      securityConfig.Level,
 		"allow_critical_pins": securityConfig.AllowCriticalPins,
 		"max_concurrent_ops":  securityConfig.MaxConcurrentOps,
@@ -139,7 +139,7 @@ func (c *Controller) initializeSecureDefaults() {
 		}
 	}
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"allowed_pins":    c.config.AllowedPins,
 		"restricted_pins": c.config.RestrictedPins,
 		"security_level":  c.securityConfig.Level,
@@ -149,7 +149,7 @@ func (c *Controller) initializeSecureDefaults() {
 // Initialize initializes the GPIO controller
 func (c *Controller) Initialize(ctx context.Context) error {
 	if err := c.impl.Initialize(ctx); err != nil {
-		c.logger.WithError(err).Error("Failed to initialize GPIO implementation")
+		c.logger.Errorf("Failed to initialize GPIO implementation: %v", err)
 		return fmt.Errorf("failed to initialize GPIO: %w", err)
 	}
 
@@ -160,7 +160,7 @@ func (c *Controller) Initialize(ctx context.Context) error {
 // Close closes the GPIO controller
 func (c *Controller) Close() error {
 	if err := c.impl.Close(); err != nil {
-		c.logger.WithError(err).Error("Failed to close GPIO implementation")
+		c.logger.Errorf("Failed to close GPIO implementation: %v", err)
 		return fmt.Errorf("failed to close GPIO: %w", err)
 	}
 
@@ -294,12 +294,12 @@ func (c *Controller) ConfigurePin(config PinConfig, userID string) error {
 	}
 
 	if err := c.impl.ConfigurePin(config); err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":       config.Pin,
 			"direction": config.Direction,
 			"user_id":   userID,
 			"error":     err,
-		}).Error("Failed to configure GPIO pin")
+		}).Errorf("Failed to configure GPIO pin")
 		c.auditLog("pin_configure_failed", fmt.Sprintf("Failed to configure pin %d: %v", config.Pin, err), userID, config.Pin)
 		return fmt.Errorf("failed to configure pin %d: %w", config.Pin, err)
 	}
@@ -314,7 +314,7 @@ func (c *Controller) ConfigurePin(config PinConfig, userID string) error {
 	}
 	c.mutex.Unlock()
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":       config.Pin,
 		"direction": config.Direction,
 		"pull_mode": config.PullMode,
@@ -333,11 +333,11 @@ func (c *Controller) ReadPin(pin int, userID string) (PinValue, error) {
 
 	value, err := c.impl.ReadPin(pin)
 	if err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":     pin,
 			"user_id": userID,
 			"error":   err,
-		}).Error("Failed to read GPIO pin")
+		}).Errorf("Failed to read GPIO pin")
 		c.auditLog("pin_read_failed", fmt.Sprintf("Failed to read pin %d: %v", pin, err), userID, pin)
 		return Low, fmt.Errorf("failed to read pin %d: %w", pin, err)
 	}
@@ -350,7 +350,7 @@ func (c *Controller) ReadPin(pin int, userID string) (PinValue, error) {
 	}
 	c.mutex.Unlock()
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":     pin,
 		"value":   value,
 		"user_id": userID,
@@ -378,12 +378,12 @@ func (c *Controller) WritePin(pin int, value PinValue, userID string) error {
 	c.mutex.RUnlock()
 
 	if err := c.impl.WritePin(pin, value); err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":     pin,
 			"value":   value,
 			"user_id": userID,
 			"error":   err,
-		}).Error("Failed to write GPIO pin")
+		}).Errorf("Failed to write GPIO pin")
 		c.auditLog("pin_write_failed", fmt.Sprintf("Failed to write pin %d: %v", pin, err), userID, pin)
 		return fmt.Errorf("failed to write pin %d: %w", pin, err)
 	}
@@ -396,7 +396,7 @@ func (c *Controller) WritePin(pin int, value PinValue, userID string) error {
 	}
 	c.mutex.Unlock()
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":     pin,
 		"value":   value,
 		"user_id": userID,
@@ -443,18 +443,18 @@ func (c *Controller) SetPWM(pin int, frequency int, dutyCycle int, userID string
 	}
 
 	if err := c.impl.SetPWM(pin, frequency, dutyCycle); err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":        pin,
 			"frequency":  frequency,
 			"duty_cycle": dutyCycle,
 			"user_id":    userID,
 			"error":      err,
-		}).Error("Failed to set PWM")
+		}).Errorf("Failed to set PWM")
 		c.auditLog("pwm_set_failed", fmt.Sprintf("Failed to set PWM on pin %d: %v", pin, err), userID, pin)
 		return fmt.Errorf("failed to set PWM on pin %d: %w", pin, err)
 	}
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":        pin,
 		"frequency":  frequency,
 		"duty_cycle": dutyCycle,
@@ -579,7 +579,7 @@ func (c *Controller) auditLog(eventType, message, userID string, pin int) {
 		return
 	}
 
-	fields := logrus.Fields{
+	fields := map[string]interface{}{
 		"event_type": eventType,
 		"message":    message,
 		"user_id":    userID,

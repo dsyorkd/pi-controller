@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -45,7 +45,7 @@ func DefaultControllerManagerConfig() *ControllerManagerConfig {
 // ControllerManager manages all Kubernetes controllers
 type ControllerManager struct {
 	config      *ControllerManagerConfig
-	logger      *logrus.Entry
+	logger      logger.Interface
 	db          *storage.Database
 	gpioService *services.GPIOService
 	pwmService  *services.PWMService
@@ -54,27 +54,16 @@ type ControllerManager struct {
 }
 
 // NewControllerManager creates a new controller manager
-func NewControllerManager(config *ControllerManagerConfig, logrusLogger *logrus.Logger, db *storage.Database) (*ControllerManager, error) {
+func NewControllerManager(config *ControllerManagerConfig, log *logger.Logger, db *storage.Database, tlsConfig *tls.Config) (*ControllerManager, error) {
 	if config == nil {
 		config = DefaultControllerManagerConfig()
 	}
 
-	// Create internal logger from logrus configuration
-	// Convert logrus config to internal logger config
-	loggerConfig := logger.Config{
-		Level:  logrusLogger.Level.String(),
-		Format: "text", // Default to text format
-		Output: "stdout",
-	}
-
-	// Create internal logger that implements the logger.Interface
-	internalLogger, err := logger.New(loggerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create internal logger: %w", err)
-	}
+	// Use the provided logger
+	internalLogger := log
 
 	// Create services
-	gpioService := services.NewGPIOService(db, internalLogger)
+	gpioService := services.NewGPIOService(db, internalLogger, tlsConfig)
 	pwmService := services.NewPWMService(db, internalLogger)
 	i2cService := services.NewI2CService(db, internalLogger)
 	nodeService := services.NewNodeService(db, internalLogger)
@@ -82,7 +71,7 @@ func NewControllerManager(config *ControllerManagerConfig, logrusLogger *logrus.
 
 	return &ControllerManager{
 		config:      config,
-		logger:      logrusLogger.WithField("component", "controller-manager"),
+		logger:      internalLogger.WithField("component", "controller-manager"),
 		db:          db,
 		gpioService: gpioService,
 		pwmService:  pwmService,
@@ -136,7 +125,7 @@ func (cm *ControllerManager) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to setup readiness check: %w", err)
 	}
 
-	cm.logger.WithFields(logrus.Fields{
+	cm.logger.WithFields(map[string]interface{}{
 		"metrics_addr":    cm.config.MetricsAddr,
 		"health_addr":     cm.config.HealthAddr,
 		"leader_election": cm.config.LeaderElection,

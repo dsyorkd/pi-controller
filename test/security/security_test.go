@@ -62,12 +62,12 @@ func (suite *SecurityTestSuite) SetupSuite() {
 	// Initialize services
 	clusterService := services.NewClusterService(suite.db, appLogger)
 	nodeService := services.NewNodeService(suite.db, appLogger)
-	suite.gpioService = services.NewGPIOService(suite.db, appLogger)
+	suite.gpioService = services.NewGPIOService(suite.db, appLogger, nil)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(suite.db)
 	clusterHandler := handlers.NewClusterHandler(clusterService, appLogger)
-	nodeHandler := handlers.NewNodeHandler(nodeService, appLogger)
+	nodeHandler := handlers.NewNodeHandler(nodeService, appLogger, "")
 	gpioHandler := handlers.NewGPIOHandler(suite.gpioService, appLogger)
 
 	// Setup router WITH authentication middleware - THIS IS THE KEY DIFFERENCE

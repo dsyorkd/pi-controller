@@ -16,7 +16,7 @@ type CAService interface {
 	GetCACertificate(ctx context.Context) (*x509.Certificate, error)
 
 	// Certificate Issuance
-	IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (*models.Certificate, error)
+	IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (*models.Certificate, string, error)
 	RenewCertificate(ctx context.Context, certID uint) (*models.Certificate, error)
 	RevokeCertificate(ctx context.Context, certID uint, reason string) error
 
@@ -118,7 +118,7 @@ type CABackend interface {
 	GetCACertificate(ctx context.Context) (*x509.Certificate, error)
 
 	// Certificate operations
-	IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (certPEM string, err error)
+	IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (certPEM, keyPEM string, err error)
 	RevokeCertificate(ctx context.Context, cert *models.Certificate) error
 	ValidateCertificate(ctx context.Context, certPEM string) (*CertificateValidation, error)
 

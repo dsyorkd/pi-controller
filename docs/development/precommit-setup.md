@@ -146,8 +146,8 @@ git commit --no-verify
 - Pre-commit framework: <https://pre-commit.com/>
 - Configuration file: `.pre-commit-config.yaml`
 - Setup script: `scripts/setup-precommit.sh`
-- Full documentation: `docs/PRECOMMIT_HOOKS.md`
-- Quick reference: `docs/PRECOMMIT_QUICKREF.md`
+- Full documentation: `precommit-hooks.md`
+- Quick reference: `precommit-quickref.md`
 
 ---
 **Last Updated:** October 13, 2025

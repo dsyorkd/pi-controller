@@ -83,7 +83,7 @@ func (s *CAServiceImpl) GetCACertificate(ctx context.Context) (*x509.Certificate
 }
 
 // IssueCertificate issues a new certificate
-func (s *CAServiceImpl) IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (*models.Certificate, error) {
+func (s *CAServiceImpl) IssueCertificate(ctx context.Context, req *IssueCertificateRequest) (*models.Certificate, string, error) {
 	s.logger.WithFields(map[string]interface{}{
 		"common_name": req.CommonName,
 		"type":        req.Type,
@@ -93,19 +93,19 @@ func (s *CAServiceImpl) IssueCertificate(ctx context.Context, req *IssueCertific
 
 	// Validate request
 	if err := s.validateCertificateRequest(req); err != nil {
-		return nil, fmt.Errorf("certificate request validation failed: %w", err)
+		return nil, "", fmt.Errorf("certificate request validation failed: %w", err)
 	}
 
 	// Issue certificate through backend
-	certPEM, err := s.backend.IssueCertificate(ctx, req)
+	certPEM, keyPEM, err := s.backend.IssueCertificate(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("backend certificate issuance failed: %w", err)
+		return nil, "", fmt.Errorf("backend certificate issuance failed: %w", err)
 	}
 
 	// Parse the certificate to extract metadata
 	cert, err := s.parseCertificatePEM(certPEM)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse issued certificate: %w", err)
+		return nil, "", fmt.Errorf("failed to parse issued certificate: %w", err)
 	}
 
 	// Store certificate in database
@@ -156,7 +156,7 @@ func (s *CAServiceImpl) IssueCertificate(ctx context.Context, req *IssueCertific
 	}
 
 	if err := s.database.DB().Create(certRecord).Error; err != nil {
-		return nil, fmt.Errorf("failed to store certificate: %w", err)
+		return nil, "", fmt.Errorf("failed to store certificate: %w", err)
 	}
 
 	// Update CA statistics
@@ -171,7 +171,7 @@ func (s *CAServiceImpl) IssueCertificate(ctx context.Context, req *IssueCertific
 		"not_after":     certRecord.NotAfter,
 	}).Info("Certificate issued successfully")
 
-	return certRecord, nil
+	return certRecord, keyPEM, nil
 }
 
 // RenewCertificate renews an existing certificate
@@ -214,7 +214,7 @@ func (s *CAServiceImpl) RenewCertificate(ctx context.Context, certID uint) (*mod
 	}
 
 	// Issue the new certificate
-	newCert, err := s.IssueCertificate(ctx, req)
+	newCert, _, err := s.IssueCertificate(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to issue renewal certificate: %w", err)
 	}
@@ -454,7 +454,7 @@ func (s *CAServiceImpl) ProcessCertificateRequest(ctx context.Context, csrID uin
 	}
 
 	// Issue the certificate
-	cert, err := s.IssueCertificate(ctx, req)
+	cert, _, err := s.IssueCertificate(ctx, req)
 	if err != nil {
 		// Mark CSR as failed
 		csr.Status = models.CSRStatusFailed

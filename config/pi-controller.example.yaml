@@ -42,3 +42,7 @@ discovery:
   enabled: true
   method: "mdns"
   port: 9091
+  # Trust token for node adoption - set the same value on all pi-controllers
+  # to allow secure node discovery and adoption across the cluster
+  # Leave empty to disable trust token verification (not recommended for production)
+  trust_token: ""

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	gpiov1 "github.com/dsyorkd/pi-controller/pkg/apis/gpio/v1"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,7 @@ import (
 type PWMControllerReconciler struct {
 	client.Client
 	Scheme      *runtime.Scheme
-	Logger      *logrus.Entry
+	Logger      logger.Interface
 	PWMService  services.PWMControllerService
 	NodeService services.NodeControllerService
 }
@@ -37,7 +37,7 @@ type PWMControllerReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { // nolint:dupl // Kubernetes controller pattern, extracting would require complex generics
-	logger := r.Logger.WithFields(logrus.Fields{
+	logger := r.Logger.WithFields(map[string]interface{}{
 		"pwmcontroller": req.NamespacedName,
 		"namespace":     req.Namespace,
 	})
@@ -51,7 +51,7 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			logger.Info("PWMController resource not found, likely deleted")
 			return ctrl.Result{}, nil
 		}
-		logger.WithError(err).Error("Failed to get PWMController resource")
+		logger.Errorf("Failed to get PWMController resource: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -64,7 +64,7 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if !controllerutil.ContainsFinalizer(&pwmController, "gpio.pi-controller.io/finalizer") {
 		controllerutil.AddFinalizer(&pwmController, "gpio.pi-controller.io/finalizer")
 		if err := r.Update(ctx, &pwmController); err != nil {
-			logger.WithError(err).Error("Failed to add finalizer")
+			logger.Errorf("Failed to add finalizer: %v", err)
 			return ctrl.Result{}, err
 		}
 		logger.Info("Added finalizer to PWMController")
@@ -74,7 +74,7 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// Find the target node
 	targetNode, err := r.findTargetNode(ctx, &pwmController, logger)
 	if err != nil {
-		logger.WithError(err).Error("Failed to find target node")
+		logger.Errorf("Failed to find target node: %v", err)
 		return r.updateStatus(ctx, &pwmController, gpiov1.PWMPhaseFailed,
 			"Failed to find target node", err.Error(), logger)
 	}
@@ -88,7 +88,7 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// Check if node is reachable
 	nodeReachable, err := r.checkNodeReachability(ctx, targetNode, logger)
 	if err != nil {
-		logger.WithError(err).Error("Failed to check node reachability")
+		logger.Errorf("Failed to check node reachability: %v", err)
 		return r.updateStatus(ctx, &pwmController, gpiov1.PWMPhaseFailed,
 			"Failed to check node reachability", err.Error(), logger)
 	}
@@ -110,7 +110,7 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Configure the PWM controller on the target node
 	if err := r.configurePWMController(ctx, &pwmController, targetNode, logger); err != nil {
-		logger.WithError(err).Error("Failed to configure PWM controller")
+		logger.Errorf("Failed to configure PWM controller: %v", err)
 		return r.updateStatus(ctx, &pwmController, gpiov1.PWMPhaseFailed,
 			"Configuration failed", err.Error(), logger)
 	}
@@ -121,12 +121,12 @@ func (r *PWMControllerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 // findTargetNode finds the node that matches the nodeSelector
-func (r *PWMControllerReconciler) findTargetNode(ctx context.Context, pwmController *gpiov1.PWMController, logger *logrus.Entry) (*corev1.Node, error) {
+func (r *PWMControllerReconciler) findTargetNode(ctx context.Context, pwmController *gpiov1.PWMController, logger logger.Interface) (*corev1.Node, error) {
 	return FindNodeBySelector(ctx, r, pwmController.Spec.NodeSelector, "PWMController", logger)
 }
 
 // checkNodeReachability checks if the target node is reachable
-func (r *PWMControllerReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger *logrus.Entry) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
+func (r *PWMControllerReconciler) checkNodeReachability(ctx context.Context, node *corev1.Node, logger logger.Interface) (bool, error) { // nolint:unparam // error return reserved for future connectivity checks
 	_ = ctx // TODO: Use context for timeout or cancellation in future node health checks
 	// Check if node is ready
 	for _, condition := range node.Status.Conditions {
@@ -145,10 +145,10 @@ func (r *PWMControllerReconciler) checkNodeReachability(ctx context.Context, nod
 }
 
 // configurePWMController configures the PWM controller on the target node via gRPC
-func (r *PWMControllerReconciler) configurePWMController(ctx context.Context, pwmController *gpiov1.PWMController, node *corev1.Node, logger *logrus.Entry) error {
+func (r *PWMControllerReconciler) configurePWMController(ctx context.Context, pwmController *gpiov1.PWMController, node *corev1.Node, logger logger.Interface) error {
 	// Convert PWMController spec to PWM service request
 	request := &services.PWMRequest{
-		NodeID:        node.Name,
+		NodeID:        node.Name, // Use node name as identifier
 		Address:       pwmController.Spec.Address,
 		BaseFrequency: pwmController.Spec.BaseFrequency,
 		ChannelCount:  pwmController.Spec.ChannelCount,
@@ -167,26 +167,23 @@ func (r *PWMControllerReconciler) configurePWMController(ctx context.Context, pw
 		})
 	}
 
-	logger.WithFields(logrus.Fields{
-		"node_id":        request.NodeID,
-		"address":        request.Address,
-		"base_frequency": request.BaseFrequency,
-		"channel_count":  request.ChannelCount,
-		"channels":       len(request.Channels),
+	logger.WithFields(map[string]interface{}{
+		"node":           node.Name,
+		"address":        pwmController.Spec.Address,
+		"base_frequency": pwmController.Spec.BaseFrequency,
 	}).Info("Configuring PWM controller via service")
 
 	// Call the PWM service to configure the controller
 	if err := r.PWMService.ConfigureController(ctx, request); err != nil {
-		return fmt.Errorf("failed to configure PWM controller via service: %w", err)
+		return fmt.Errorf("failed to configure PWM controller %s on node %s: %w", pwmController.Name, node.Name, err)
 	}
 
-	logger.Info("Successfully configured PWM controller")
 	return nil
 }
 
 // updateStatus updates the PWMController status
 func (r *PWMControllerReconciler) updateStatus(ctx context.Context, pwmController *gpiov1.PWMController,
-	phase gpiov1.PWMPhase, message, reason string, logger *logrus.Entry) (ctrl.Result, error) {
+	phase gpiov1.PWMPhase, message, reason string, logger logger.Interface) (ctrl.Result, error) {
 	// Update basic status fields
 	now := metav1.Now()
 	pwmController.Status.Phase = phase
@@ -220,11 +217,11 @@ func (r *PWMControllerReconciler) updateStatus(ctx context.Context, pwmControlle
 
 	// Update the status
 	if err := r.Status().Update(ctx, pwmController); err != nil {
-		logger.WithError(err).Error("Failed to update PWMController status")
+		logger.Errorf("Failed to update PWMController status: %v", err)
 		return ctrl.Result{}, err
 	}
 
-	logger.WithFields(logrus.Fields{
+	logger.WithFields(map[string]interface{}{
 		"phase":   phase,
 		"message": message,
 	}).Info("Updated PWMController status")
@@ -271,7 +268,7 @@ func (r *PWMControllerReconciler) setPWMCondition(status *gpiov1.PWMControllerSt
 }
 
 // handleDeletion handles PWMController deletion
-func (r *PWMControllerReconciler) handleDeletion(ctx context.Context, pwmController *gpiov1.PWMController, logger *logrus.Entry) (ctrl.Result, error) {
+func (r *PWMControllerReconciler) handleDeletion(ctx context.Context, pwmController *gpiov1.PWMController, logger logger.Interface) (ctrl.Result, error) {
 	logger.Info("Handling PWMController deletion")
 
 	// Find the node that was managing this controller
@@ -284,7 +281,7 @@ func (r *PWMControllerReconciler) handleDeletion(ctx context.Context, pwmControl
 		}
 
 		if err := r.PWMService.ConfigureController(ctx, cleanupRequest); err != nil {
-			logger.WithError(err).Warn("Failed to cleanup PWM controller on node, continuing with deletion")
+			logger.Warnf("Failed to cleanup PWM controller on node, continuing with deletion: %v", err)
 		} else {
 			logger.Info("Successfully cleaned up PWM controller on node")
 		}
@@ -293,7 +290,7 @@ func (r *PWMControllerReconciler) handleDeletion(ctx context.Context, pwmControl
 	// Remove finalizer
 	controllerutil.RemoveFinalizer(pwmController, "gpio.pi-controller.io/finalizer")
 	if err := r.Update(ctx, pwmController); err != nil {
-		logger.WithError(err).Error("Failed to remove finalizer")
+		logger.Errorf("Failed to remove finalizer: %v", err)
 		return ctrl.Result{}, err
 	}
 
@@ -319,7 +316,7 @@ func (r *PWMControllerReconciler) mapNodeToPWMControllers(ctx context.Context, o
 
 	var pwmControllerList gpiov1.PWMControllerList
 	if err := r.List(ctx, &pwmControllerList); err != nil {
-		r.Logger.WithError(err).Error("Failed to list PWMControllers for node mapping")
+		r.Logger.Errorf("Failed to list PWMControllers for node mapping: %v", err)
 		return nil
 	}
 
@@ -337,7 +334,7 @@ func (r *PWMControllerReconciler) mapNodeToPWMControllers(ctx context.Context, o
 		}
 	}
 
-	r.Logger.WithFields(logrus.Fields{
+	r.Logger.WithFields(map[string]interface{}{
 		"node":                node.Name,
 		"pwmcontroller_count": len(requests),
 	}).Debug("Mapped node change to PWMController reconcile requests")

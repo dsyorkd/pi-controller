@@ -7,7 +7,6 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	pb "github.com/dsyorkd/pi-controller/proto"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,8 +28,8 @@ func createTestGPIOService(t *testing.T) *GPIOService {
 	securityConfig.RequireUserContext = false
 
 	// Create GPIO controller with mock mode
-	logrusLogger := logrus.New()
-	controller := gpio.NewController(gpioConfig, securityConfig, logrusLogger)
+	controllerLogger := logger.Default()
+	controller := gpio.NewController(gpioConfig, securityConfig, controllerLogger)
 
 	// Create the GPIO service with the mock controller
 	service := &GPIOService{
