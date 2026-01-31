@@ -3,23 +3,12 @@
     "ralph-wiggum@claude-plugins-official": true
   },
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash -c 'echo \"[VALIDATION REMINDER] Code was modified. Run /validate:validate-code before marking task complete.\"'"
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'if git diff --name-only 2>/dev/null | grep -q \"\\.go$\"; then echo \"[PRE-COMMIT CHECK] Running validation on Go files...\"; go build ./... 2>&1 | head -20; fi'"
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel)\" 2>/dev/null || exit 0; FILES=$(git diff --name-only 2>/dev/null); if [ -n \"$FILES\" ]; then echo \"[PRE-COMMIT] Validating changed files...\"; pre-commit run --files $FILES 2>&1; EXIT=$?; if [ $EXIT -ne 0 ]; then echo \"\"; echo \"[PRE-COMMIT FAILED] Fix the issues above before committing.\"; exit 1; fi; fi'"
           }
         ]
       }
