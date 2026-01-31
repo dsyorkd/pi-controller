@@ -55,18 +55,30 @@ type Config struct {
 	StaticNodes []string `yaml:"static_nodes" mapstructure:"static_nodes"`
 	ServiceName string   `yaml:"service_name" mapstructure:"service_name"`
 	ServiceType string   `yaml:"service_type" mapstructure:"service_type"`
+
+	// Network scanning configuration
+	ScanRanges      []string `yaml:"scan_ranges" mapstructure:"scan_ranges"`           // IP ranges to scan in CIDR notation (e.g., "192.168.1.0/24")
+	ScanPorts       []int    `yaml:"scan_ports" mapstructure:"scan_ports"`             // Ports to scan on discovered hosts
+	ScanTimeout     string   `yaml:"scan_timeout" mapstructure:"scan_timeout"`         // Timeout for individual scan operations
+	ScanConcurrency int      `yaml:"scan_concurrency" mapstructure:"scan_concurrency"` // Number of concurrent scan workers
+	ScanRateLimit   int      `yaml:"scan_rate_limit" mapstructure:"scan_rate_limit"`   // Maximum scans per second to avoid network flooding
 }
 
 // DefaultConfig returns default discovery configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Enabled:     true,
-		Method:      "mdns",
-		Port:        9091,
-		Interval:    "30s",
-		Timeout:     "5s",
-		ServiceName: "pi-controller",
-		ServiceType: "_pi-controller._tcp",
+		Enabled:         true,
+		Method:          "mdns",
+		Port:            9091,
+		Interval:        "30s",
+		Timeout:         "5s",
+		ServiceName:     "pi-controller",
+		ServiceType:     "_pi-controller._tcp",
+		ScanRanges:      []string{},  // No default scan ranges - must be explicitly configured
+		ScanPorts:       []int{9091}, // Scan default agent port
+		ScanTimeout:     "2s",        // Timeout for individual host scans
+		ScanConcurrency: 10,          // Scan 10 hosts concurrently
+		ScanRateLimit:   100,         // Max 100 scans per second
 	}
 }
 
@@ -81,6 +93,8 @@ type Service struct {
 	stopChan      chan struct{}
 	interval      time.Duration
 	timeout       time.Duration
+	scanner       *PortScanner
+	scanTimeout   time.Duration
 }
 
 // NewService creates a new discovery service
@@ -99,13 +113,23 @@ func NewService(config *Config, logger applogger.Interface) (*Service, error) {
 		return nil, fmt.Errorf("invalid timeout: %w", err)
 	}
 
+	scanTimeout, err := time.ParseDuration(config.ScanTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("invalid scan timeout: %w", err)
+	}
+
+	// Create port scanner with rate limiting
+	scanner := NewPortScanner(config.ScanRateLimit, scanTimeout)
+
 	service := &Service{
-		config:   config,
-		logger:   logger.WithField("component", "discovery"),
-		nodes:    make(map[string]*Node),
-		interval: interval,
-		timeout:  timeout,
-		stopChan: make(chan struct{}),
+		config:      config,
+		logger:      logger.WithField("component", "discovery"),
+		nodes:       make(map[string]*Node),
+		interval:    interval,
+		timeout:     timeout,
+		scanTimeout: scanTimeout,
+		scanner:     scanner,
+		stopChan:    make(chan struct{}),
 	}
 
 	return service, nil
@@ -367,9 +391,10 @@ func (s *Service) createNodeFromEntry(entry *mdns.ServiceEntry) *Node {
 
 // processDiscoveredNodes updates the internal registry with discovered nodes
 func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// Collect events to emit while holding the lock, then emit after releasing
+	var events []NodeEvent
 
+	s.mu.Lock()
 	for _, node := range discoveredNodes {
 		existingNode, exists := s.nodes[node.ID]
 		if exists {
@@ -378,7 +403,7 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 			existingNode.TXTRecords = node.TXTRecords
 			existingNode.Capabilities = node.Capabilities
 
-			s.emitEvent(NodeEvent{
+			events = append(events, NodeEvent{
 				Type: NodeUpdated,
 				Node: *existingNode,
 			})
@@ -390,7 +415,7 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 		} else {
 			// New node discovered
 			s.nodes[node.ID] = node
-			s.emitEvent(NodeEvent{
+			events = append(events, NodeEvent{
 				Type: NodeDiscovered,
 				Node: *node,
 			})
@@ -402,6 +427,12 @@ func (s *Service) processDiscoveredNodes(discoveredNodes []*Node) {
 				"port":       node.Port,
 			}).Info("Discovered new node via mDNS")
 		}
+	}
+	s.mu.Unlock()
+
+	// Emit events after releasing the lock to avoid deadlock
+	for _, event := range events {
+		s.emitEvent(event)
 	}
 }
 
@@ -463,6 +494,102 @@ func (s *Service) performNetworkScan() {
 			}
 		}
 	}
+
+	// Check if scan ranges are configured
+	if len(s.config.ScanRanges) == 0 {
+		s.logger.Warn("Network scanning enabled but no scan ranges configured")
+		return
+	}
+
+	// Parse scan timeout
+	scanTimeout, err := time.ParseDuration(s.config.ScanTimeout)
+	if err != nil {
+		s.logger.WithError(err).Error("Invalid scan timeout")
+		return
+	}
+
+	// Create port scanner with rate limiting
+	scanner := NewPortScanner(s.config.ScanRateLimit, scanTimeout)
+
+	// Create context with timeout for the entire scan operation
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+
+	// Parse all configured IP ranges
+	var allIPs []net.IP
+	for _, cidr := range s.config.ScanRanges {
+		ips, err := parseIPRange(cidr)
+		if err != nil {
+			s.logger.WithFields(map[string]interface{}{
+				"cidr":  cidr,
+				"error": err,
+			}).Warn("Failed to parse scan range")
+			continue
+		}
+
+		s.logger.WithFields(map[string]interface{}{
+			"cidr":     cidr,
+			"ip_count": len(ips),
+		}).Debug("Parsed scan range")
+
+		allIPs = append(allIPs, ips...)
+	}
+
+	if len(allIPs) == 0 {
+		s.logger.Warn("No valid IP addresses to scan")
+		return
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"total_ips":   len(allIPs),
+		"ports":       s.config.ScanPorts,
+		"rate_limit":  s.config.ScanRateLimit,
+		"concurrency": s.config.ScanConcurrency,
+	}).Info("Starting network scan")
+
+	// Scan the IP ranges for configured ports
+	resultsCh := scanner.ScanRange(ctx, allIPs, s.config.ScanPorts)
+
+	// Collect discovered nodes
+	discoveredNodes := make([]*Node, 0)
+
+	// Process scan results
+	for result := range resultsCh {
+		if !result.Open {
+			continue
+		}
+
+		s.logger.WithFields(map[string]interface{}{
+			"ip":   result.IP.String(),
+			"port": result.Port,
+		}).Debug("Found open port, attempting node identification")
+
+		// Attempt to identify if this is a pi-controller agent
+		node, err := identifyNode(result.IP, result.Port, scanTimeout)
+		if err != nil {
+			s.logger.WithFields(map[string]interface{}{
+				"ip":    result.IP.String(),
+				"port":  result.Port,
+				"error": err,
+			}).Debug("Failed to identify node")
+			continue
+		}
+
+		discoveredNodes = append(discoveredNodes, node)
+
+		s.logger.WithFields(map[string]interface{}{
+			"ip":   node.IPAddress,
+			"port": node.Port,
+			"id":   node.ID,
+		}).Info("Identified pi-controller agent via network scan")
+	}
+
+	// Update our internal node registry
+	s.processDiscoveredNodes(discoveredNodes)
+
+	s.logger.WithFields(map[string]interface{}{
+		"nodes_found": len(discoveredNodes),
+	}).Info("Network scan completed")
 }
 
 // runCleanupRoutine runs the cleanup routine to remove stale nodes
@@ -519,14 +646,19 @@ func (s *Service) cleanupStaleNodes() {
 
 // emitEvent emits a node event to all registered handlers
 func (s *Service) emitEvent(event NodeEvent) {
-	for _, handler := range s.eventHandlers {
-		go func(h NodeEventHandler) {
+	s.mu.RLock()
+	handlers := make([]NodeEventHandler, len(s.eventHandlers))
+	copy(handlers, s.eventHandlers)
+	s.mu.RUnlock()
+
+	for _, handler := range handlers {
+		go func(h NodeEventHandler, e NodeEvent) {
 			defer func() {
 				if r := recover(); r != nil {
 					s.logger.Errorf("Event handler panicked: %v", r)
 				}
 			}()
-			h(event)
-		}(handler)
+			h(e)
+		}(handler, event)
 	}
 }

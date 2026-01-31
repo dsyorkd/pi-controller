@@ -99,15 +99,23 @@ gpio:
 
 # Node discovery configuration
 discovery:
-  enabled: true              # Enable mDNS discovery
-  method: "mdns"             # Discovery method (mdns, static)
+  enabled: true              # Enable discovery
+  method: "mdns"             # Discovery method (mdns, scan, static)
   interface: ""              # Network interface (auto-detect if empty)
   domain: "local"            # mDNS domain
   service_name: "_pi-controller._tcp"
-  scan_interval: "30s"       # Periodic scan interval
+  interval: "30s"            # Periodic scan interval
 
-  # Static node list (when mdns disabled)
+  # Static node list (when method: static)
   static_nodes: []
+
+  # Network scan configuration (when method: scan or combined with mdns)
+  # Provides fallback discovery for environments where mDNS is blocked (VLANs, corporate networks)
+  scan_ranges: []            # IP ranges to scan in CIDR notation (e.g., ["192.168.1.0/24", "10.0.0.0/16"])
+  scan_ports: [9091]         # Ports to scan on each host (default: pi-agent gRPC port)
+  scan_timeout: "2s"         # Timeout for individual port scans
+  scan_concurrency: 10       # Number of concurrent scan workers
+  scan_rate_limit: 100       # Maximum scans per second (prevents network flooding)
 
 # Certificate Authority configuration
 ca:

@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dsyorkd/pi-controller/internal/config/defaults"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 )
@@ -131,163 +132,196 @@ func LoadWithViperAndWatch(configPath string, onChange func(*Config)) (*Config, 
 	return &config, nil
 }
 
-// setViperDefaults sets default values in Viper
+// setViperDefaults sets default values in Viper using the defaults package
 func setViperDefaults(v *viper.Viper) {
 	// Determine environment
 	env := os.Getenv("PI_CONTROLLER_ENVIRONMENT")
 	if env == "" {
 		env = os.Getenv("ENVIRONMENT")
 		if env == "" {
-			env = "development"
+			env = defaults.AppEnvironment
 		}
 	}
 
-	// Get defaults based on environment
-	defaults := getDefaults()
-
 	// App defaults
-	v.SetDefault("app.name", defaults.App.Name)
-	v.SetDefault("app.version", defaults.App.Version)
+	v.SetDefault("app.name", defaults.AppName)
+	v.SetDefault("app.version", defaults.AppVersion)
 	v.SetDefault("app.environment", env)
-	v.SetDefault("app.data_dir", defaults.App.DataDir)
-	v.SetDefault("app.debug", defaults.App.Debug)
+	v.SetDefault("app.data_dir", defaults.AppDataDir)
+	v.SetDefault("app.debug", defaults.AppDebug)
 
 	// Database defaults
-	v.SetDefault("database.path", defaults.Database.Path)
-	v.SetDefault("database.max_open_conns", defaults.Database.MaxOpenConns)
-	v.SetDefault("database.max_idle_conns", defaults.Database.MaxIdleConns)
-	v.SetDefault("database.conn_max_lifetime", defaults.Database.ConnMaxLifetime)
-	v.SetDefault("database.log_level", defaults.Database.LogLevel)
+	v.SetDefault("database.path", defaults.DatabasePath)
+	v.SetDefault("database.max_open_conns", defaults.DatabaseMaxOpenConns)
+	v.SetDefault("database.max_idle_conns", defaults.DatabaseMaxIdleConns)
+	v.SetDefault("database.conn_max_lifetime", defaults.DatabaseConnMaxLifetime)
+	v.SetDefault("database.log_level", defaults.DatabaseLogLevel)
 
 	// API defaults
-	v.SetDefault("api.host", defaults.API.Host)
-	v.SetDefault("api.port", defaults.API.Port)
-	v.SetDefault("api.read_timeout", defaults.API.ReadTimeout)
-	v.SetDefault("api.write_timeout", defaults.API.WriteTimeout)
-	v.SetDefault("api.cors_enabled", defaults.API.CORSEnabled)
-	v.SetDefault("api.auth_enabled", defaults.API.AuthEnabled)
-	v.SetDefault("api.tls_cert_file", defaults.API.TLSCertFile)
-	v.SetDefault("api.tls_key_file", defaults.API.TLSKeyFile)
-	v.SetDefault("api.tls_ca_file", defaults.API.TLSCAFile)
+	v.SetDefault("api.host", defaults.APIHost)
+	v.SetDefault("api.port", defaults.APIPort)
+	v.SetDefault("api.read_timeout", defaults.APIReadTimeout)
+	v.SetDefault("api.write_timeout", defaults.APIWriteTimeout)
+	v.SetDefault("api.cors_enabled", defaults.APICORSEnabled)
+	v.SetDefault("api.auth_enabled", defaults.APIAuthEnabled)
+	v.SetDefault("api.tls_cert_file", defaults.APITLSCertFile)
+	v.SetDefault("api.tls_key_file", defaults.APITLSKeyFile)
+	v.SetDefault("api.tls_ca_file", defaults.APITLSCAFile)
 
 	// gRPC defaults
-	v.SetDefault("grpc.host", defaults.GRPC.Host)
-	v.SetDefault("grpc.port", defaults.GRPC.Port)
-	v.SetDefault("grpc.tls_cert_file", defaults.GRPC.TLSCertFile)
-	v.SetDefault("grpc.tls_key_file", defaults.GRPC.TLSKeyFile)
-	v.SetDefault("grpc.tls_ca_file", defaults.GRPC.TLSCAFile)
+	v.SetDefault("grpc.host", defaults.GRPCHost)
+	v.SetDefault("grpc.port", defaults.GRPCPort)
+	v.SetDefault("grpc.tls_cert_file", defaults.GRPCTLSCertFile)
+	v.SetDefault("grpc.tls_key_file", defaults.GRPCTLSKeyFile)
+	v.SetDefault("grpc.tls_ca_file", defaults.GRPCTLSCAFile)
 
 	// WebSocket defaults
-	v.SetDefault("websocket.host", defaults.WebSocket.Host)
-	v.SetDefault("websocket.port", defaults.WebSocket.Port)
-	v.SetDefault("websocket.path", defaults.WebSocket.Path)
+	v.SetDefault("websocket.host", defaults.WebSocketHost)
+	v.SetDefault("websocket.port", defaults.WebSocketPort)
+	v.SetDefault("websocket.path", defaults.WebSocketPath)
 
 	// Log defaults
-	v.SetDefault("log.level", defaults.Log.Level)
-	v.SetDefault("log.format", defaults.Log.Format)
-	v.SetDefault("log.output", defaults.Log.Output)
+	v.SetDefault("log.level", defaults.LogLevel)
+	v.SetDefault("log.format", defaults.LogFormat)
+	v.SetDefault("log.output", defaults.LogOutput)
 
 	// GPIO defaults
-	v.SetDefault("gpio.enabled", defaults.GPIO.Enabled)
-	v.SetDefault("agent_server.port", defaults.AgentServer.Port)
-	v.SetDefault("agent_server.enable_gpio", defaults.AgentServer.EnableGPIO)
-	v.SetDefault("agent_server.tls_cert_file", defaults.AgentServer.TLSCertFile)
-	v.SetDefault("agent_server.tls_key_file", defaults.AgentServer.TLSKeyFile)
-	v.SetDefault("agent_server.tls_ca_file", defaults.AgentServer.TLSCAFile)
+	v.SetDefault("gpio.enabled", defaults.GPIOEnabled)
+	v.SetDefault("agent_server.port", defaults.AgentServerPort)
+	v.SetDefault("agent_server.enable_gpio", defaults.AgentServerEnableGPIO)
+	v.SetDefault("agent_server.tls_cert_file", "")
+	v.SetDefault("agent_server.tls_key_file", "")
+	v.SetDefault("agent_server.tls_ca_file", "")
 
 	// GRPC Client defaults
-	v.SetDefault("grpc_client.server_address", defaults.GRPCClient.ServerAddress)
-	v.SetDefault("grpc_client.server_port", defaults.GRPCClient.ServerPort)
-	v.SetDefault("grpc_client.insecure", defaults.GRPCClient.Insecure)
-	v.SetDefault("grpc_client.tls_cert_file", defaults.GRPCClient.TLSCert)
-	v.SetDefault("grpc_client.tls_key_file", defaults.GRPCClient.TLSKey)
-	v.SetDefault("grpc_client.tls_ca_file", defaults.GRPCClient.TLSCAFile)
+	v.SetDefault("grpc_client.server_address", defaults.GRPCClientServerAddress)
+	v.SetDefault("grpc_client.server_port", defaults.GRPCClientServerPort)
+	v.SetDefault("grpc_client.insecure", defaults.GRPCClientInsecure)
+	v.SetDefault("grpc_client.tls_cert_file", "")
+	v.SetDefault("grpc_client.tls_key_file", "")
+	v.SetDefault("grpc_client.tls_ca_file", "")
 
 	// Discovery defaults
-	v.SetDefault("discovery.enabled", defaults.Discovery.Enabled)
-	v.SetDefault("discovery.method", defaults.Discovery.Method)
-	v.SetDefault("discovery.port", defaults.Discovery.Port)
+	v.SetDefault("discovery.enabled", defaults.DiscoveryEnabled)
+	v.SetDefault("discovery.method", defaults.DiscoveryMethod)
+	v.SetDefault("discovery.port", defaults.DiscoveryPort)
+	v.SetDefault("discovery.interval", defaults.DiscoveryInterval)
+	v.SetDefault("discovery.timeout", defaults.DiscoveryTimeout)
+	v.SetDefault("discovery.service_name", defaults.DiscoveryServiceName)
+	v.SetDefault("discovery.service_type", defaults.DiscoveryServiceType)
+	v.SetDefault("discovery.scan_ranges", []string{})
+	v.SetDefault("discovery.scan_ports", defaults.DiscoveryScanPorts)
+	v.SetDefault("discovery.scan_timeout", defaults.DiscoveryScanTimeout)
+	v.SetDefault("discovery.scan_concurrency", defaults.DiscoveryScanConcurrency)
+	v.SetDefault("discovery.scan_rate_limit", defaults.DiscoveryScanRateLimit)
+
+	// Cluster defaults
+	v.SetDefault("cluster.enabled", defaults.ClusterEnabled)
+	v.SetDefault("cluster.portable", defaults.ClusterPortable)
+	v.SetDefault("cluster.bootstrap", defaults.ClusterBootstrap)
+	v.SetDefault("cluster.data_dir", defaults.ClusterDataDir)
+	v.SetDefault("cluster.heartbeat_timeout", defaults.ClusterHeartbeatTimeout)
+	v.SetDefault("cluster.election_timeout", defaults.ClusterElectionTimeout)
+	v.SetDefault("cluster.snapshot_interval", defaults.ClusterSnapshotInterval)
+	v.SetDefault("cluster.snapshot_threshold", defaults.ClusterSnapshotThreshold)
+	v.SetDefault("cluster.max_append_entries", defaults.ClusterMaxAppendEntries)
 
 	// WebUI defaults
-	v.SetDefault("webui.enabled", defaults.WebUI.Enabled)
-	v.SetDefault("webui.host", defaults.WebUI.Host)
-	v.SetDefault("webui.port", defaults.WebUI.Port)
-	v.SetDefault("webui.static_dir", defaults.WebUI.StaticDir)
-	v.SetDefault("webui.index_file", defaults.WebUI.IndexFile)
-	v.SetDefault("webui.spa_mode", defaults.WebUI.SPAMode)
+	v.SetDefault("webui.enabled", defaults.WebUIEnabled)
+	v.SetDefault("webui.host", defaults.WebUIHost)
+	v.SetDefault("webui.port", defaults.WebUIPort)
+	v.SetDefault("webui.static_dir", defaults.WebUIStaticDir)
+	v.SetDefault("webui.index_file", defaults.WebUIIndexFile)
+	v.SetDefault("webui.spa_mode", defaults.WebUISPAMode)
 
 	// WebUI Backend defaults
-	v.SetDefault("webui.backend.api.url", defaults.WebUI.Backend.API.URL)
-	v.SetDefault("webui.backend.api.internal_url", defaults.WebUI.Backend.API.InternalURL)
-	v.SetDefault("webui.backend.api.prefix", defaults.WebUI.Backend.API.Prefix)
-	v.SetDefault("webui.backend.grpc.url", defaults.WebUI.Backend.GRPC.URL)
-	v.SetDefault("webui.backend.grpc.internal_url", defaults.WebUI.Backend.GRPC.InternalURL)
-	v.SetDefault("webui.backend.websocket.url", defaults.WebUI.Backend.WebSocket.URL)
-	v.SetDefault("webui.backend.websocket.internal_url", defaults.WebUI.Backend.WebSocket.InternalURL)
-	v.SetDefault("webui.backend.websocket.path", defaults.WebUI.Backend.WebSocket.Path)
+	v.SetDefault("webui.backend.api.url", defaults.WebUIBackendAPIURL)
+	v.SetDefault("webui.backend.api.internal_url", defaults.WebUIBackendAPIInternalURL)
+	v.SetDefault("webui.backend.api.prefix", defaults.WebUIBackendAPIPrefix)
+	v.SetDefault("webui.backend.grpc.url", defaults.WebUIBackendGRPCURL)
+	v.SetDefault("webui.backend.grpc.internal_url", defaults.WebUIBackendGRPCInternalURL)
+	v.SetDefault("webui.backend.websocket.url", defaults.WebUIBackendWebSocketURL)
+	v.SetDefault("webui.backend.websocket.internal_url", defaults.WebUIBackendWebSocketInternalURL)
+	v.SetDefault("webui.backend.websocket.path", defaults.WebUIBackendWebSocketPath)
 
 	// WebUI Runtime Config defaults
-	v.SetDefault("webui.runtime_config.enabled", defaults.WebUI.RuntimeConfig.Enabled)
-	v.SetDefault("webui.runtime_config.path", defaults.WebUI.RuntimeConfig.Path)
+	v.SetDefault("webui.runtime_config.enabled", defaults.WebUIRuntimeConfigEnabled)
+	v.SetDefault("webui.runtime_config.path", defaults.WebUIRuntimeConfigPath)
 
 	// WebUI Auth defaults
-	v.SetDefault("webui.auth.enabled", defaults.WebUI.Auth.Enabled)
-	v.SetDefault("webui.auth.session_secret_env", defaults.WebUI.Auth.SessionSecretEnv)
-	v.SetDefault("webui.auth.jwt_secret_env", defaults.WebUI.Auth.JWTSecretEnv)
-	v.SetDefault("webui.auth.session_timeout", defaults.WebUI.Auth.SessionTimeout)
-	v.SetDefault("webui.auth.cookie_secure", defaults.WebUI.Auth.CookieSecure)
-	v.SetDefault("webui.auth.cookie_same_site", defaults.WebUI.Auth.CookieSameSite)
+	v.SetDefault("webui.auth.enabled", defaults.WebUIAuthEnabled)
+	v.SetDefault("webui.auth.session_secret_env", defaults.WebUIAuthSessionSecretEnv)
+	v.SetDefault("webui.auth.jwt_secret_env", defaults.WebUIAuthJWTSecretEnv)
+	v.SetDefault("webui.auth.session_timeout", defaults.WebUIAuthSessionTimeout)
+	v.SetDefault("webui.auth.cookie_secure", defaults.WebUIAuthCookieSecure)
+	v.SetDefault("webui.auth.cookie_same_site", defaults.WebUIAuthCookieSameSite)
 
 	// WebUI CORS defaults
-	v.SetDefault("webui.cors.enabled", defaults.WebUI.CORS.Enabled)
-	v.SetDefault("webui.cors.allowed_origins", defaults.WebUI.CORS.AllowedOrigins)
-	v.SetDefault("webui.cors.allowed_methods", defaults.WebUI.CORS.AllowedMethods)
-	v.SetDefault("webui.cors.allowed_headers", defaults.WebUI.CORS.AllowedHeaders)
-	v.SetDefault("webui.cors.credentials", defaults.WebUI.CORS.Credentials)
+	v.SetDefault("webui.cors.enabled", defaults.WebUICORSEnabled)
+	v.SetDefault("webui.cors.allowed_origins", defaults.WebUICORSAllowedOrigins)
+	v.SetDefault("webui.cors.allowed_methods", defaults.WebUICORSAllowedMethods)
+	v.SetDefault("webui.cors.allowed_headers", defaults.WebUICORSAllowedHeaders)
+	v.SetDefault("webui.cors.credentials", defaults.WebUICORSCredentials)
 
 	// WebUI Features defaults
-	v.SetDefault("webui.features.gpio_control", defaults.WebUI.Features.GPIOControl)
-	v.SetDefault("webui.features.cluster_management", defaults.WebUI.Features.ClusterManagement)
-	v.SetDefault("webui.features.certificate_management", defaults.WebUI.Features.CertificateManagement)
-	v.SetDefault("webui.features.real_time_metrics", defaults.WebUI.Features.RealTimeMetrics)
-	v.SetDefault("webui.features.node_discovery", defaults.WebUI.Features.NodeDiscovery)
-	v.SetDefault("webui.features.advanced_networking", defaults.WebUI.Features.AdvancedNetworking)
-	v.SetDefault("webui.features.experimental", defaults.WebUI.Features.Experimental)
+	v.SetDefault("webui.features.gpio_control", defaults.WebUIFeatureGPIOControl)
+	v.SetDefault("webui.features.cluster_management", defaults.WebUIFeatureClusterManagement)
+	v.SetDefault("webui.features.certificate_management", defaults.WebUIFeatureCertificateManagement)
+	v.SetDefault("webui.features.real_time_metrics", defaults.WebUIFeatureRealTimeMetrics)
+	v.SetDefault("webui.features.node_discovery", defaults.WebUIFeatureNodeDiscovery)
+	v.SetDefault("webui.features.advanced_networking", defaults.WebUIFeatureAdvancedNetworking)
+	v.SetDefault("webui.features.experimental", defaults.WebUIFeatureExperimental)
 
 	// WebUI Branding defaults
-	v.SetDefault("webui.branding.title", defaults.WebUI.Branding.Title)
-	v.SetDefault("webui.branding.primary_color", defaults.WebUI.Branding.PrimaryColor)
-	v.SetDefault("webui.branding.theme", defaults.WebUI.Branding.Theme)
+	v.SetDefault("webui.branding.title", defaults.WebUIBrandingTitle)
+	v.SetDefault("webui.branding.primary_color", defaults.WebUIBrandingPrimaryColor)
+	v.SetDefault("webui.branding.theme", defaults.WebUIBrandingTheme)
 
 	// WebUI Cache defaults
-	v.SetDefault("webui.cache.enabled", defaults.WebUI.Cache.Enabled)
-	v.SetDefault("webui.cache.static_max_age", defaults.WebUI.Cache.StaticMaxAge)
-	v.SetDefault("webui.cache.html_max_age", defaults.WebUI.Cache.HTMLMaxAge)
+	v.SetDefault("webui.cache.enabled", defaults.WebUICacheEnabled)
+	v.SetDefault("webui.cache.static_max_age", defaults.WebUICacheStaticMaxAge)
+	v.SetDefault("webui.cache.html_max_age", defaults.WebUICacheHTMLMaxAge)
 
 	// WebUI Compression defaults
-	v.SetDefault("webui.compression.enabled", defaults.WebUI.Compression.Enabled)
-	v.SetDefault("webui.compression.level", defaults.WebUI.Compression.Level)
-	v.SetDefault("webui.compression.min_size", defaults.WebUI.Compression.MinSize)
+	v.SetDefault("webui.compression.enabled", defaults.WebUICompressionEnabled)
+	v.SetDefault("webui.compression.level", defaults.WebUICompressionLevel)
+	v.SetDefault("webui.compression.min_size", defaults.WebUICompressionMinSize)
 
 	// WebUI Security defaults
-	v.SetDefault("webui.security.hsts_enabled", defaults.WebUI.Security.HSTSEnabled)
-	v.SetDefault("webui.security.hsts_max_age", defaults.WebUI.Security.HSTSMaxAge)
-	v.SetDefault("webui.security.frame_deny", defaults.WebUI.Security.FrameDeny)
-	v.SetDefault("webui.security.content_type_nosniff", defaults.WebUI.Security.ContentTypeNoSniff)
-	v.SetDefault("webui.security.xss_protection", defaults.WebUI.Security.XSSProtection)
-	v.SetDefault("webui.security.csp_enabled", defaults.WebUI.Security.CSPEnabled)
-	v.SetDefault("webui.security.csp_directives", defaults.WebUI.Security.CSPDirectives)
+	v.SetDefault("webui.security.hsts_enabled", defaults.WebUISecurityHSTSEnabled)
+	v.SetDefault("webui.security.hsts_max_age", defaults.WebUISecurityHSTSMaxAge)
+	v.SetDefault("webui.security.frame_deny", defaults.WebUISecurityFrameDeny)
+	v.SetDefault("webui.security.content_type_nosniff", defaults.WebUISecurityContentTypeNoSniff)
+	v.SetDefault("webui.security.xss_protection", defaults.WebUISecurityXSSProtection)
+	v.SetDefault("webui.security.csp_enabled", defaults.WebUISecurityCSPEnabled)
+	v.SetDefault("webui.security.csp_directives", "")
 
 	// WebUI Rate Limit defaults
-	v.SetDefault("webui.rate_limit.enabled", defaults.WebUI.RateLimit.Enabled)
-	v.SetDefault("webui.rate_limit.requests_per_minute", defaults.WebUI.RateLimit.RequestsPerMinute)
-	v.SetDefault("webui.rate_limit.burst_size", defaults.WebUI.RateLimit.BurstSize)
+	v.SetDefault("webui.rate_limit.enabled", defaults.WebUIRateLimitEnabled)
+	v.SetDefault("webui.rate_limit.requests_per_minute", defaults.WebUIRateLimitRequestsPerMinute)
+	v.SetDefault("webui.rate_limit.burst_size", defaults.WebUIRateLimitBurstSize)
 
 	// WebUI Health defaults
-	v.SetDefault("webui.health.enabled", defaults.WebUI.Health.Enabled)
-	v.SetDefault("webui.health.path", defaults.WebUI.Health.Path)
-	v.SetDefault("webui.health.liveness_path", defaults.WebUI.Health.LivenessPath)
-	v.SetDefault("webui.health.readiness_path", defaults.WebUI.Health.ReadinessPath)
+	v.SetDefault("webui.health.enabled", defaults.WebUIHealthEnabled)
+	v.SetDefault("webui.health.path", defaults.WebUIHealthPath)
+	v.SetDefault("webui.health.liveness_path", defaults.WebUIHealthLivenessPath)
+	v.SetDefault("webui.health.readiness_path", defaults.WebUIHealthReadinessPath)
+
+	// Development environment overrides - less secure settings for easier local development
+	if env == "development" || env == "dev" {
+		v.SetDefault("webui.auth.cookie_secure", false)
+		v.SetDefault("webui.security.hsts_enabled", false)
+		v.SetDefault("webui.backend.tls.enabled", false)
+		v.SetDefault("api.tls_cert_file", "")
+		v.SetDefault("api.tls_key_file", "")
+		v.SetDefault("grpc.tls_cert_file", "")
+		v.SetDefault("grpc.tls_key_file", "")
+		v.SetDefault("ca.local.data_dir", "./data/ca")
+		v.SetDefault("ca.ssh.strict_host_key_checking", false)
+		v.SetDefault("ca.ssh.known_hosts_file", "")
+		v.SetDefault("ca.vault.allow_insecure", true)
+		v.SetDefault("ca.vault.tls_config.insecure_skip_verify", true)
+	}
 }
 
 // bindEnv wraps viper.BindEnv with error handling
@@ -373,6 +407,11 @@ func bindNestedEnvVars(v *viper.Viper) {
 	bindEnv(v, "discovery.static_nodes")
 	bindEnv(v, "discovery.service_name")
 	bindEnv(v, "discovery.service_type")
+	bindEnv(v, "discovery.scan_ranges")
+	bindEnv(v, "discovery.scan_ports")
+	bindEnv(v, "discovery.scan_timeout")
+	bindEnv(v, "discovery.scan_concurrency")
+	bindEnv(v, "discovery.scan_rate_limit")
 
 	// Cluster
 	bindEnv(v, "cluster.enabled")

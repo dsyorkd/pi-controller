@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dsyorkd/pi-controller/internal/config/defaults"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
@@ -179,6 +180,12 @@ type DiscoveryConfig struct {
 	// Node trust token for verifying discovered nodes
 	// This shared secret is used to authenticate nodes during adoption
 	TrustToken string `yaml:"trust_token" mapstructure:"trust_token"`
+	// Network scanning configuration
+	ScanRanges      []string `yaml:"scan_ranges" mapstructure:"scan_ranges"`           // IP ranges to scan in CIDR notation (e.g., "192.168.1.0/24")
+	ScanPorts       []int    `yaml:"scan_ports" mapstructure:"scan_ports"`             // Ports to scan on discovered hosts
+	ScanTimeout     string   `yaml:"scan_timeout" mapstructure:"scan_timeout"`         // Timeout for individual scan operations
+	ScanConcurrency int      `yaml:"scan_concurrency" mapstructure:"scan_concurrency"` // Number of concurrent scan workers
+	ScanRateLimit   int      `yaml:"scan_rate_limit" mapstructure:"scan_rate_limit"`   // Maximum scans per second to avoid network flooding
 }
 
 // GRPCClientConfig contains gRPC client settings for Pi Agent
@@ -693,291 +700,362 @@ func getDevelopmentDefaults() Config {
 	return config
 }
 
-// getProductionDefaults returns secure production defaults
+// getProductionDefaults returns secure production defaults using the defaults package
 func getProductionDefaults() Config {
 	return Config{
-		App: AppConfig{
-			Name:        "pi-controller",
-			Version:     "dev",
-			Environment: "development",
-			DataDir:     "./data",
-			Debug:       false,
+		App:         appDefaults(),
+		Database:    databaseDefaults(),
+		API:         apiDefaults(),
+		GRPC:        grpcDefaults(),
+		WebSocket:   webSocketDefaults(),
+		Log:         logDefaults(),
+		Kubernetes:  kubernetesDefaults(),
+		GPIO:        gpioDefaults(),
+		Discovery:   discoveryDefaults(),
+		GRPCClient:  grpcClientDefaults(),
+		AgentServer: agentServerDefaults(),
+		CA:          caDefaults(),
+		Sentry:      sentryDefaults(),
+		Cluster:     clusterDefaults(),
+		WebUI:       webUIDefaults(),
+	}
+}
+
+// appDefaults returns default AppConfig
+func appDefaults() AppConfig {
+	return AppConfig{
+		Name:        defaults.AppName,
+		Version:     defaults.AppVersion,
+		Environment: defaults.AppEnvironment,
+		DataDir:     defaults.AppDataDir,
+		Debug:       defaults.AppDebug,
+	}
+}
+
+// databaseDefaults returns default storage.Config
+func databaseDefaults() storage.Config {
+	return storage.Config{
+		Path:            defaults.DatabasePath,
+		MaxOpenConns:    defaults.DatabaseMaxOpenConns,
+		MaxIdleConns:    defaults.DatabaseMaxIdleConns,
+		ConnMaxLifetime: defaults.DatabaseConnMaxLifetime,
+		LogLevel:        defaults.DatabaseLogLevel,
+	}
+}
+
+// apiDefaults returns default APIConfig
+func apiDefaults() APIConfig {
+	return APIConfig{
+		Host:         defaults.APIHost,
+		Port:         defaults.APIPort,
+		ReadTimeout:  defaults.APIReadTimeout,
+		WriteTimeout: defaults.APIWriteTimeout,
+		TLSCertFile:  defaults.APITLSCertFile,
+		TLSKeyFile:   defaults.APITLSKeyFile,
+		TLSCAFile:    defaults.APITLSCAFile,
+		CORSEnabled:  defaults.APICORSEnabled,
+		AuthEnabled:  defaults.APIAuthEnabled,
+	}
+}
+
+// grpcDefaults returns default GRPCConfig
+func grpcDefaults() GRPCConfig {
+	return GRPCConfig{
+		Host:        defaults.GRPCHost,
+		Port:        defaults.GRPCPort,
+		TLSCertFile: defaults.GRPCTLSCertFile,
+		TLSKeyFile:  defaults.GRPCTLSKeyFile,
+		TLSCAFile:   defaults.GRPCTLSCAFile,
+	}
+}
+
+// webSocketDefaults returns default WebSocketConfig
+func webSocketDefaults() WebSocketConfig {
+	return WebSocketConfig{
+		Host:            defaults.WebSocketHost,
+		Port:            defaults.WebSocketPort,
+		Path:            defaults.WebSocketPath,
+		ReadBufferSize:  defaults.WebSocketReadBufferSize,
+		WriteBufferSize: defaults.WebSocketWriteBufferSize,
+		CheckOrigin:     defaults.WebSocketCheckOrigin,
+	}
+}
+
+// logDefaults returns default LogConfig
+func logDefaults() LogConfig {
+	return LogConfig{
+		Level:      defaults.LogLevel,
+		Format:     defaults.LogFormat,
+		Output:     defaults.LogOutput,
+		MaxSize:    defaults.LogMaxSize,
+		MaxBackups: defaults.LogMaxBackups,
+		MaxAge:     defaults.LogMaxAge,
+		Compress:   defaults.LogCompress,
+	}
+}
+
+// kubernetesDefaults returns default KubernetesConfig
+func kubernetesDefaults() KubernetesConfig {
+	return KubernetesConfig{
+		Enabled:        defaults.KubernetesEnabled,
+		InCluster:      defaults.KubernetesInCluster,
+		Namespace:      defaults.KubernetesNamespace,
+		ResyncInterval: defaults.KubernetesResyncInterval,
+	}
+}
+
+// gpioDefaults returns default GPIOConfig
+func gpioDefaults() GPIOConfig {
+	return GPIOConfig{
+		Enabled:          defaults.GPIOEnabled,
+		MockMode:         defaults.GPIOMockMode,
+		SampleInterval:   defaults.GPIOSampleInterval,
+		RetentionPeriod:  defaults.GPIORetentionPeriod,
+		AllowedPins:      defaults.GPIOAllowedPins,
+		RestrictedPins:   defaults.GPIORestrictedPins,
+		DefaultDirection: defaults.GPIODefaultDirection,
+		DefaultPullMode:  defaults.GPIODefaultPullMode,
+	}
+}
+
+// discoveryDefaults returns default DiscoveryConfig
+func discoveryDefaults() DiscoveryConfig {
+	return DiscoveryConfig{
+		Enabled:         defaults.DiscoveryEnabled,
+		Method:          defaults.DiscoveryMethod,
+		Port:            defaults.DiscoveryPort,
+		Interval:        defaults.DiscoveryInterval,
+		Timeout:         defaults.DiscoveryTimeout,
+		ServiceName:     defaults.DiscoveryServiceName,
+		ServiceType:     defaults.DiscoveryServiceType,
+		TrustToken:      "",         // Empty by default - must be set for secure node adoption
+		ScanRanges:      []string{}, // No default scan ranges - must be explicitly configured
+		ScanPorts:       defaults.DiscoveryScanPorts,
+		ScanTimeout:     defaults.DiscoveryScanTimeout,
+		ScanConcurrency: defaults.DiscoveryScanConcurrency,
+		ScanRateLimit:   defaults.DiscoveryScanRateLimit,
+	}
+}
+
+// grpcClientDefaults returns default GRPCClientConfig
+func grpcClientDefaults() GRPCClientConfig {
+	return GRPCClientConfig{
+		ServerAddress:     defaults.GRPCClientServerAddress,
+		ServerPort:        defaults.GRPCClientServerPort,
+		ConnectionTimeout: defaults.GRPCClientConnectionTimeout,
+		RequestTimeout:    defaults.GRPCClientRequestTimeout,
+		MaxMessageSize:    defaults.GRPCClientMaxMessageSize,
+		MaxRetries:        defaults.GRPCClientMaxRetries,
+		InitialRetryDelay: defaults.GRPCClientInitialRetryDelay,
+		MaxRetryDelay:     defaults.GRPCClientMaxRetryDelay,
+		RetryMultiplier:   defaults.GRPCClientRetryMultiplier,
+		HeartbeatInterval: defaults.GRPCClientHeartbeatInterval,
+		HeartbeatTimeout:  defaults.GRPCClientHeartbeatTimeout,
+		KeepAliveTime:     defaults.GRPCClientKeepAliveTime,
+		KeepAliveTimeout:  defaults.GRPCClientKeepAliveTimeout,
+		Insecure:          defaults.GRPCClientInsecure,
+		NodeID:            "",
+		NodeName:          "",
+	}
+}
+
+// agentServerDefaults returns default AgentServerConfig
+func agentServerDefaults() AgentServerConfig {
+	return AgentServerConfig{
+		Address:    defaults.AgentServerAddress,
+		Port:       defaults.AgentServerPort,
+		EnableGPIO: defaults.AgentServerEnableGPIO,
+	}
+}
+
+// caDefaults returns default CAConfig
+func caDefaults() CAConfig {
+	return CAConfig{
+		Backend: defaults.CABackend,
+		Local: LocalCAConfig{
+			DataDir:            defaults.LocalCADataDir,
+			CAValidityPeriod:   defaults.LocalCAValidityPeriod,
+			CertValidityPeriod: defaults.LocalCACertValidityPeriod,
+			KeySize:            defaults.LocalCAKeySize,
+			Organization:       defaults.LocalCAOrganization,
+			OrganizationalUnit: defaults.LocalCAOrganizationalUnit,
+			Country:            defaults.LocalCACountry,
+			Province:           defaults.LocalCAProvince,
+			Locality:           defaults.LocalCALocality,
 		},
-		Database: storage.Config{
-			Path:            "pi-controller.db",
-			MaxOpenConns:    25,
-			MaxIdleConns:    5,
-			ConnMaxLifetime: "5m",
-			LogLevel:        "warn",
-		},
-		API: APIConfig{
-			Host:         "0.0.0.0",
-			Port:         8080,
-			ReadTimeout:  "30s",
-			WriteTimeout: "30s",
-			TLSCertFile:  "/etc/pi-controller/tls/server.crt", // Default TLS cert path for production
-			TLSKeyFile:   "/etc/pi-controller/tls/server.key", // Default TLS key path for production
-			TLSCAFile:    "/etc/pi-controller/tls/ca.crt",     // Default CA cert path for mTLS
-			CORSEnabled:  true,
-			AuthEnabled:  true, // Enable authentication by default for security
-		},
-		GRPC: GRPCConfig{
-			Host:        "0.0.0.0",
-			Port:        9090,
-			TLSCertFile: "/etc/pi-controller/tls/server.crt", // Default TLS cert path for production
-			TLSKeyFile:  "/etc/pi-controller/tls/server.key", // Default TLS key path for production
-			TLSCAFile:   "/etc/pi-controller/tls/ca.crt",     // Default CA cert path for mTLS
-		},
-		WebSocket: WebSocketConfig{
-			Host:            "0.0.0.0",
-			Port:            8081,
-			Path:            "/ws",
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			CheckOrigin:     false,
-		},
-		Log: LogConfig{
-			Level:      "info",
-			Format:     "json",
-			Output:     "stdout",
-			MaxSize:    100,
-			MaxBackups: 3,
-			MaxAge:     28,
-			Compress:   true,
-		},
-		Kubernetes: KubernetesConfig{
-			Enabled:        false, // Disabled by default - enable when K8s cluster is available
-			InCluster:      false,
-			Namespace:      "default",
-			ResyncInterval: "30s",
-		},
-		GPIO: GPIOConfig{
-			Enabled:          true,
-			MockMode:         false,
-			SampleInterval:   "1s",
-			RetentionPeriod:  "24h",
-			AllowedPins:      []int{2, 3, 4, 17, 27, 22, 10, 9, 11, 5, 6, 13, 19, 26, 18, 23, 24, 25, 8, 7, 12, 16, 20, 21}, // Safe GPIO pins
-			RestrictedPins:   []int{0, 1, 14, 15},                                                                           // System critical pins (I2C, UART)
-			DefaultDirection: "input",
-			DefaultPullMode:  "none",
-		},
-		Discovery: DiscoveryConfig{
-			Enabled:     true,
-			Method:      "mdns",
-			Port:        9091,
-			Interval:    "30s",
-			Timeout:     "5s",
-			ServiceName: "pi-controller",
-			ServiceType: "_pi-controller._tcp",
-			TrustToken:  "", // Empty by default - must be set for secure node adoption
-		},
-		GRPCClient: GRPCClientConfig{
-			ServerAddress:     "localhost",
-			ServerPort:        9090,
-			ConnectionTimeout: "10s",
-			RequestTimeout:    "30s",
-			MaxMessageSize:    4 * 1024 * 1024, // 4MB
-			MaxRetries:        5,
-			InitialRetryDelay: "1s",
-			MaxRetryDelay:     "60s",
-			RetryMultiplier:   2.0,
-			HeartbeatInterval: "30s",
-			HeartbeatTimeout:  "5s",
-			KeepAliveTime:     "30s",
-			KeepAliveTimeout:  "5s",
-			Insecure:          true,
-			NodeID:            "",
-			NodeName:          "",
-		},
-		AgentServer: AgentServerConfig{
-			Address:    "0.0.0.0",
-			Port:       9091,
-			EnableGPIO: true,
-		},
-		CA: CAConfig{
-			Backend: "local", // Default to local CA for development
-			Local: LocalCAConfig{
-				DataDir:            "/etc/pi-controller/ca",
-				CAValidityPeriod:   "87600h", // 10 years
-				CertValidityPeriod: "8760h",  // 1 year
-				KeySize:            2048,
-				Organization:       "Pi Controller",
-				OrganizationalUnit: "Infrastructure",
-				Country:            "US",
-				Province:           "CA",
-				Locality:           "San Francisco",
-			},
-			Vault: VaultCAConfig{
-				Address:       "https://vault.example.com:8200",
-				MountPath:     "pki",
-				Timeout:       "30s",
-				CertRole:      "pi-controller",
-				AllowInsecure: false,
-				TLSConfig: VaultTLSConfig{
-					InsecureSkipVerify: false,
-				},
-			},
-			SSH: SSHConfig{
-				User:                  "pi",
-				Port:                  22,
-				Timeout:               "30s",
-				StrictHostKeyChecking: true,
-				KnownHostsFile:        "/etc/pi-controller/known_hosts",
-			},
-			CertificateConfig: CertificateConfig{
-				DefaultValidityPeriod: "8760h", // 1 year
-				RenewalThreshold:      "720h",  // 30 days
-				DefaultKeyUsage: []string{
-					"digital_signature",
-					"key_encipherment",
-				},
-				DefaultExtKeyUsage: []string{
-					"server_auth",
-					"client_auth",
-				},
-				AllowWildcardDNS: false,
-				AllowedDomains:   []string{"*.pi-controller.local", "*.cluster.local"},
-				StoragePath:      "./data/certificates",
-				CleanupInterval:  "24h",
-				RetentionPeriod:  "2160h", // 90 days
+		Vault: VaultCAConfig{
+			Address:       defaults.VaultCAAddress,
+			MountPath:     defaults.VaultCAMountPath,
+			Timeout:       defaults.VaultCATimeout,
+			CertRole:      defaults.VaultCACertRole,
+			AllowInsecure: defaults.VaultCAAllowInsecure,
+			TLSConfig: VaultTLSConfig{
+				InsecureSkipVerify: defaults.VaultCAInsecureSkipVerify,
 			},
 		},
-		Sentry: SentryConfig{
-			DSN:              "", // Must be set via environment variable
-			Environment:      "", // Will be set from App.Environment if not specified
-			Release:          "", // Will be set from App.Version if not specified
-			Debug:            false,
-			TracesSampleRate: 0.1, // 10% sampling for performance
-			SampleRate:       1.0, // 100% error sampling
-			EnableTracing:    true,
-			SendDefaultPII:   false, // Security: don't send PII by default
-			MaxBreadcrumbs:   100,
-			AttachStacktrace: true,
+		SSH: SSHConfig{
+			User:                  defaults.SSHUser,
+			Port:                  defaults.SSHPort,
+			Timeout:               defaults.SSHTimeout,
+			StrictHostKeyChecking: defaults.SSHStrictHostKeyChecking,
+			KnownHostsFile:        defaults.SSHKnownHostsFile,
 		},
-		Cluster: ClusterConfig{
-			Enabled:           false, // Disabled by default, enable in production for HA
-			ControllerID:      "",    // Must be set if enabled
-			BindAddr:          "",    // Must be set if enabled (e.g., "192.168.1.10:9091")
-			Bootstrap:         false,
-			InitialPeers:      []string{},
-			DataDir:           "./data/raft",
-			HeartbeatTimeout:  "1s",
-			ElectionTimeout:   "1s",
-			SnapshotInterval:  "30m",
-			SnapshotThreshold: 8192,
-			MaxAppendEntries:  64,
+		CertificateConfig: CertificateConfig{
+			DefaultValidityPeriod: defaults.CertDefaultValidityPeriod,
+			RenewalThreshold:      defaults.CertRenewalThreshold,
+			DefaultKeyUsage:       defaults.CertDefaultKeyUsage,
+			DefaultExtKeyUsage:    defaults.CertDefaultExtKeyUsage,
+			AllowWildcardDNS:      defaults.CertAllowWildcardDNS,
+			AllowedDomains:        defaults.CertAllowedDomains,
+			StoragePath:           defaults.CertStoragePath,
+			CleanupInterval:       defaults.CertCleanupInterval,
+			RetentionPeriod:       defaults.CertRetentionPeriod,
 		},
-		WebUI: WebUIConfig{
-			Enabled:   true,
-			Host:      "0.0.0.0",
-			Port:      3000,
-			StaticDir: "./web/dist",
-			IndexFile: "index.html",
-			SPAMode:   true,
-			Backend: BackendConfig{
-				API: BackendServiceConfig{
-					URL:         "http://localhost:8080",
-					InternalURL: "http://pi-controller-api:8080",
-					Prefix:      "/api",
-				},
-				GRPC: BackendServiceConfig{
-					URL:         "localhost:9090",
-					InternalURL: "pi-controller-grpc:9090",
-					WebEnabled:  false,
-				},
-				WebSocket: BackendServiceConfig{
-					URL:         "ws://localhost:8081",
-					InternalURL: "ws://pi-controller-ws:8081",
-					Path:        "/socket.io",
-				},
-				TLS: TLSConfig{
-					Enabled: false,
-				},
+	}
+}
+
+// sentryDefaults returns default SentryConfig
+func sentryDefaults() SentryConfig {
+	return SentryConfig{
+		DSN:              "", // Must be set via environment variable
+		Environment:      "", // Will be set from App.Environment if not specified
+		Release:          "", // Will be set from App.Version if not specified
+		Debug:            defaults.SentryDebug,
+		TracesSampleRate: defaults.SentryTracesSampleRate,
+		SampleRate:       defaults.SentrySampleRate,
+		EnableTracing:    defaults.SentryEnableTracing,
+		SendDefaultPII:   defaults.SentrySendDefaultPII,
+		MaxBreadcrumbs:   defaults.SentryMaxBreadcrumbs,
+		AttachStacktrace: defaults.SentryAttachStacktrace,
+	}
+}
+
+// clusterDefaults returns default ClusterConfig
+func clusterDefaults() ClusterConfig {
+	return ClusterConfig{
+		Enabled:           defaults.ClusterEnabled,
+		ControllerID:      "", // Must be set if enabled
+		BindAddr:          "", // Must be set if enabled
+		Bootstrap:         defaults.ClusterBootstrap,
+		InitialPeers:      []string{},
+		DataDir:           defaults.ClusterDataDir,
+		HeartbeatTimeout:  defaults.ClusterHeartbeatTimeout,
+		ElectionTimeout:   defaults.ClusterElectionTimeout,
+		SnapshotInterval:  defaults.ClusterSnapshotInterval,
+		SnapshotThreshold: defaults.ClusterSnapshotThreshold,
+		MaxAppendEntries:  defaults.ClusterMaxAppendEntries,
+	}
+}
+
+// webUIDefaults returns default WebUIConfig
+func webUIDefaults() WebUIConfig {
+	return WebUIConfig{
+		Enabled:   defaults.WebUIEnabled,
+		Host:      defaults.WebUIHost,
+		Port:      defaults.WebUIPort,
+		StaticDir: defaults.WebUIStaticDir,
+		IndexFile: defaults.WebUIIndexFile,
+		SPAMode:   defaults.WebUISPAMode,
+		Backend: BackendConfig{
+			API: BackendServiceConfig{
+				URL:         defaults.WebUIBackendAPIURL,
+				InternalURL: defaults.WebUIBackendAPIInternalURL,
+				Prefix:      defaults.WebUIBackendAPIPrefix,
 			},
-			RuntimeConfig: RuntimeConfigSettings{
-				Enabled: true,
-				Path:    "/config.js",
+			GRPC: BackendServiceConfig{
+				URL:         defaults.WebUIBackendGRPCURL,
+				InternalURL: defaults.WebUIBackendGRPCInternalURL,
+				WebEnabled:  defaults.WebUIBackendGRPCWebEnabled,
 			},
-			Auth: WebAuthConfig{
-				Enabled:          true,
-				SessionSecretEnv: "WEBUI_SESSION_SECRET",
-				JWTSecretEnv:     "WEBUI_JWT_SECRET",
-				SessionTimeout:   "24h",
-				CookieSecure:     true,
-				CookieSameSite:   "strict",
+			WebSocket: BackendServiceConfig{
+				URL:         defaults.WebUIBackendWebSocketURL,
+				InternalURL: defaults.WebUIBackendWebSocketInternalURL,
+				Path:        defaults.WebUIBackendWebSocketPath,
 			},
-			CORS: CORSConfig{
-				Enabled: true,
-				AllowedOrigins: []string{
-					"http://localhost:3000",
-					"http://localhost:8080",
-				},
-				AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-				AllowedHeaders: []string{"Authorization", "Content-Type", "X-Requested-With"},
-				ExposedHeaders: []string{"X-Total-Count", "X-Page"},
-				Credentials:    true,
-				MaxAge:         "12h",
+			TLS: TLSConfig{
+				Enabled: defaults.WebUIBackendTLSEnabled,
 			},
-			Features: FeatureFlags{
-				GPIOControl:           true,
-				ClusterManagement:     true,
-				CertificateManagement: true,
-				RealTimeMetrics:       true,
-				NodeDiscovery:         true,
-				AdvancedNetworking:    false,
-				Experimental:          false,
-			},
-			Branding: BrandingConfig{
-				Title:        "Pi Controller",
-				LogoURL:      "",
-				FaviconURL:   "",
-				PrimaryColor: "#10b981",
-				Theme:        "dark",
-			},
-			Cache: CacheConfig{
-				Enabled:        true,
-				StaticMaxAge:   "31536000", // 1 year
-				HTMLMaxAge:     "0",
-				APICacheMaxAge: "300", // 5 minutes
-			},
-			Compression: CompressionConfig{
-				Enabled: true,
-				Level:   6,
-				MinSize: 1024,
-			},
-			Security: SecurityConfig{
-				HSTSEnabled:        true,
-				HSTSMaxAge:         "31536000",
-				FrameDeny:          true,
-				ContentTypeNoSniff: true,
-				XSSProtection:      true,
-				CSPEnabled:         false,
-				CSPDirectives:      "",
-			},
-			RateLimit: RateLimitConfig{
-				Enabled:           true,
-				RequestsPerMinute: 60,
-				BurstSize:         100,
-			},
-			Observability: ObservabilityConfig{
-				AccessLog:       true,
-				AccessLogFormat: "json",
-				MetricsEnabled:  true,
-				MetricsPath:     "/metrics",
-				TracingEnabled:  false,
-			},
-			Resources: ResourcesConfig{
-				CPULimit:      "500m",
-				MemoryLimit:   "512Mi",
-				CPURequest:    "100m",
-				MemoryRequest: "128Mi",
-			},
-			Health: HealthConfig{
-				Enabled:       true,
-				Path:          "/health",
-				LivenessPath:  "/health/live",
-				ReadinessPath: "/health/ready",
-			},
+		},
+		RuntimeConfig: RuntimeConfigSettings{
+			Enabled: defaults.WebUIRuntimeConfigEnabled,
+			Path:    defaults.WebUIRuntimeConfigPath,
+		},
+		Auth: WebAuthConfig{
+			Enabled:          defaults.WebUIAuthEnabled,
+			SessionSecretEnv: defaults.WebUIAuthSessionSecretEnv,
+			JWTSecretEnv:     defaults.WebUIAuthJWTSecretEnv,
+			SessionTimeout:   defaults.WebUIAuthSessionTimeout,
+			CookieSecure:     defaults.WebUIAuthCookieSecure,
+			CookieSameSite:   defaults.WebUIAuthCookieSameSite,
+		},
+		CORS: CORSConfig{
+			Enabled:        defaults.WebUICORSEnabled,
+			AllowedOrigins: defaults.WebUICORSAllowedOrigins,
+			AllowedMethods: defaults.WebUICORSAllowedMethods,
+			AllowedHeaders: defaults.WebUICORSAllowedHeaders,
+			ExposedHeaders: defaults.WebUICORSExposedHeaders,
+			Credentials:    defaults.WebUICORSCredentials,
+			MaxAge:         defaults.WebUICORSMaxAge,
+		},
+		Features: FeatureFlags{
+			GPIOControl:           defaults.WebUIFeatureGPIOControl,
+			ClusterManagement:     defaults.WebUIFeatureClusterManagement,
+			CertificateManagement: defaults.WebUIFeatureCertificateManagement,
+			RealTimeMetrics:       defaults.WebUIFeatureRealTimeMetrics,
+			NodeDiscovery:         defaults.WebUIFeatureNodeDiscovery,
+			AdvancedNetworking:    defaults.WebUIFeatureAdvancedNetworking,
+			Experimental:          defaults.WebUIFeatureExperimental,
+		},
+		Branding: BrandingConfig{
+			Title:        defaults.WebUIBrandingTitle,
+			LogoURL:      "",
+			FaviconURL:   "",
+			PrimaryColor: defaults.WebUIBrandingPrimaryColor,
+			Theme:        defaults.WebUIBrandingTheme,
+		},
+		Cache: CacheConfig{
+			Enabled:        defaults.WebUICacheEnabled,
+			StaticMaxAge:   defaults.WebUICacheStaticMaxAge,
+			HTMLMaxAge:     defaults.WebUICacheHTMLMaxAge,
+			APICacheMaxAge: defaults.WebUICacheAPIMaxAge,
+		},
+		Compression: CompressionConfig{
+			Enabled: defaults.WebUICompressionEnabled,
+			Level:   defaults.WebUICompressionLevel,
+			MinSize: defaults.WebUICompressionMinSize,
+		},
+		Security: SecurityConfig{
+			HSTSEnabled:        defaults.WebUISecurityHSTSEnabled,
+			HSTSMaxAge:         defaults.WebUISecurityHSTSMaxAge,
+			FrameDeny:          defaults.WebUISecurityFrameDeny,
+			ContentTypeNoSniff: defaults.WebUISecurityContentTypeNoSniff,
+			XSSProtection:      defaults.WebUISecurityXSSProtection,
+			CSPEnabled:         defaults.WebUISecurityCSPEnabled,
+			CSPDirectives:      "",
+		},
+		RateLimit: RateLimitConfig{
+			Enabled:           defaults.WebUIRateLimitEnabled,
+			RequestsPerMinute: defaults.WebUIRateLimitRequestsPerMinute,
+			BurstSize:         defaults.WebUIRateLimitBurstSize,
+		},
+		Observability: ObservabilityConfig{
+			AccessLog:       defaults.WebUIObservabilityAccessLog,
+			AccessLogFormat: defaults.WebUIObservabilityAccessLogFormat,
+			MetricsEnabled:  defaults.WebUIObservabilityMetricsEnabled,
+			MetricsPath:     defaults.WebUIObservabilityMetricsPath,
+			TracingEnabled:  defaults.WebUIObservabilityTracingEnabled,
+		},
+		Resources: ResourcesConfig{
+			CPULimit:      defaults.WebUIResourcesCPULimit,
+			MemoryLimit:   defaults.WebUIResourcesMemoryLimit,
+			CPURequest:    defaults.WebUIResourcesCPURequest,
+			MemoryRequest: defaults.WebUIResourcesMemoryRequest,
+		},
+		Health: HealthConfig{
+			Enabled:       defaults.WebUIHealthEnabled,
+			Path:          defaults.WebUIHealthPath,
+			LivenessPath:  defaults.WebUIHealthLivenessPath,
+			ReadinessPath: defaults.WebUIHealthReadinessPath,
 		},
 	}
 }

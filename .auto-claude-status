@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "002-network-scanning-discovery",
+  "state": "complete",
+  "subtasks": {
+    "completed": 14,
+    "total": 14,
+    "in_progress": 0,
+    "failed": 0
+  },
+  "phase": {
+    "current": "Comprehensive Testing",
+    "id": null,
+    "total": 4
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 1725,
+    "started_at": "2026-01-18T09:37:01.649739"
+  },
+  "last_update": "2026-01-18T13:44:08.560132"
+}
