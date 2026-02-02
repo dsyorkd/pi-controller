@@ -340,8 +340,9 @@
         "dependencies": [
           "93"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:28:40.533Z"
       },
       {
         "id": "95",
@@ -421,8 +422,9 @@
           "93",
           "96"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:28:42.060Z"
       },
       {
         "id": "101",
@@ -473,8 +475,9 @@
         "dependencies": [
           "103"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:28:43.596Z"
       },
       {
         "id": "105",
@@ -604,8 +607,9 @@
         "dependencies": [
           "113"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:28:45.130Z"
       },
       {
         "id": "115",
@@ -643,8 +647,9 @@
         "dependencies": [
           "112"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:28:46.671Z"
       },
       {
         "id": "118",
@@ -773,8 +778,9 @@
         "dependencies": [
           "122"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:28:48.215Z"
       },
       {
         "id": "128",
@@ -850,8 +856,9 @@
         "dependencies": [
           "132"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:28:49.780Z"
       },
       {
         "id": "134",
@@ -1879,9 +1886,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-02-02T07:22:58.947Z",
+      "lastModified": "2026-02-02T07:28:49.781Z",
       "taskCount": 140,
-      "completedCount": 42,
+      "completedCount": 49,
       "tags": [
         "master"
       ]
