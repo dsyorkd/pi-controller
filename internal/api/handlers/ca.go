@@ -570,8 +570,97 @@ func (h *CAHandler) CleanupExpiredCertificates(c *gin.Context) {
 func (h *CAHandler) handleServiceError(c *gin.Context, err error, message string) {
 	h.logger.WithError(err).Error(message)
 
-	// TODO: Add specific error type handling like in cluster handler
-	// For now, default to internal server error
+	// Handle specific service errors
+	if services.IsNotFound(err) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "Not Found",
+			"message": "Resource not found",
+		})
+		return
+	}
+
+	if services.IsAlreadyExists(err) {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "Conflict",
+			"message": "Resource already exists",
+		})
+		return
+	}
+
+	if services.IsInvalidInput(err) || services.IsValidationFailed(err) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": "Invalid input or validation failed",
+		})
+		return
+	}
+
+	if services.IsUnauthorized(err) {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "Unauthorized",
+			"message": "Authentication required",
+		})
+		return
+	}
+
+	if services.IsForbidden(err) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "Forbidden",
+			"message": "Access denied",
+		})
+		return
+	}
+
+	if services.IsConflict(err) {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "Conflict",
+			"message": "Operation conflicts with current state",
+		})
+		return
+	}
+
+	// Handle CA-specific model errors
+	if err == models.ErrCertificateNotFound || err == models.ErrCSRNotFound || err == models.ErrCANotFound {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "Not Found",
+			"message": "Resource not found",
+		})
+		return
+	}
+
+	if err == models.ErrInvalidCertificatePEM {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": "Invalid certificate PEM data",
+		})
+		return
+	}
+
+	if err == models.ErrCertificateExpired {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "Conflict",
+			"message": "Certificate has expired",
+		})
+		return
+	}
+
+	if err == models.ErrCertificateRevoked {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "Conflict",
+			"message": "Certificate has been revoked",
+		})
+		return
+	}
+
+	if err == models.ErrCAInactive {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "Service Unavailable",
+			"message": "Certificate Authority is not active",
+		})
+		return
+	}
+
+	// Default to internal server error for unhandled cases
 	c.JSON(http.StatusInternalServerError, gin.H{
 		"error":   "Internal Server Error",
 		"message": message,

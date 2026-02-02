@@ -5,9 +5,12 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/logger"
@@ -181,11 +184,14 @@ func (s *CAServiceImpl) RenewCertificate(ctx context.Context, certID uint) (*mod
 	// Get the existing certificate
 	var existingCert models.Certificate
 	if err := s.database.DB().First(&existingCert, certID).Error; err != nil {
-		return nil, fmt.Errorf("certificate not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: certificate with ID %d", ErrNotFound, certID)
+		}
+		return nil, fmt.Errorf("failed to get certificate for renewal: %w", err)
 	}
 
 	if !existingCert.IsActive() {
-		return nil, fmt.Errorf("cannot renew inactive certificate")
+		return nil, fmt.Errorf("%w: cannot renew inactive certificate", ErrConflict)
 	}
 
 	// Create renewal request based on existing certificate
@@ -253,11 +259,14 @@ func (s *CAServiceImpl) RevokeCertificate(ctx context.Context, certID uint, reas
 	// Get the certificate
 	var cert models.Certificate
 	if err := s.database.DB().First(&cert, certID).Error; err != nil {
-		return fmt.Errorf("certificate not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("%w: certificate with ID %d", ErrNotFound, certID)
+		}
+		return fmt.Errorf("failed to get certificate for revocation: %w", err)
 	}
 
 	if cert.Status == models.CertificateStatusRevoked {
-		return fmt.Errorf("certificate is already revoked")
+		return fmt.Errorf("%w: certificate is already revoked", ErrConflict)
 	}
 
 	// Revoke through backend
@@ -289,7 +298,10 @@ func (s *CAServiceImpl) GetCertificate(ctx context.Context, id uint) (*models.Ce
 	var cert models.Certificate
 	err := s.database.DB().Preload("Node").Preload("Cluster").First(&cert, id).Error
 	if err != nil {
-		return nil, fmt.Errorf("certificate not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: certificate with ID %d", ErrNotFound, id)
+		}
+		return nil, fmt.Errorf("failed to get certificate: %w", err)
 	}
 	return &cert, nil
 }
@@ -299,7 +311,10 @@ func (s *CAServiceImpl) GetCertificateBySerial(ctx context.Context, serial strin
 	var cert models.Certificate
 	err := s.database.DB().Preload("Node").Preload("Cluster").Where("serial_number = ?", serial).First(&cert).Error
 	if err != nil {
-		return nil, fmt.Errorf("certificate not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: certificate with serial %s", ErrNotFound, serial)
+		}
+		return nil, fmt.Errorf("failed to get certificate by serial: %w", err)
 	}
 	return &cert, nil
 }
@@ -408,11 +423,14 @@ func (s *CAServiceImpl) ProcessCertificateRequest(ctx context.Context, csrID uin
 	// Get the CSR
 	var csr models.CertificateRequest
 	if err := s.database.DB().First(&csr, csrID).Error; err != nil {
-		return nil, fmt.Errorf("certificate request not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: certificate request with ID %d", ErrNotFound, csrID)
+		}
+		return nil, fmt.Errorf("failed to get certificate request: %w", err)
 	}
 
 	if !csr.IsPending() {
-		return nil, fmt.Errorf("certificate request is not pending")
+		return nil, fmt.Errorf("%w: certificate request is not pending", ErrConflict)
 	}
 
 	if !approve {
@@ -602,11 +620,11 @@ func (s *CAServiceImpl) GetCertificateStats(ctx context.Context) (*CertificateSt
 
 func (s *CAServiceImpl) validateCertificateRequest(req *IssueCertificateRequest) error {
 	if req.CommonName == "" {
-		return fmt.Errorf("common name is required")
+		return fmt.Errorf("%w: common name is required", ErrValidationFailed)
 	}
 
 	if req.Type == "" {
-		return fmt.Errorf("certificate type is required")
+		return fmt.Errorf("%w: certificate type is required", ErrValidationFailed)
 	}
 
 	// Validate allowed domains if configured
@@ -619,7 +637,7 @@ func (s *CAServiceImpl) validateCertificateRequest(req *IssueCertificateRequest)
 			}
 		}
 		if !allowed {
-			return fmt.Errorf("common name %s is not in allowed domains", req.CommonName)
+			return fmt.Errorf("%w: common name %s is not in allowed domains", ErrValidationFailed, req.CommonName)
 		}
 	}
 
@@ -629,19 +647,29 @@ func (s *CAServiceImpl) validateCertificateRequest(req *IssueCertificateRequest)
 func (s *CAServiceImpl) parseCertificatePEM(certPEM string) (*x509.Certificate, error) {
 	block, _ := pem.Decode([]byte(certPEM))
 	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, fmt.Errorf("invalid certificate PEM")
+		return nil, fmt.Errorf("%w: invalid certificate PEM format", ErrInvalidInput)
 	}
 
-	return x509.ParseCertificate(block.Bytes)
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to parse certificate: %v", ErrInvalidInput, err)
+	}
+
+	return cert, nil
 }
 
 func (s *CAServiceImpl) parseCSRPEM(csrPEM string) (*x509.CertificateRequest, error) {
 	block, _ := pem.Decode([]byte(csrPEM))
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		return nil, fmt.Errorf("invalid CSR PEM")
+		return nil, fmt.Errorf("%w: invalid CSR PEM format", ErrInvalidInput)
 	}
 
-	return x509.ParseCertificateRequest(block.Bytes)
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to parse CSR: %v", ErrInvalidInput, err)
+	}
+
+	return csr, nil
 }
 
 func (s *CAServiceImpl) formatKeyUsage(keyUsage x509.KeyUsage) string {
