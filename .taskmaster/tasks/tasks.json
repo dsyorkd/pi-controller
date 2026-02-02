@@ -229,8 +229,9 @@
         "dependencies": [
           "85"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:06:50.077Z"
       },
       {
         "id": "87",
@@ -242,8 +243,9 @@
         "dependencies": [
           "85"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:07:41.829Z"
       },
       {
         "id": "88",
@@ -269,8 +271,9 @@
         "dependencies": [
           "85"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:06:51.630Z"
       },
       {
         "id": "90",
@@ -308,8 +311,9 @@
         "testStrategy": "Verify that `test-data.ts` is created and exports the `mockUsers` object correctly. Ensure the test suite can be run (even with no tests) without configuration errors. Import `mockUsers` into a test file and log the data to confirm it's accessible.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:07:33.958Z"
       },
       {
         "id": "93",
@@ -437,8 +441,9 @@
         "testStrategy": "Verify that the `dashboard.spec.ts` and `navigation.spec.ts` files are created in the `tests/` directory. Run a simple placeholder test within one of the files that navigates to the dashboard and confirms the page title. Ensure the `page.route` intercepts are being called successfully by adding a `console.log` inside the handler during the test run.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:07:35.567Z"
       },
       {
         "id": "103",
@@ -566,8 +571,9 @@
         "testStrategy": "Verify that the created data module can be imported into a test file without errors. Write a simple test that mocks the API endpoint and confirms the frontend renders the mock data correctly.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:07:37.133Z"
       },
       {
         "id": "113",
@@ -694,8 +700,9 @@
         "testStrategy": "Review the mock data file to ensure it covers all required test permutations (different statuses, roles, edge cases). A simple unit test can be added to validate the data structure if it becomes programmatically generated. The primary validation will be its successful use in subsequent E2E tests.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:07:38.708Z"
       },
       {
         "id": "123",
@@ -822,8 +829,9 @@
         "testStrategy": "Run a simple test that navigates to a hardware page and asserts that a mocked API call was intercepted. Verify that the test runner can access and use the mock data structures. No UI assertions are needed for this task, focus solely on the mocking infrastructure.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:07:40.259Z"
       },
       {
         "id": "133",
@@ -1724,8 +1732,9 @@
         "testStrategy": "Run `task-master --version` and ensure it returns a version number. List the contents of the `.taskmaster/docs/` directory to confirm all 13 PRD files are present. The script should exit with a status code of 0 if successful.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:06:53.199Z"
       },
       {
         "id": "201",
@@ -1737,8 +1746,9 @@
         "dependencies": [
           "200"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-02-02T07:06:54.756Z"
       },
       {
         "id": "202",
@@ -1850,9 +1860,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-19T00:13:50.643Z",
+      "lastModified": "2026-02-02T07:07:41.829Z",
       "taskCount": 140,
-      "completedCount": 13,
+      "completedCount": 23,
       "tags": [
         "master"
       ]
