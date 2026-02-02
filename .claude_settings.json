@@ -1,0 +1,39 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/**)",
+      "Write(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/**)",
+      "Edit(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/**)",
+      "Glob(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/**)",
+      "Grep(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/**)",
+      "Read(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/.auto-claude/specs/002-network-scanning-discovery/**)",
+      "Write(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/.auto-claude/specs/002-network-scanning-discovery/**)",
+      "Edit(/Users/spenceryork/Projects/pi-controller/.auto-claude/worktrees/tasks/002-network-scanning-discovery/.auto-claude/specs/002-network-scanning-discovery/**)",
+      "Read(/Users/spenceryork/Projects/pi-controller/.auto-claude/**)",
+      "Write(/Users/spenceryork/Projects/pi-controller/.auto-claude/**)",
+      "Edit(/Users/spenceryork/Projects/pi-controller/.auto-claude/**)",
+      "Glob(/Users/spenceryork/Projects/pi-controller/.auto-claude/**)",
+      "Grep(/Users/spenceryork/Projects/pi-controller/.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}

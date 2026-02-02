@@ -1,0 +1,58 @@
+# PRD: Performance Testing
+
+## Product Overview
+Automated performance testing to ensure the pi-controller web interface meets Core Web Vitals standards and provides a smooth user experience.
+
+## Implementation Tasks
+
+### Task 2.10: Performance Testing
+**Priority:** LOW
+**Estimated Effort:** 3-4 hours
+
+**Subtasks:**
+1. Create `performance/performance.spec.ts` test file
+2. Implement initial page load time test (< 3 seconds)
+3. Implement time to interactive test (< 4 seconds)
+4. Implement largest contentful paint test (< 2.5 seconds)
+5. Implement animation smoothness test (60fps)
+6. Implement memory leak detection test
+7. Implement efficient re-render test
+8. Configure Lighthouse CI integration
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication)
+
+## Test Scenarios
+
+### Page Load Performance
+```typescript
+test('should load dashboard in under 3 seconds', async ({ authenticatedPage }) => {
+  const startTime = Date.now();
+
+  await authenticatedPage.goto('/pi-controller');
+  await page.waitForLoadState('networkidle');
+
+  const loadTime = Date.now() - startTime;
+  expect(loadTime).toBeLessThan(3000);
+});
+```
+
+### Core Web Vitals
+```typescript
+test('should meet Core Web Vitals thresholds', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller');
+
+  const metrics = await page.evaluate(() => {
+    return new Promise(resolve => {
+      new PerformanceObserver(list => {
+        const entries = list.getEntries();
+        const lcp = entries.find(e => e.entryType === 'largest-contentful-paint');
+        resolve({ lcp: lcp?.renderTime });
+      }).observe({ entryTypes: ['largest-contentful-paint'] });
+    });
+  });
+
+  expect(metrics.lcp).toBeLessThan(2500); // 2.5 seconds
+});
+```

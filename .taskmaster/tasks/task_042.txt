@@ -40,4 +40,3 @@ In the `codecov/codecov-action@v3` step within `.github/workflows/ci.yml`, add a
 ### Description: Modify the `test` job to ensure it only runs after the `build` job has completed successfully. This creates a logical dependency chain in the CI pipeline.
 ### Details:
 In the definition of the `test` job in `.github/workflows/ci.yml`, add the `needs: build` key. This will prevent tests from running if the build fails, saving CI resources and providing clearer failure signals.
-

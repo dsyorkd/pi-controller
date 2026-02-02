@@ -11,6 +11,7 @@ Creates or updates README.md with beautifully formatted task information.
 ## Argument Parsing
 
 Optional filters:
+
 - "pending" → Only pending tasks
 - "with-subtasks" → Include subtask details
 - "by-priority" → Group by priority
@@ -25,6 +26,7 @@ task-master sync-readme [--with-subtasks] [--status=<status>]
 ## README Generation
 
 ### 1. **Project Header**
+
 ```markdown
 # Project Name
 
@@ -40,13 +42,16 @@ Last Updated: 2024-01-15 10:30 AM
 ```
 
 ### 2. **Task Sections**
+
 Organized by status or priority:
+
 - Progress indicators
 - Task descriptions
 - Dependencies noted
 - Time estimates
 
 ### 3. **Visual Elements**
+
 - Progress bars
 - Status badges
 - Priority indicators
@@ -93,6 +98,7 @@ Organized by status or priority:
 ## Customization
 
 Based on arguments:
+
 - Include/exclude sections
 - Detail level control
 - Custom grouping
@@ -101,6 +107,7 @@ Based on arguments:
 ## Post-Sync
 
 After generation:
+
 1. Show diff preview
 2. Backup existing README
 3. Write new content
@@ -110,6 +117,7 @@ After generation:
 ## Integration
 
 Works well with:
+
 - Git workflows
 - CI/CD pipelines
 - Project documentation

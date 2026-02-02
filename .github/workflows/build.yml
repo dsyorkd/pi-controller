@@ -1,0 +1,41 @@
+name: build
+on:
+  push:
+    branches:
+    - master
+    - release-*
+    - v*
+    - renovate/*
+  pull_request:
+  schedule:
+    - cron: "10 0,12 * * *"
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
+jobs:
+  configure_input_vars:
+    runs-on: ubuntu-latest
+    outputs:
+      sha_short: ${{ steps.set_vars.outputs.sha_short }}
+      branch: ${{ steps.set_vars.outputs.branch }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Declare branch and sha_short
+      id: set_vars
+      run: |
+        echo "sha_short=$(git rev-parse --short=8 "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+        echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> "$GITHUB_OUTPUT"
+
+  calling-build-factory:
+    needs: configure_input_vars
+    uses: ./.github/workflows/build-factory.yml
+    with:
+      image_tag: ${{ needs.configure_input_vars.outputs.branch }}-head
+      build_version: ${{ needs.configure_input_vars.outputs.branch }}-${{ needs.configure_input_vars.outputs.sha_short }}-head

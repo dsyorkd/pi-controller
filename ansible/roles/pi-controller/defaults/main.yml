@@ -1,0 +1,45 @@
+---
+# Pi Controller Role Defaults
+
+# Version to install (use 'local' for local binary)
+pi_controller_version: latest
+
+# Service configuration
+pi_controller_mode: on-device
+pi_controller_log_level: info
+pi_controller_debug: false
+pi_controller_environment: production
+
+# Whether to start the service after installation
+start_service: true
+
+# Whether to create a backup before upgrades
+create_backup: true
+
+# Number of backups to retain
+keep_backup_count: 3
+
+# Paths
+data_dir: /var/lib/pi-controller
+config_dir: /etc/pi-controller
+log_dir: /var/log/pi-controller
+backup_dir: /var/lib/pi-controller/backups
+database_path: /var/lib/pi-controller/pi-controller.db
+
+# Ports
+api_port: 8080
+grpc_port: 9090
+websocket_port: 8081
+cluster_port: 9091
+
+# Cluster settings
+cluster_bootstrap: false
+
+# GPIO
+enable_gpio: true
+gpio_mock_mode: false
+
+# Security
+enable_tls: false
+enable_auth: false
+enable_security_hardening: false

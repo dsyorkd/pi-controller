@@ -25,7 +25,7 @@ This Product Requirements Document outlines the completion of the Pi Controller 
 - **Required**: Complete node agent with GPIO control, system monitoring, and gRPC communication
 - **Business Impact**: Core functionality for hardware control is missing
 
-#### 2. **Discovery Service Implementation** - HIGH PRIORITY  
+#### 2. **Discovery Service Implementation** - HIGH PRIORITY
 - **Current State**: Mock mDNS discovery with placeholder functions
 - **Required**: Real mDNS discovery, network scanning, and node registration
 - **Business Impact**: Automatic node discovery is critical for usability
@@ -84,7 +84,7 @@ This Product Requirements Document outlines the completion of the Pi Controller 
    - Implement proper transaction handling
    - Add comprehensive input validation
 
-### Phase 2.2: Hardware Control Implementation (Sprint 3-4)  
+### Phase 2.2: Hardware Control Implementation (Sprint 3-4)
 **Goal**: Deliver working GPIO and hardware control functionality
 
 #### Tasks:
@@ -139,7 +139,7 @@ This Product Requirements Document outlines the completion of the Pi Controller 
    - Status reporting and reconciliation
    - Resource quotas and limits
 
-2. **Kubernetes Controllers** 
+2. **Kubernetes Controllers**
    - GPIO resource reconciliation loops
    - Node-to-resource assignment logic
    - Hardware state synchronization
@@ -162,7 +162,7 @@ This Product Requirements Document outlines the completion of the Pi Controller 
    - Connection pooling and retry logic
 
 2. **K3s Provisioning**
-   - K3s binary installation and configuration  
+   - K3s binary installation and configuration
    - Cluster bootstrap and join token management
    - Network CNI configuration
    - Storage and ingress setup
@@ -213,7 +213,7 @@ This Product Requirements Document outlines the completion of the Pi Controller 
 
 3. **User Experience**
    - Onboarding and setup wizards
-   - Documentation and help system  
+   - Documentation and help system
    - Accessibility compliance
    - Performance optimization
 
@@ -271,7 +271,7 @@ This Product Requirements Document outlines the completion of the Pi Controller 
 ### External Dependencies
 - **hashicorp/mdns** - mDNS discovery implementation
 - **go.k8s.io/client-go** - Kubernetes API client
-- **periph.io/x/periph** - Hardware GPIO access  
+- **periph.io/x/periph** - Hardware GPIO access
 - **golang.org/x/crypto/ssh** - SSH client implementation
 - **React 18+** - Frontend framework
 
@@ -290,7 +290,7 @@ This Product Requirements Document outlines the completion of the Pi Controller 
 
 ## Success Metrics
 
-### Development Metrics  
+### Development Metrics
 - Zero compilation errors and warnings
 - 100% passing test suite
 - Code coverage above 80%

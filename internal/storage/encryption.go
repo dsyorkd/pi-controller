@@ -11,20 +11,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sirupsen/logrus"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"go.etcd.io/bbolt"
 	"golang.org/x/crypto/pbkdf2"
 )
 
 // EncryptionConfig holds encryption configuration
 type EncryptionConfig struct {
-	Enabled           bool   `yaml:"enabled"`
-	KeyFile           string `yaml:"key_file"`
-	KeyFromEnv        string `yaml:"key_from_env"`
-	EncryptedDBPath   string `yaml:"encrypted_db_path"`
-	PragmaKey         string `yaml:"pragma_key"`
-	PBKDF2Iterations  int    `yaml:"pbkdf2_iterations"`
-	GenerateKeyIfMissing bool `yaml:"generate_key_if_missing"`
+	Enabled              bool   `yaml:"enabled"`
+	KeyFile              string `yaml:"key_file"`
+	KeyFromEnv           string `yaml:"key_from_env"`
+	EncryptedDBPath      string `yaml:"encrypted_db_path"`
+	PragmaKey            string `yaml:"pragma_key"`
+	PBKDF2Iterations     int    `yaml:"pbkdf2_iterations"`
+	GenerateKeyIfMissing bool   `yaml:"generate_key_if_missing"`
 }
 
 // DefaultEncryptionConfig returns secure default encryption configuration
@@ -42,13 +42,13 @@ func DefaultEncryptionConfig() *EncryptionConfig {
 // EncryptedStorage provides encrypted storage for sensitive data
 type EncryptedStorage struct {
 	config *EncryptionConfig
-	logger *logrus.Entry
+	logger applogger.Interface
 	db     *bbolt.DB
 	gcm    cipher.AEAD
 }
 
 // NewEncryptedStorage creates a new encrypted storage instance
-func NewEncryptedStorage(config *EncryptionConfig, logger *logrus.Logger) (*EncryptedStorage, error) {
+func NewEncryptedStorage(config *EncryptionConfig, logger applogger.Interface) (*EncryptedStorage, error) {
 	if config == nil {
 		config = DefaultEncryptionConfig()
 	}
@@ -238,12 +238,12 @@ func (es *EncryptedStorage) Retrieve(bucket, key string) ([]byte, error) {
 		if b == nil {
 			return fmt.Errorf("bucket %s not found", bucket)
 		}
-		
+
 		data := b.Get([]byte(key))
 		if data == nil {
 			return fmt.Errorf("key %s not found in bucket %s", key, bucket)
 		}
-		
+
 		encryptedData = make([]byte, len(data))
 		copy(encryptedData, data)
 		return nil
@@ -346,13 +346,13 @@ func (es *EncryptedStorage) GetStats() map[string]interface{} {
 
 	stats := es.db.Stats()
 	return map[string]interface{}{
-		"enabled":          true,
-		"database_path":    es.config.EncryptedDBPath,
-		"tx_stats":         stats.TxStats,
-		"free_page_count":  stats.FreePageN,
+		"enabled":            true,
+		"database_path":      es.config.EncryptedDBPath,
+		"tx_stats":           stats.TxStats,
+		"free_page_count":    stats.FreePageN,
 		"pending_page_count": stats.PendingPageN,
-		"free_alloc":       stats.FreeAlloc,
-		"free_list_inuse":  stats.FreelistInuse,
+		"free_alloc":         stats.FreeAlloc,
+		"free_list_inuse":    stats.FreelistInuse,
 	}
 }
 

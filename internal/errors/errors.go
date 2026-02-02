@@ -9,25 +9,25 @@ import (
 var (
 	// ErrNotFound indicates a resource was not found
 	ErrNotFound = errors.New("resource not found")
-	
+
 	// ErrAlreadyExists indicates a resource already exists
 	ErrAlreadyExists = errors.New("resource already exists")
-	
+
 	// ErrInvalidInput indicates invalid input was provided
 	ErrInvalidInput = errors.New("invalid input")
-	
+
 	// ErrUnauthorized indicates insufficient permissions
 	ErrUnauthorized = errors.New("unauthorized")
-	
+
 	// ErrForbidden indicates access is forbidden
 	ErrForbidden = errors.New("forbidden")
-	
+
 	// ErrConflict indicates a resource conflict
 	ErrConflict = errors.New("resource conflict")
-	
+
 	// ErrInternal indicates an internal server error
 	ErrInternal = errors.New("internal server error")
-	
+
 	// ErrServiceUnavailable indicates a service is unavailable
 	ErrServiceUnavailable = errors.New("service unavailable")
 )

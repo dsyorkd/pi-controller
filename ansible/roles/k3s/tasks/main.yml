@@ -1,0 +1,153 @@
+---
+# K3s Cleanup Role
+# =================
+# This role DOES NOT install K3s - that's handled by pi-controller.
+# This role provides cleanup/rollback when:
+# - pi-controller hits a race condition
+# - Testing leaves orphaned K3s state
+# - A failed installation needs to be reset
+
+- name: Check for k3s installation
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Check for k3s-uninstall script
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s-uninstall.sh
+  register: k3s_uninstall_script
+
+- name: Check for k3s-agent-uninstall script
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s-agent-uninstall.sh
+  register: k3s_agent_uninstall_script
+
+# ----------------------
+# Stop Services First
+# ----------------------
+- name: Stop k3s server service
+  ansible.builtin.systemd:
+    name: k3s
+    state: stopped
+  ignore_errors: true
+  when: k3s_binary.stat.exists
+
+- name: Stop k3s agent service
+  ansible.builtin.systemd:
+    name: k3s-agent
+    state: stopped
+  ignore_errors: true
+  when: k3s_binary.stat.exists
+
+# ----------------------
+# Use Built-in Uninstall Scripts (Preferred)
+# ----------------------
+- name: Run k3s-uninstall.sh if available
+  ansible.builtin.command: /usr/local/bin/k3s-uninstall.sh
+  when: k3s_uninstall_script.stat.exists
+  ignore_errors: true
+
+- name: Run k3s-agent-uninstall.sh if available
+  ansible.builtin.command: /usr/local/bin/k3s-agent-uninstall.sh
+  when: k3s_agent_uninstall_script.stat.exists
+  ignore_errors: true
+
+# ----------------------
+# Force Cleanup (for partial/failed installs)
+# ----------------------
+- name: Kill any remaining k3s processes
+  ansible.builtin.shell: |
+    pkill -9 -f k3s || true
+    pkill -9 -f containerd-shim || true
+  changed_when: false
+  ignore_errors: true
+
+- name: Unmount k3s-related mounts
+  ansible.builtin.shell: |
+    for mount in $(mount | grep -E 'kubelet|rancher|cni' | awk '{print $3}'); do
+      umount -f "$mount" 2>/dev/null || true
+    done
+  changed_when: false
+  ignore_errors: true
+  args:
+    executable: /bin/bash
+
+- name: Remove k3s binaries
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/bin/k3s
+    - /usr/local/bin/k3s-uninstall.sh
+    - /usr/local/bin/k3s-agent-uninstall.sh
+    - /usr/local/bin/k3s-killall.sh
+    - /usr/local/bin/kubectl
+    - /usr/local/bin/crictl
+    - /usr/local/bin/ctr
+  ignore_errors: true
+
+- name: Remove k3s data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/rancher
+    - /etc/rancher
+    - /var/lib/kubelet
+    - /var/lib/cni
+    - /etc/cni
+    - /var/log/containers
+    - /var/log/pods
+  ignore_errors: true
+
+- name: Remove k3s systemd units
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/k3s.service
+    - /etc/systemd/system/k3s-agent.service
+    - /etc/systemd/system/k3s.service.env
+  notify: reload systemd
+  ignore_errors: true
+
+# ----------------------
+# Network Cleanup
+# ----------------------
+- name: Remove CNI network interfaces
+  ansible.builtin.shell: |
+    ip link delete flannel.1 2>/dev/null || true
+    ip link delete flannel-v6.1 2>/dev/null || true
+    ip link delete cni0 2>/dev/null || true
+    ip link delete vxlan.calico 2>/dev/null || true
+  changed_when: false
+  ignore_errors: true
+
+- name: Flush iptables rules (optional - use with caution)
+  ansible.builtin.shell: |
+    # Only remove K3s/Kubernetes-related rules, preserve others
+    iptables-save | grep -v -E 'KUBE-|CNI-|FLANNEL' | iptables-restore || true
+  changed_when: false
+  when: flush_iptables | default(false)
+  ignore_errors: true
+
+# ----------------------
+# Verification
+# ----------------------
+- name: Verify cleanup - check for k3s binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_after_cleanup
+
+- name: Verify cleanup - check for rancher directory
+  ansible.builtin.stat:
+    path: /var/lib/rancher
+  register: rancher_after_cleanup
+
+- name: Report cleanup status
+  ansible.builtin.debug:
+    msg: |
+      K3s cleanup on {{ inventory_hostname }}:
+      - Binary removed: {{ not k3s_after_cleanup.stat.exists }}
+      - Data removed: {{ not rancher_after_cleanup.stat.exists }}
+      - Status: {{ 'CLEAN' if (not k3s_after_cleanup.stat.exists and not rancher_after_cleanup.stat.exists) else 'PARTIAL - manual intervention may be needed' }}

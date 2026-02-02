@@ -1,11 +1,14 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/getsentry/sentry-go"
 )
 
 // Interface defines the logging interface used throughout the application
@@ -14,13 +17,13 @@ type Interface interface {
 	Info(msg string, args ...interface{})
 	Warn(msg string, args ...interface{})
 	Error(msg string, args ...interface{})
-	
+
 	Debugf(format string, args ...interface{})
 	Infof(format string, args ...interface{})
 	Warnf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
-	
+
 	WithField(key string, value interface{}) Interface
 	WithFields(fields map[string]interface{}) Interface
 	WithError(err error) Interface
@@ -29,6 +32,71 @@ type Interface interface {
 // Logger wraps slog.Logger to provide a common interface across the application
 type Logger struct {
 	*slog.Logger
+}
+
+// SentryHandler wraps an slog.Handler and sends error-level logs to Sentry
+type SentryHandler struct {
+	handler slog.Handler
+}
+
+// NewSentryHandler wraps an existing handler with Sentry integration
+func NewSentryHandler(handler slog.Handler) *SentryHandler {
+	return &SentryHandler{handler: handler}
+}
+
+// Handle implements slog.Handler interface
+func (h *SentryHandler) Handle(ctx context.Context, record slog.Record) error {
+	// Always delegate to the underlying handler first
+	err := h.handler.Handle(ctx, record)
+
+	// Send to Sentry if it's an error level
+	if record.Level >= slog.LevelError && sentry.CurrentHub().Client() != nil {
+		// Extract fields from the record
+		fields := make(map[string]interface{})
+		record.Attrs(func(attr slog.Attr) bool {
+			fields[attr.Key] = attr.Value.Any()
+			return true
+		})
+
+		// Capture to Sentry
+		event := sentry.NewEvent()
+		event.Level = sentry.LevelError
+		event.Message = record.Message
+		event.Timestamp = record.Time
+
+		if len(fields) > 0 {
+			event.Extra = fields
+		}
+
+		// Check if there's an error in the fields
+		if errValue, exists := fields["error"]; exists {
+			if actualErr, ok := errValue.(error); ok {
+				event.Exception = []sentry.Exception{{
+					Type:  "Error",
+					Value: actualErr.Error(),
+				}}
+			}
+		}
+
+		sentry.CurrentHub().CaptureEvent(event)
+	}
+
+	return err
+}
+
+// Enabled implements slog.Handler interface
+func (h *SentryHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.handler.Enabled(ctx, level)
+}
+
+// WithAttrs implements slog.Handler interface
+func (h *SentryHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &SentryHandler{handler: h.handler.WithAttrs(attrs)}
+}
+
+// WithGroup implements slog.Handler interface
+func (h *SentryHandler) WithGroup(name string) slog.Handler {
+	return &SentryHandler{handler: h.handler.WithGroup(name)}
 }
 
 // Config contains logging configuration
@@ -60,7 +128,7 @@ func New(config Config) (*Logger, error) {
 		output = os.Stderr
 	default:
 		// If it's not stdout/stderr, treat it as a file path
-		file, err := os.OpenFile(config.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(config.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) // #nosec G302 - secure file permissions
 		if err != nil {
 			return nil, fmt.Errorf("failed to open log file '%s': %w", config.Output, err)
 		}
@@ -70,7 +138,7 @@ func New(config Config) (*Logger, error) {
 	// Create handler based on format
 	var handler slog.Handler
 	opts := &slog.HandlerOptions{
-		Level: level,
+		Level:     level,
 		AddSource: level == slog.LevelDebug, // Add source info for debug level
 	}
 
@@ -82,6 +150,9 @@ func New(config Config) (*Logger, error) {
 	default:
 		return nil, fmt.Errorf("unsupported log format '%s'", config.Format)
 	}
+
+	// Wrap with Sentry handler for error capture
+	handler = NewSentryHandler(handler)
 
 	logger := slog.New(handler)
 	return &Logger{Logger: logger}, nil

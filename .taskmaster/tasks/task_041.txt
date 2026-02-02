@@ -40,4 +40,3 @@ The test will call `Discoverer.Discover()` and then write a well-formed mDNS res
 ### Description: Extend the discovery tests to handle more complex scenarios. Verify that the `Discoverer` can find multiple services advertised on the network. Additionally, test the context cancellation logic to ensure that the discovery process terminates promptly when the provided context is cancelled.
 ### Details:
 For the multiple service test, inject several distinct mDNS response packets and ensure all are received on the results channel. For the cancellation test, create a context using `context.WithCancel()`, call `Discover()`, immediately cancel the context, and verify that the discovery goroutine exits and the channel is closed without delay.
-

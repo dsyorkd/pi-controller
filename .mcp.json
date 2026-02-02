@@ -1,5 +1,11 @@
 {
 	"mcpServers": {
+                "playwright": {
+                        "command": "npx",
+                        "args": [
+                          "@playwright/mcp@latest"
+                        ]
+                },
 		"task-master-ai": {
 			"type": "stdio",
 			"command": "npx",
@@ -21,4 +27,4 @@
 			}
 		}
 	}
-}
+	}

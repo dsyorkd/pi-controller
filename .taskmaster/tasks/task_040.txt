@@ -40,4 +40,3 @@ Configure the `mockPin` to return specific values from its `Read()` method. For 
 ### Description: Create tests to ensure the controller behaves correctly when asked to operate on a pin identifier that was not configured during initialization or is otherwise unknown.
 ### Details:
 Instantiate a controller with a valid set of pins (e.g., "GPIO1"). Then, call methods like `SetPinHigh` or `ReadPin` with an invalid identifier (e.g., "GPIO99"). Assert that these calls do not interact with the mock and return a specific, identifiable error (e.g., `ErrPinNotFound`).
-

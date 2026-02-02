@@ -40,4 +40,3 @@ In `internal/websocket/client_test.go`, use a mock `websocket.Conn` that can be 
 ### Description: Write a unit test for the `Hub` in `internal/websocket/hub.go` to verify its message broadcasting functionality. Ensure that a message sent to the `broadcast` channel is delivered to all registered clients.
 ### Details:
 In `internal/websocket/hub_test.go`, create a `Hub` and run it. Create several mock clients, each with its own `send` channel. Register these clients with the hub. Send a message to the hub's `broadcast` channel. Assert that each registered client's `send` channel receives the message. Also, test that a client that has been unregistered does not receive the message.
-

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package pi_agent;
 
-option go_package = "github.com/dsyorkd/pi-controller/proto";
-
 import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dsyorkd/pi-controller/proto";
 
 // PiAgentService provides gRPC API for direct hardware control on Pi nodes
 service PiAgentService {
@@ -14,11 +14,22 @@ service PiAgentService {
   rpc WriteGPIOPin(WriteGPIOPinRequest) returns (WriteGPIOPinResponse);
   rpc SetGPIOPWM(SetGPIOPWMRequest) returns (SetGPIOPWMResponse);
   rpc ListConfiguredPins(ListConfiguredPinsRequest) returns (ListConfiguredPinsResponse);
-  
+
+  // SPI operations
+  rpc SPIExchange(SPIExchangeRequest) returns (SPIExchangeResponse);
+  rpc SPIWrite(SPIWriteRequest) returns (SPIWriteResponse);
+  rpc SPIRead(SPIReadRequest) returns (SPIReadResponse);
+
+  // I2C operations
+  rpc I2CWrite(I2CWriteRequest) returns (I2CWriteResponse);
+  rpc I2CRead(I2CReadRequest) returns (I2CReadResponse);
+  rpc I2CWriteRegister(I2CWriteRegisterRequest) returns (I2CWriteRegisterResponse);
+  rpc I2CReadRegister(I2CReadRegisterRequest) returns (I2CReadRegisterResponse);
+
   // Health and status
   rpc AgentHealth(AgentHealthRequest) returns (AgentHealthResponse);
   rpc GetSystemInfo(GetSystemInfoRequest) returns (GetSystemInfoResponse);
-  
+
   // System metrics
   rpc GetSystemMetrics(GetSystemMetricsRequest) returns (GetSystemMetricsResponse);
   rpc StreamSystemMetrics(StreamSystemMetricsRequest) returns (stream SystemMetricsResponse);
@@ -86,6 +97,80 @@ message ListConfiguredPinsResponse {
   repeated GPIOPinState pins = 1;
 }
 
+// SPI messages
+message SPIExchangeRequest {
+  int32 channel = 1;
+  bytes data = 2;
+}
+
+message SPIExchangeResponse {
+  bytes data = 1;
+}
+
+message SPIWriteRequest {
+  int32 channel = 1;
+  bytes data = 2;
+}
+
+message SPIWriteResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message SPIReadRequest {
+  int32 channel = 1;
+  int32 length = 2;
+}
+
+message SPIReadResponse {
+  bytes data = 1;
+}
+
+// I2C messages
+message I2CWriteRequest {
+  int32 bus = 1;
+  int32 address = 2;
+  bytes data = 3;
+}
+
+message I2CWriteResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message I2CReadRequest {
+  int32 bus = 1;
+  int32 address = 2;
+  int32 length = 3;
+}
+
+message I2CReadResponse {
+  bytes data = 1;
+}
+
+message I2CWriteRegisterRequest {
+  int32 bus = 1;
+  int32 address = 2;
+  int32 register = 3;
+  bytes data = 4;
+}
+
+message I2CWriteRegisterResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message I2CReadRegisterRequest {
+  int32 bus = 1;
+  int32 address = 2;
+  int32 register = 3;
+  int32 length = 4;
+}
+
+message I2CReadRegisterResponse {
+  bytes data = 1;
+}
+
 // GPIO pin state
 message GPIOPinState {
   int32 pin = 1;
@@ -118,6 +203,7 @@ message AgentHealthResponse {
   string version = 3;
   string uptime = 4;
   bool gpio_available = 5;
+  repeated string capabilities = 6;
 }
 
 message GetSystemInfoRequest {}
@@ -157,72 +243,72 @@ message SystemMetricsResponse {
 message SystemMetrics {
   // CPU metrics
   CPUMetrics cpu = 1;
-  
+
   // Memory metrics
   MemoryMetrics memory = 2;
-  
+
   // Disk metrics
   repeated DiskMetrics disks = 3;
-  
+
   // Network metrics
   repeated NetworkMetrics network = 4;
-  
+
   // Thermal metrics (especially important for Raspberry Pi)
   ThermalMetrics thermal = 5;
-  
+
   // System load
   LoadMetrics load = 6;
-  
+
   // Process metrics
   ProcessMetrics processes = 7;
 }
 
 message CPUMetrics {
-  double usage_percent = 1;           // Overall CPU usage percentage
+  double usage_percent = 1; // Overall CPU usage percentage
   repeated double per_core_usage = 2; // Usage per CPU core
-  double user_percent = 3;            // User space CPU usage
-  double system_percent = 4;          // System/kernel CPU usage
-  double idle_percent = 5;            // Idle CPU percentage
-  double iowait_percent = 6;          // I/O wait percentage
+  double user_percent = 3; // User space CPU usage
+  double system_percent = 4; // System/kernel CPU usage
+  double idle_percent = 5; // Idle CPU percentage
+  double iowait_percent = 6; // I/O wait percentage
 }
 
 message MemoryMetrics {
-  uint64 total_bytes = 1;        // Total system memory
-  uint64 available_bytes = 2;    // Available memory
-  uint64 used_bytes = 3;         // Used memory
-  uint64 free_bytes = 4;         // Free memory
-  uint64 cached_bytes = 5;       // Cached memory
-  uint64 buffers_bytes = 6;      // Buffer cache
-  double usage_percent = 7;      // Memory usage percentage
-  uint64 swap_total_bytes = 8;   // Total swap space
-  uint64 swap_used_bytes = 9;    // Used swap space
+  uint64 total_bytes = 1; // Total system memory
+  uint64 available_bytes = 2; // Available memory
+  uint64 used_bytes = 3; // Used memory
+  uint64 free_bytes = 4; // Free memory
+  uint64 cached_bytes = 5; // Cached memory
+  uint64 buffers_bytes = 6; // Buffer cache
+  double usage_percent = 7; // Memory usage percentage
+  uint64 swap_total_bytes = 8; // Total swap space
+  uint64 swap_used_bytes = 9; // Used swap space
   double swap_usage_percent = 10; // Swap usage percentage
 }
 
 message DiskMetrics {
-  string device = 1;             // Device name (e.g., /dev/sda1)
-  string mountpoint = 2;         // Mount point (e.g., /)
-  string filesystem = 3;         // Filesystem type (e.g., ext4)
-  uint64 total_bytes = 4;        // Total disk space
-  uint64 used_bytes = 5;         // Used disk space
-  uint64 free_bytes = 6;         // Free disk space
-  double usage_percent = 7;      // Disk usage percentage
-  uint64 inodes_total = 8;       // Total inodes
-  uint64 inodes_used = 9;        // Used inodes
-  uint64 inodes_free = 10;       // Free inodes
+  string device = 1; // Device name (e.g., /dev/sda1)
+  string mountpoint = 2; // Mount point (e.g., /)
+  string filesystem = 3; // Filesystem type (e.g., ext4)
+  uint64 total_bytes = 4; // Total disk space
+  uint64 used_bytes = 5; // Used disk space
+  uint64 free_bytes = 6; // Free disk space
+  double usage_percent = 7; // Disk usage percentage
+  uint64 inodes_total = 8; // Total inodes
+  uint64 inodes_used = 9; // Used inodes
+  uint64 inodes_free = 10; // Free inodes
   double inodes_usage_percent = 11; // Inode usage percentage
 }
 
 message NetworkMetrics {
-  string interface = 1;          // Network interface name
-  uint64 bytes_sent = 2;         // Total bytes sent
-  uint64 bytes_recv = 3;         // Total bytes received
-  uint64 packets_sent = 4;       // Total packets sent
-  uint64 packets_recv = 5;       // Total packets received
-  uint64 err_in = 6;            // Input errors
-  uint64 err_out = 7;           // Output errors
-  uint64 drop_in = 8;           // Input drops
-  uint64 drop_out = 9;          // Output drops
+  string interface = 1; // Network interface name
+  uint64 bytes_sent = 2; // Total bytes sent
+  uint64 bytes_recv = 3; // Total bytes received
+  uint64 packets_sent = 4; // Total packets sent
+  uint64 packets_recv = 5; // Total packets received
+  uint64 err_in = 6; // Input errors
+  uint64 err_out = 7; // Output errors
+  uint64 drop_in = 8; // Input drops
+  uint64 drop_out = 9; // Output drops
 }
 
 message ThermalMetrics {
@@ -230,22 +316,22 @@ message ThermalMetrics {
 }
 
 message ThermalZone {
-  string name = 1;               // Zone name (e.g., cpu-thermal)
+  string name = 1; // Zone name (e.g., cpu-thermal)
   double temperature_celsius = 2; // Current temperature in Celsius
-  double critical_temp = 3;      // Critical temperature threshold
-  string status = 4;             // Thermal zone status
+  double critical_temp = 3; // Critical temperature threshold
+  string status = 4; // Thermal zone status
 }
 
 message LoadMetrics {
-  double load1 = 1;              // 1-minute load average
-  double load5 = 2;              // 5-minute load average
-  double load15 = 3;             // 15-minute load average
+  double load1 = 1; // 1-minute load average
+  double load5 = 2; // 5-minute load average
+  double load15 = 3; // 15-minute load average
 }
 
 message ProcessMetrics {
-  uint32 total = 1;              // Total number of processes
-  uint32 running = 2;            // Number of running processes
-  uint32 sleeping = 3;           // Number of sleeping processes
-  uint32 stopped = 4;            // Number of stopped processes
-  uint32 zombie = 5;             // Number of zombie processes
+  uint32 total = 1; // Total number of processes
+  uint32 running = 2; // Number of running processes
+  uint32 sleeping = 3; // Number of sleeping processes
+  uint32 stopped = 4; // Number of stopped processes
+  uint32 zombie = 5; // Number of zombie processes
 }

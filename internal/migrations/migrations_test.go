@@ -4,13 +4,12 @@ import (
 	"testing"
 	"time"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // testLogger implements a simple logger for testing
@@ -158,7 +157,7 @@ func TestMigrator_ValidateMigrationOrder(t *testing.T) {
 
 func TestMigrator_GetPendingMigrations(t *testing.T) {
 	db, log := setupTestDB(t)
-	
+
 	// Create test migrations
 	testMigrations := []MigrationDefinition{
 		{ID: "20241201000001", Description: "Test 1"},
@@ -200,7 +199,7 @@ func TestMigrator_GetPendingMigrations(t *testing.T) {
 
 func TestMigrator_Status(t *testing.T) {
 	db, log := setupTestDB(t)
-	
+
 	testMigrations := []MigrationDefinition{
 		{ID: "20241201000001", Description: "Test 1"},
 		{ID: "20241201000002", Description: "Test 2"},
@@ -475,7 +474,7 @@ func TestMigrator_ProductionSchemaIntegration(t *testing.T) {
 		// Verify expected indexes exist (sample a few critical ones)
 		expectedIndexes := []string{
 			"idx_clusters_name",
-			"idx_nodes_name", 
+			"idx_nodes_name",
 			"idx_nodes_ip_address",
 			"idx_gpio_devices_node_id",
 			"idx_gpio_readings_device_id",
@@ -489,18 +488,18 @@ func TestMigrator_ProductionSchemaIntegration(t *testing.T) {
 
 		// Verify foreign key constraints work by testing table structure
 		var pragmaResults []struct {
-			CID      int    `gorm:"column:cid"`
-			Name     string `gorm:"column:name"`
-			Type     string `gorm:"column:type"`
-			NotNull  int    `gorm:"column:notnull"`
+			CID       int         `gorm:"column:cid"`
+			Name      string      `gorm:"column:name"`
+			Type      string      `gorm:"column:type"`
+			NotNull   int         `gorm:"column:notnull"`
 			DfltValue interface{} `gorm:"column:dflt_value"`
-			PK       int    `gorm:"column:pk"`
+			PK        int         `gorm:"column:pk"`
 		}
 
 		// Check nodes table has foreign key to clusters
 		err = db.Raw("PRAGMA table_info(nodes)").Scan(&pragmaResults).Error
 		assert.NoError(t, err)
-		
+
 		clusterIDFound := false
 		for _, col := range pragmaResults {
 			if col.Name == "cluster_id" {
@@ -550,5 +549,232 @@ func TestMigrator_ProductionSchemaIntegration(t *testing.T) {
 		err = db.Raw("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='migrations'").Scan(&migrationTableCount).Error
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), migrationTableCount, "Migrations table should still exist")
+	})
+}
+
+// Test migration 20241201000013 - Add node discovery and type tracking fields
+func TestMigration_AddNodeDiscoveryFields(t *testing.T) {
+	db, log := setupTestDB(t)
+
+	// Apply migrations up to but not including the discovery fields migration
+	preMigrations := []MigrationDefinition{}
+	for _, m := range getAllMigrations() {
+		if m.ID < "20241201000013" {
+			preMigrations = append(preMigrations, m)
+		}
+	}
+
+	preMigrator := &Migrator{
+		db:         db,
+		logger:     log,
+		migrations: preMigrations,
+	}
+
+	// Apply pre-discovery migrations
+	err := preMigrator.Up()
+	require.NoError(t, err)
+
+	// Insert a test node before the discovery migration
+	err = db.Exec(`
+		INSERT INTO nodes (name, ip_address, mac_address, status, role, created_at, updated_at)
+		VALUES ('test-node', '192.168.1.10', 'aa:bb:cc:dd:ee:ff', 'ready', 'worker', datetime('now'), datetime('now'))
+	`).Error
+	require.NoError(t, err)
+
+	// Get the node ID
+	var nodeID uint
+	err = db.Raw("SELECT id FROM nodes WHERE name = 'test-node'").Scan(&nodeID).Error
+	require.NoError(t, err)
+
+	// Get the node's created_at timestamp
+	var createdAt time.Time
+	err = db.Raw("SELECT created_at FROM nodes WHERE id = ?", nodeID).Scan(&createdAt).Error
+	require.NoError(t, err)
+
+	t.Run("Apply discovery fields migration", func(t *testing.T) {
+		// Find and apply only the discovery migration
+		var discoveryMigration *MigrationDefinition
+		for _, m := range getAllMigrations() {
+			if m.ID == "20241201000013" {
+				migDef := m
+				discoveryMigration = &migDef
+				break
+			}
+		}
+		require.NotNil(t, discoveryMigration)
+
+		// Apply the migration
+		err := discoveryMigration.Up(db)
+		assert.NoError(t, err)
+
+		// Verify new columns exist
+		var pragmaResults []struct {
+			CID       int         `gorm:"column:cid"`
+			Name      string      `gorm:"column:name"`
+			Type      string      `gorm:"column:type"`
+			NotNull   int         `gorm:"column:notnull"`
+			DfltValue interface{} `gorm:"column:dflt_value"`
+			PK        int         `gorm:"column:pk"`
+		}
+
+		err = db.Raw("PRAGMA table_info(nodes)").Scan(&pragmaResults).Error
+		require.NoError(t, err)
+
+		// Check that all new columns exist
+		requiredColumns := map[string]bool{
+			"discovery_method":   false,
+			"discovered_at":      false,
+			"node_type":          false,
+			"controller_version": false,
+			"agent_port":         false,
+		}
+
+		for _, col := range pragmaResults {
+			if _, exists := requiredColumns[col.Name]; exists {
+				requiredColumns[col.Name] = true
+			}
+		}
+
+		for colName, found := range requiredColumns {
+			assert.True(t, found, "Column %s should exist", colName)
+		}
+
+		// Verify default values are set correctly
+		var node struct {
+			DiscoveryMethod   string
+			DiscoveredAt      *time.Time
+			NodeType          string
+			ControllerVersion string
+			AgentPort         int
+		}
+
+		err = db.Raw(`
+			SELECT discovery_method, discovered_at, node_type, controller_version, agent_port
+			FROM nodes WHERE id = ?
+		`, nodeID).Scan(&node).Error
+		require.NoError(t, err)
+
+		// Check default values
+		assert.Equal(t, "manual", node.DiscoveryMethod, "Should default to manual")
+		assert.Equal(t, "generic", node.NodeType, "Should default to generic")
+		assert.NotNil(t, node.DiscoveredAt, "discovered_at should be set")
+		// discovered_at should equal created_at for existing nodes
+		if node.DiscoveredAt != nil {
+			assert.WithinDuration(t, createdAt, *node.DiscoveredAt, time.Second)
+		}
+		assert.Equal(t, 0, node.AgentPort, "AgentPort should default to 0")
+		assert.Empty(t, node.ControllerVersion, "ControllerVersion should be empty")
+	})
+
+	t.Run("Test discovery fields with new node", func(t *testing.T) {
+		// Insert a new node with discovery information
+		err := db.Exec(`
+			INSERT INTO nodes (
+				name, ip_address, mac_address, status, role,
+				discovery_method, discovered_at, node_type, controller_version, agent_port,
+				created_at, updated_at
+			) VALUES (
+				'controller-node', '192.168.1.11', 'aa:bb:cc:dd:ee:01', 'discovered', 'master',
+				'mdns', datetime('now'), 'controller', 'v1.0.0', 0,
+				datetime('now'), datetime('now')
+			)
+		`).Error
+		assert.NoError(t, err)
+
+		// Verify the data
+		var controllerNode struct {
+			Name              string
+			DiscoveryMethod   string
+			NodeType          string
+			ControllerVersion string
+			AgentPort         int
+		}
+
+		err = db.Raw(`
+			SELECT name, discovery_method, node_type, controller_version, agent_port
+			FROM nodes WHERE name = 'controller-node'
+		`).Scan(&controllerNode).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, "controller-node", controllerNode.Name)
+		assert.Equal(t, "mdns", controllerNode.DiscoveryMethod)
+		assert.Equal(t, "controller", controllerNode.NodeType)
+		assert.Equal(t, "v1.0.0", controllerNode.ControllerVersion)
+		assert.Equal(t, 0, controllerNode.AgentPort)
+
+		// Insert an agent node
+		err = db.Exec(`
+			INSERT INTO nodes (
+				name, ip_address, mac_address, status, role,
+				discovery_method, discovered_at, node_type, controller_version, agent_port,
+				created_at, updated_at
+			) VALUES (
+				'agent-node', '192.168.1.15', 'aa:bb:cc:dd:ee:02', 'ready', 'worker',
+				'mdns', datetime('now'), 'agent', '', 9091,
+				datetime('now'), datetime('now')
+			)
+		`).Error
+		assert.NoError(t, err)
+
+		// Verify agent data
+		var agentNode struct {
+			Name              string
+			DiscoveryMethod   string
+			NodeType          string
+			ControllerVersion string
+			AgentPort         int
+		}
+
+		err = db.Raw(`
+			SELECT name, discovery_method, node_type, controller_version, agent_port
+			FROM nodes WHERE name = 'agent-node'
+		`).Scan(&agentNode).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, "agent-node", agentNode.Name)
+		assert.Equal(t, "mdns", agentNode.DiscoveryMethod)
+		assert.Equal(t, "agent", agentNode.NodeType)
+		assert.Empty(t, agentNode.ControllerVersion)
+		assert.Equal(t, 9091, agentNode.AgentPort)
+	})
+
+	t.Run("Rollback discovery fields migration", func(t *testing.T) {
+		// Find the discovery migration
+		var discoveryMigration *MigrationDefinition
+		for _, m := range getAllMigrations() {
+			if m.ID == "20241201000013" {
+				migDef := m
+				discoveryMigration = &migDef
+				break
+			}
+		}
+		require.NotNil(t, discoveryMigration)
+
+		// Roll back the migration
+		err := discoveryMigration.Down(db)
+		assert.NoError(t, err)
+
+		// NOTE: SQLite doesn't support DROP COLUMN, so the rollback is a no-op
+		// The columns will still exist after rollback. This is acceptable because:
+		// 1. Migrations are typically applied forward, not rolled back in production
+		// 2. Implementing column removal would require recreating the entire table
+		// 3. The columns being present doesn't break anything
+
+		// Verify the rollback completed without error
+		// and that the table structure is still intact
+		var nodeCount int64
+		err = db.Raw("SELECT count(*) FROM nodes").Scan(&nodeCount).Error
+		assert.NoError(t, err)
+		assert.Greater(t, nodeCount, int64(0), "Nodes should still exist after rollback")
+
+		// Verify we can still query the basic node fields
+		var testNode struct {
+			ID        uint
+			Name      string
+			IPAddress string
+		}
+		err = db.Raw("SELECT id, name, ip_address FROM nodes LIMIT 1").Scan(&testNode).Error
+		assert.NoError(t, err)
+		assert.NotZero(t, testNode.ID)
 	})
 }

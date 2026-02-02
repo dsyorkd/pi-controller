@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 )
 
 // Critical system pins that must be protected
@@ -28,25 +28,25 @@ const (
 
 // SecurityConfig holds GPIO security configuration
 type SecurityConfig struct {
-	Level                SecurityLevel `yaml:"level"`
-	AllowCriticalPins    bool          `yaml:"allow_critical_pins"`
-	MaxConcurrentOps     int           `yaml:"max_concurrent_ops"`
-	OperationTimeout     time.Duration `yaml:"operation_timeout"`
-	EnableAuditLog       bool          `yaml:"enable_audit_log"`
-	RequireUserContext   bool          `yaml:"require_user_context"`
-	AllowedOperations    []string      `yaml:"allowed_operations"`
+	Level              SecurityLevel `yaml:"level"`
+	AllowCriticalPins  bool          `yaml:"allow_critical_pins"`
+	MaxConcurrentOps   int           `yaml:"max_concurrent_ops"`
+	OperationTimeout   time.Duration `yaml:"operation_timeout"`
+	EnableAuditLog     bool          `yaml:"enable_audit_log"`
+	RequireUserContext bool          `yaml:"require_user_context"`
+	AllowedOperations  []string      `yaml:"allowed_operations"`
 }
 
 // DefaultSecurityConfig returns secure default configuration
 func DefaultSecurityConfig() *SecurityConfig {
 	return &SecurityConfig{
-		Level:                SecurityLevelStrict,
-		AllowCriticalPins:    false,
-		MaxConcurrentOps:     10,
-		OperationTimeout:     30 * time.Second,
-		EnableAuditLog:       true,
-		RequireUserContext:   true,
-		AllowedOperations:    []string{"read", "write", "configure"},
+		Level:              SecurityLevelStrict,
+		AllowCriticalPins:  false,
+		MaxConcurrentOps:   10,
+		OperationTimeout:   30 * time.Second,
+		EnableAuditLog:     true,
+		RequireUserContext: true,
+		AllowedOperations:  []string{"read", "write", "configure", "interrupt", "pwm", "i2c", "spi"},
 	}
 }
 
@@ -55,7 +55,7 @@ type Controller struct {
 	config         *Config
 	securityConfig *SecurityConfig
 	impl           FullInterface
-	logger         *logrus.Entry
+	logger         applogger.Interface
 	available      bool
 	activePins     map[int]*PinState
 	activeOps      int
@@ -64,7 +64,7 @@ type Controller struct {
 }
 
 // NewController creates a new GPIO controller with enhanced security
-func NewController(config *Config, securityConfig *SecurityConfig, logger *logrus.Logger) *Controller {
+func NewController(config *Config, securityConfig *SecurityConfig, logger applogger.Interface) *Controller {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -94,7 +94,7 @@ func NewController(config *Config, securityConfig *SecurityConfig, logger *logru
 		controller.logger.Info("Initialized GPIO controller with periph.io implementation")
 	}
 
-	controller.logger.WithFields(logrus.Fields{
+	controller.logger.WithFields(map[string]interface{}{
 		"security_level":      securityConfig.Level,
 		"allow_critical_pins": securityConfig.AllowCriticalPins,
 		"max_concurrent_ops":  securityConfig.MaxConcurrentOps,
@@ -126,19 +126,20 @@ func (c *Controller) initializeSecureDefaults() {
 		// Only allow known safe pins
 		c.config.AllowedPins = []int{18, 19, 20, 21} // PWM and safe GPIO pins
 		c.config.RestrictedPins = append(c.config.RestrictedPins, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 22, 23, 24, 25, 26, 27)
-		
+
 	case SecurityLevelStrict:
 		// Default secure configuration - allow most GPIO but protect system pins
 		// RestrictedPins already includes critical system pins
-		
+
 	case SecurityLevelPermissive:
 		// Allow more pins but still protect critical ones
 		if !c.securityConfig.AllowCriticalPins {
 			// Keep critical pins restricted even in permissive mode
+			// Future: Add specific pin restrictions here
 		}
 	}
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"allowed_pins":    c.config.AllowedPins,
 		"restricted_pins": c.config.RestrictedPins,
 		"security_level":  c.securityConfig.Level,
@@ -148,7 +149,7 @@ func (c *Controller) initializeSecureDefaults() {
 // Initialize initializes the GPIO controller
 func (c *Controller) Initialize(ctx context.Context) error {
 	if err := c.impl.Initialize(ctx); err != nil {
-		c.logger.WithError(err).Error("Failed to initialize GPIO implementation")
+		c.logger.Errorf("Failed to initialize GPIO implementation: %v", err)
 		return fmt.Errorf("failed to initialize GPIO: %w", err)
 	}
 
@@ -159,7 +160,7 @@ func (c *Controller) Initialize(ctx context.Context) error {
 // Close closes the GPIO controller
 func (c *Controller) Close() error {
 	if err := c.impl.Close(); err != nil {
-		c.logger.WithError(err).Error("Failed to close GPIO implementation")
+		c.logger.Errorf("Failed to close GPIO implementation: %v", err)
 		return fmt.Errorf("failed to close GPIO: %w", err)
 	}
 
@@ -241,9 +242,9 @@ func (c *Controller) checkOperationLimits() error {
 	if c.activeOps >= c.securityConfig.MaxConcurrentOps {
 		return fmt.Errorf("maximum concurrent operations (%d) reached", c.securityConfig.MaxConcurrentOps)
 	}
-	
+
 	c.activeOps++
-	
+
 	// Set up cleanup after timeout
 	go func() {
 		time.Sleep(c.securityConfig.OperationTimeout)
@@ -293,12 +294,12 @@ func (c *Controller) ConfigurePin(config PinConfig, userID string) error {
 	}
 
 	if err := c.impl.ConfigurePin(config); err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":       config.Pin,
 			"direction": config.Direction,
 			"user_id":   userID,
 			"error":     err,
-		}).Error("Failed to configure GPIO pin")
+		}).Errorf("Failed to configure GPIO pin")
 		c.auditLog("pin_configure_failed", fmt.Sprintf("Failed to configure pin %d: %v", config.Pin, err), userID, config.Pin)
 		return fmt.Errorf("failed to configure pin %d: %w", config.Pin, err)
 	}
@@ -313,7 +314,7 @@ func (c *Controller) ConfigurePin(config PinConfig, userID string) error {
 	}
 	c.mutex.Unlock()
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":       config.Pin,
 		"direction": config.Direction,
 		"pull_mode": config.PullMode,
@@ -332,11 +333,11 @@ func (c *Controller) ReadPin(pin int, userID string) (PinValue, error) {
 
 	value, err := c.impl.ReadPin(pin)
 	if err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":     pin,
 			"user_id": userID,
 			"error":   err,
-		}).Error("Failed to read GPIO pin")
+		}).Errorf("Failed to read GPIO pin")
 		c.auditLog("pin_read_failed", fmt.Sprintf("Failed to read pin %d: %v", pin, err), userID, pin)
 		return Low, fmt.Errorf("failed to read pin %d: %w", pin, err)
 	}
@@ -349,7 +350,7 @@ func (c *Controller) ReadPin(pin int, userID string) (PinValue, error) {
 	}
 	c.mutex.Unlock()
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":     pin,
 		"value":   value,
 		"user_id": userID,
@@ -377,12 +378,12 @@ func (c *Controller) WritePin(pin int, value PinValue, userID string) error {
 	c.mutex.RUnlock()
 
 	if err := c.impl.WritePin(pin, value); err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":     pin,
 			"value":   value,
 			"user_id": userID,
 			"error":   err,
-		}).Error("Failed to write GPIO pin")
+		}).Errorf("Failed to write GPIO pin")
 		c.auditLog("pin_write_failed", fmt.Sprintf("Failed to write pin %d: %v", pin, err), userID, pin)
 		return fmt.Errorf("failed to write pin %d: %w", pin, err)
 	}
@@ -395,7 +396,7 @@ func (c *Controller) WritePin(pin int, value PinValue, userID string) error {
 	}
 	c.mutex.Unlock()
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":     pin,
 		"value":   value,
 		"user_id": userID,
@@ -442,18 +443,18 @@ func (c *Controller) SetPWM(pin int, frequency int, dutyCycle int, userID string
 	}
 
 	if err := c.impl.SetPWM(pin, frequency, dutyCycle); err != nil {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(map[string]interface{}{
 			"pin":        pin,
 			"frequency":  frequency,
 			"duty_cycle": dutyCycle,
 			"user_id":    userID,
 			"error":      err,
-		}).Error("Failed to set PWM")
+		}).Errorf("Failed to set PWM")
 		c.auditLog("pwm_set_failed", fmt.Sprintf("Failed to set PWM on pin %d: %v", pin, err), userID, pin)
 		return fmt.Errorf("failed to set PWM on pin %d: %w", pin, err)
 	}
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(map[string]interface{}{
 		"pin":        pin,
 		"frequency":  frequency,
 		"duty_cycle": dutyCycle,
@@ -485,7 +486,7 @@ func (c *Controller) SPITransfer(channel int, data []byte, userID string) ([]byt
 	if len(data) > 4096 { // Limit SPI transfer size for safety
 		return nil, fmt.Errorf("SPI transfer size %d bytes exceeds maximum allowed (4096)", len(data))
 	}
-	
+
 	c.auditLog("spi_transfer", fmt.Sprintf("SPI transfer on channel %d, %d bytes", channel, len(data)), userID, -1)
 	return c.impl.SPITransfer(channel, data)
 }
@@ -494,7 +495,7 @@ func (c *Controller) SPIWrite(channel int, data []byte, userID string) error {
 	if len(data) > 4096 {
 		return fmt.Errorf("SPI write size %d bytes exceeds maximum allowed (4096)", len(data))
 	}
-	
+
 	c.auditLog("spi_write", fmt.Sprintf("SPI write on channel %d, %d bytes", channel, len(data)), userID, -1)
 	return c.impl.SPIWrite(channel, data)
 }
@@ -503,7 +504,7 @@ func (c *Controller) SPIRead(channel int, length int, userID string) ([]byte, er
 	if length > 4096 {
 		return nil, fmt.Errorf("SPI read length %d bytes exceeds maximum allowed (4096)", length)
 	}
-	
+
 	c.auditLog("spi_read", fmt.Sprintf("SPI read on channel %d, %d bytes", channel, length), userID, -1)
 	return c.impl.SPIRead(channel, length)
 }
@@ -513,7 +514,7 @@ func (c *Controller) I2CWrite(bus int, address int, data []byte, userID string) 
 	if len(data) > 256 { // Limit I2C transfer size
 		return fmt.Errorf("I2C write size %d bytes exceeds maximum allowed (256)", len(data))
 	}
-	
+
 	c.auditLog("i2c_write", fmt.Sprintf("I2C write to bus %d, address 0x%02x, %d bytes", bus, address, len(data)), userID, -1)
 	return c.impl.I2CWrite(bus, address, data)
 }
@@ -522,7 +523,7 @@ func (c *Controller) I2CRead(bus int, address int, length int, userID string) ([
 	if length > 256 {
 		return nil, fmt.Errorf("I2C read length %d bytes exceeds maximum allowed (256)", length)
 	}
-	
+
 	c.auditLog("i2c_read", fmt.Sprintf("I2C read from bus %d, address 0x%02x, %d bytes", bus, address, length), userID, -1)
 	return c.impl.I2CRead(bus, address, length)
 }
@@ -531,7 +532,7 @@ func (c *Controller) I2CWriteRegister(bus int, address int, register int, data [
 	if len(data) > 256 {
 		return fmt.Errorf("I2C register write size %d bytes exceeds maximum allowed (256)", len(data))
 	}
-	
+
 	c.auditLog("i2c_write_register", fmt.Sprintf("I2C write to bus %d, address 0x%02x, register 0x%02x, %d bytes", bus, address, register, len(data)), userID, -1)
 	return c.impl.I2CWriteRegister(bus, address, register, data)
 }
@@ -540,7 +541,7 @@ func (c *Controller) I2CReadRegister(bus int, address int, register int, length 
 	if length > 256 {
 		return nil, fmt.Errorf("I2C register read length %d bytes exceeds maximum allowed (256)", length)
 	}
-	
+
 	c.auditLog("i2c_read_register", fmt.Sprintf("I2C read from bus %d, address 0x%02x, register 0x%02x, %d bytes", bus, address, register, length), userID, -1)
 	return c.impl.I2CReadRegister(bus, address, register, length)
 }
@@ -578,7 +579,7 @@ func (c *Controller) auditLog(eventType, message, userID string, pin int) {
 		return
 	}
 
-	fields := logrus.Fields{
+	fields := map[string]interface{}{
 		"event_type": eventType,
 		"message":    message,
 		"user_id":    userID,
@@ -598,14 +599,14 @@ func (c *Controller) GetSecurityStats() map[string]interface{} {
 	defer c.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"security_level":       c.securityConfig.Level,
-		"allow_critical_pins":  c.securityConfig.AllowCriticalPins,
-		"active_pins":          len(c.activePins),
-		"active_operations":    c.activeOps,
-		"max_concurrent_ops":   c.securityConfig.MaxConcurrentOps,
-		"restricted_pins":      c.config.RestrictedPins,
-		"allowed_pins":         c.config.AllowedPins,
-		"critical_pins":        CriticalSystemPins,
-		"audit_enabled":        c.securityConfig.EnableAuditLog,
+		"security_level":      c.securityConfig.Level,
+		"allow_critical_pins": c.securityConfig.AllowCriticalPins,
+		"active_pins":         len(c.activePins),
+		"active_operations":   c.activeOps,
+		"max_concurrent_ops":  c.securityConfig.MaxConcurrentOps,
+		"restricted_pins":     c.config.RestrictedPins,
+		"allowed_pins":        c.config.AllowedPins,
+		"critical_pins":       CriticalSystemPins,
+		"audit_enabled":       c.securityConfig.EnableAuditLog,
 	}
 }

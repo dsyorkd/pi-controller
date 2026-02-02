@@ -1,0 +1,99 @@
+---
+# Deploy and Test Playbook
+# ========================
+# Deploys pi-controller to the cluster and runs integration tests.
+# Includes lock acquisition to prevent race conditions.
+#
+# Usage:
+#   # Deploy from local build
+#   ansible-playbook playbooks/deploy-test.yml \
+#     -e pi_controller_local_binary=../build/pi-controller-linux-arm64
+#
+#   # Deploy specific version
+#   ansible-playbook playbooks/deploy-test.yml \
+#     -e pi_controller_version=v1.0.0
+#
+#   # Skip tests (deploy only)
+#   ansible-playbook playbooks/deploy-test.yml -e run_tests=false
+
+- name: Acquire cluster lock
+  hosts: bootstrap
+  gather_facts: true
+  tasks:
+    - name: Acquire lock for testing
+      ansible.builtin.include_role:
+        name: cluster-lock
+      vars:
+        lock_action: acquire
+        lock_reason: "deploy-test playbook"
+
+- name: Prepare Pi nodes
+  hosts: pis
+  gather_facts: true
+  roles:
+    - role: pi-base
+      tags: [base, prepare]
+
+- name: Deploy pi-controller
+  hosts: pis
+  gather_facts: true
+  serial: 1  # Rolling deployment
+  roles:
+    - role: pi-controller
+      tags: [deploy, controller]
+
+- name: Wait for cluster formation
+  hosts: bootstrap
+  gather_facts: false
+  tasks:
+    - name: Wait for cluster to stabilize
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Check cluster health
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ api_port }}/api/v1/cluster/status"
+        status_code: 200
+      register: cluster_status
+      retries: 12
+      delay: 5
+      until: cluster_status.status == 200
+
+    - name: Display cluster status
+      ansible.builtin.debug:
+        msg: "Cluster is healthy: {{ cluster_status.json | default('OK') }}"
+
+- name: Run integration tests
+  hosts: bootstrap
+  gather_facts: false
+  tasks:
+    - name: Run test suite
+      when: run_tests | default(true) | bool
+      block:
+        - name: Execute pi-controller self-test
+          ansible.builtin.command: /usr/local/bin/pi-controller test --integration
+          register: test_result
+          ignore_errors: true
+
+        - name: Display test results
+          ansible.builtin.debug:
+            msg: |
+              Test Results:
+              {{ test_result.stdout | default('No output') }}
+
+        - name: Fail if tests failed
+          ansible.builtin.fail:
+            msg: "Integration tests failed!"
+          when: test_result.rc != 0
+
+- name: Release cluster lock
+  hosts: bootstrap
+  gather_facts: false
+  tasks:
+    - name: Release lock
+      ansible.builtin.include_role:
+        name: cluster-lock
+      vars:
+        lock_action: release
+  # Always release lock, even if tests fail
+  tags: [always]

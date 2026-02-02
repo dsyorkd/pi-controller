@@ -6,13 +6,14 @@ import (
 	"sync"
 	"time"
 
+	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
+	Enabled           bool          `yaml:"enabled"`
 	RequestsPerMinute int           `yaml:"requests_per_minute"`
 	BurstSize         int           `yaml:"burst_size"`
 	CleanupInterval   time.Duration `yaml:"cleanup_interval"`
@@ -24,6 +25,7 @@ type RateLimitConfig struct {
 // DefaultRateLimitConfig returns secure default rate limiting configuration
 func DefaultRateLimitConfig() *RateLimitConfig {
 	return &RateLimitConfig{
+		Enabled:           true,
 		RequestsPerMinute: 60,
 		BurstSize:         10,
 		CleanupInterval:   5 * time.Minute,
@@ -36,14 +38,14 @@ func DefaultRateLimitConfig() *RateLimitConfig {
 // RateLimiter manages rate limiting for clients
 type RateLimiter struct {
 	config    *RateLimitConfig
-	logger    *logrus.Entry
+	logger    applogger.Interface
 	limiters  map[string]*rate.Limiter
 	mutex     sync.RWMutex
 	lastClean time.Time
 }
 
 // NewRateLimiter creates a new rate limiter
-func NewRateLimiter(config *RateLimitConfig, logger *logrus.Logger) *RateLimiter {
+func NewRateLimiter(config *RateLimitConfig, logger applogger.Interface) *RateLimiter {
 	if config == nil {
 		config = DefaultRateLimitConfig()
 	}
@@ -58,7 +60,7 @@ func NewRateLimiter(config *RateLimitConfig, logger *logrus.Logger) *RateLimiter
 	// Start cleanup goroutine
 	go rl.cleanupRoutine()
 
-	rl.logger.WithFields(logrus.Fields{
+	rl.logger.WithFields(map[string]interface{}{
 		"requests_per_minute": config.RequestsPerMinute,
 		"burst_size":          config.BurstSize,
 		"enable_by_user":      config.EnableByUser,
@@ -71,6 +73,12 @@ func NewRateLimiter(config *RateLimitConfig, logger *logrus.Logger) *RateLimiter
 // RateLimit returns a rate limiting middleware
 func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip rate limiting if disabled
+		if !rl.config.Enabled {
+			c.Next()
+			return
+		}
+
 		// Get client identifier
 		clientID := rl.getClientID(c)
 		if clientID == "" {
@@ -89,12 +97,12 @@ func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 
 		// Check if request is allowed
 		if !limiter.Allow() {
-			rl.logger.WithFields(logrus.Fields{
-				"client_id":  clientID,
-				"client_ip":  c.ClientIP(),
-				"method":     c.Request.Method,
-				"path":       c.Request.URL.Path,
-				"user_agent": c.GetHeader("User-Agent"),
+			rl.logger.WithFields(map[string]interface{}{
+				"client_id":  sanitizeLogValue(clientID),
+				"client_ip":  sanitizeLogValue(c.ClientIP()),
+				"method":     sanitizeLogValue(c.Request.Method),
+				"path":       sanitizeLogValue(c.Request.URL.Path),
+				"user_agent": sanitizeLogValue(c.GetHeader("User-Agent")),
 			}).Warn("Rate limit exceeded")
 
 			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", rl.config.RequestsPerMinute))
@@ -102,8 +110,8 @@ func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 			c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()))
 
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":   "Rate Limit Exceeded",
-				"message": "Too many requests, please slow down",
+				"error":       "Rate Limit Exceeded",
+				"message":     "Too many requests, please slow down",
 				"retry_after": 60,
 			})
 			c.Abort()

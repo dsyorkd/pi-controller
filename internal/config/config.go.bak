@@ -16,28 +16,28 @@ import (
 type Config struct {
 	// Application settings
 	App AppConfig `yaml:"app" mapstructure:"app"`
-	
+
 	// Database configuration
 	Database storage.Config `yaml:"database" mapstructure:"database"`
-	
+
 	// API server configuration
 	API APIConfig `yaml:"api" mapstructure:"api"`
-	
-	// gRPC server configuration  
+
+	// gRPC server configuration
 	GRPC GRPCConfig `yaml:"grpc" mapstructure:"grpc"`
-	
+
 	// WebSocket configuration
 	WebSocket WebSocketConfig `yaml:"websocket" mapstructure:"websocket"`
-	
+
 	// Logging configuration
 	Log LogConfig `yaml:"log" mapstructure:"log"`
-	
+
 	// Kubernetes configuration
 	Kubernetes KubernetesConfig `yaml:"kubernetes" mapstructure:"kubernetes"`
-	
+
 	// GPIO configuration
 	GPIO GPIOConfig `yaml:"gpio" mapstructure:"gpio"`
-	
+
 	// Discovery configuration
 	Discovery DiscoveryConfig `yaml:"discovery" mapstructure:"discovery"`
 }
@@ -130,13 +130,13 @@ type DiscoveryConfig struct {
 func Load(configPath string) (*Config, error) {
 	// Set defaults
 	setDefaults()
-	
+
 	// Configure viper
 	viper.SetConfigType("yaml")
 	viper.SetEnvPrefix("PI_CONTROLLER")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
-	
+
 	// Load config file if provided
 	if configPath != "" {
 		viper.SetConfigFile(configPath)
@@ -152,25 +152,25 @@ func Load(configPath string) (*Config, error) {
 		viper.AddConfigPath("./config")
 		viper.AddConfigPath("/etc/pi-controller")
 		viper.AddConfigPath("$HOME/.pi-controller")
-		
+
 		if err := viper.ReadInConfig(); err != nil {
 			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 				return nil, fmt.Errorf("failed to read config file: %w", err)
 			}
 		}
 	}
-	
+
 	// Unmarshal into config struct
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-	
+
 	// Validate and set derived values
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -181,18 +181,18 @@ func (c *Config) validate() error {
 		if err := os.MkdirAll(c.App.DataDir, 0755); err != nil {
 			return fmt.Errorf("failed to create data directory: %w", err)
 		}
-		
+
 		// Set database path relative to data directory if not absolute
 		if !filepath.IsAbs(c.Database.Path) {
 			c.Database.Path = filepath.Join(c.App.DataDir, c.Database.Path)
 		}
 	}
-	
+
 	// Validate log level
 	if _, err := logrus.ParseLevel(c.Log.Level); err != nil {
 		return fmt.Errorf("invalid log level '%s': %w", c.Log.Level, err)
 	}
-	
+
 	// Validate port ranges
 	if c.API.Port < 1 || c.API.Port > 65535 {
 		return fmt.Errorf("invalid API port: %d", c.API.Port)
@@ -203,7 +203,7 @@ func (c *Config) validate() error {
 	if c.WebSocket.Port < 1 || c.WebSocket.Port > 65535 {
 		return fmt.Errorf("invalid WebSocket port: %d", c.WebSocket.Port)
 	}
-	
+
 	return nil
 }
 
@@ -215,14 +215,14 @@ func setDefaults() {
 	viper.SetDefault("app.environment", "development")
 	viper.SetDefault("app.data_dir", "./data")
 	viper.SetDefault("app.debug", false)
-	
+
 	// Database defaults
 	viper.SetDefault("database.path", "pi-controller.db")
 	viper.SetDefault("database.max_open_conns", 25)
 	viper.SetDefault("database.max_idle_conns", 5)
 	viper.SetDefault("database.conn_max_lifetime", "5m")
 	viper.SetDefault("database.log_level", "warn")
-	
+
 	// API defaults
 	viper.SetDefault("api.host", "0.0.0.0")
 	viper.SetDefault("api.port", 8080)
@@ -230,11 +230,11 @@ func setDefaults() {
 	viper.SetDefault("api.write_timeout", "30s")
 	viper.SetDefault("api.cors_enabled", true)
 	viper.SetDefault("api.auth_enabled", false)
-	
+
 	// gRPC defaults
 	viper.SetDefault("grpc.host", "0.0.0.0")
 	viper.SetDefault("grpc.port", 9090)
-	
+
 	// WebSocket defaults
 	viper.SetDefault("websocket.host", "0.0.0.0")
 	viper.SetDefault("websocket.port", 8081)
@@ -242,7 +242,7 @@ func setDefaults() {
 	viper.SetDefault("websocket.read_buffer_size", 1024)
 	viper.SetDefault("websocket.write_buffer_size", 1024)
 	viper.SetDefault("websocket.check_origin", false)
-	
+
 	// Log defaults
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "json")
@@ -251,13 +251,13 @@ func setDefaults() {
 	viper.SetDefault("log.max_backups", 3)
 	viper.SetDefault("log.max_age", 28)
 	viper.SetDefault("log.compress", true)
-	
+
 	// Kubernetes defaults
 	viper.SetDefault("kubernetes.config_path", "")
 	viper.SetDefault("kubernetes.in_cluster", false)
 	viper.SetDefault("kubernetes.namespace", "default")
 	viper.SetDefault("kubernetes.resync_interval", "30s")
-	
+
 	// GPIO defaults
 	viper.SetDefault("gpio.enabled", true)
 	viper.SetDefault("gpio.mock_mode", false)
@@ -265,7 +265,7 @@ func setDefaults() {
 	viper.SetDefault("gpio.retention_period", "24h")
 	viper.SetDefault("gpio.default_direction", "input")
 	viper.SetDefault("gpio.default_pull_mode", "none")
-	
+
 	// Discovery defaults
 	viper.SetDefault("discovery.enabled", true)
 	viper.SetDefault("discovery.method", "mdns")

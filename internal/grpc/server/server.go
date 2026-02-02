@@ -2,49 +2,99 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"net"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"os"
 
 	"github.com/dsyorkd/pi-controller/internal/config"
+	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	pb "github.com/dsyorkd/pi-controller/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // Server represents the gRPC server
 type Server struct {
-	config   *config.GRPCConfig
-	logger   logger.Interface
-	database *storage.Database
-	server   *grpc.Server
+	config     *config.GRPCConfig
+	logger     logger.Interface
+	database   *storage.Database
+	authConfig *AuthConfig
+	server     *grpc.Server
 }
 
 // New creates a new gRPC server instance
 func New(cfg *config.GRPCConfig, logger logger.Interface, db *storage.Database) (*Server, error) {
+	return NewWithAuth(cfg, logger, db, nil)
+}
+
+// NewWithAuth creates a new gRPC server instance with authentication support
+func NewWithAuth(cfg *config.GRPCConfig, logger logger.Interface, db *storage.Database, authCfg *AuthConfig) (*Server, error) {
 	var opts []grpc.ServerOption
 
 	// Add TLS credentials if configured
 	if cfg.IsTLSEnabled() {
-		creds, err := credentials.NewServerTLSFromFile(cfg.TLSCertFile, cfg.TLSKeyFile)
+		cert, err := tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load server TLS key pair: %w", err)
 		}
+
+		caCertPool := x509.NewCertPool()
+		caPEM, err := os.ReadFile(cfg.TLSCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+		}
+		if !caCertPool.AppendCertsFromPEM(caPEM) {
+			return nil, fmt.Errorf("failed to append CA certificate to pool")
+		}
+
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			ClientCAs:    caCertPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		creds := credentials.NewTLS(tlsConfig)
 		opts = append(opts, grpc.Creds(creds))
+		logger.Info("gRPC server configured with mutual TLS (mTLS)")
 	}
 
-	// Add logging interceptor
-	opts = append(opts, grpc.UnaryInterceptor(loggingInterceptor(logger)))
-	opts = append(opts, grpc.StreamInterceptor(streamLoggingInterceptor(logger)))
+	// Build unary interceptor chain
+	unaryInterceptors := []grpc.UnaryServerInterceptor{
+		loggingInterceptor(logger),
+	}
+
+	// Build stream interceptor chain
+	streamInterceptors := []grpc.StreamServerInterceptor{
+		streamLoggingInterceptor(logger),
+	}
+
+	// Add auth interceptors if authentication is enabled
+	if authCfg != nil && authCfg.Enabled {
+		authCfg.Logger = logger
+		if authCfg.SkipMethods == nil {
+			authCfg.SkipMethods = DefaultSkipMethods()
+		}
+		unaryInterceptors = append(unaryInterceptors, AuthUnaryInterceptor(authCfg))
+		streamInterceptors = append(streamInterceptors, AuthStreamInterceptor(authCfg))
+		logger.Info("gRPC authentication enabled")
+	}
+
+	// Chain interceptors
+	opts = append(opts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
+	opts = append(opts, grpc.ChainStreamInterceptor(streamInterceptors...))
 
 	grpcServer := grpc.NewServer(opts...)
 
 	s := &Server{
-		config:   cfg,
-		logger:   logger,
-		database: db,
-		server:   grpcServer,
+		config:     cfg,
+		logger:     logger,
+		database:   db,
+		authConfig: authCfg,
+		server:     grpcServer,
 	}
 
 	// Register service implementation
@@ -78,9 +128,9 @@ func (s *Server) Stop() {
 func loggingInterceptor(logger logger.Interface) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		logger.WithField("method", info.FullMethod).Debug("gRPC request started")
-		
+
 		resp, err := handler(ctx, req)
-		
+
 		if err != nil {
 			logger.WithFields(map[string]interface{}{
 				"method": info.FullMethod,
@@ -89,7 +139,7 @@ func loggingInterceptor(logger logger.Interface) grpc.UnaryServerInterceptor {
 		} else {
 			logger.WithField("method", info.FullMethod).Debug("gRPC request completed")
 		}
-		
+
 		return resp, err
 	}
 }
@@ -98,9 +148,9 @@ func loggingInterceptor(logger logger.Interface) grpc.UnaryServerInterceptor {
 func streamLoggingInterceptor(logger logger.Interface) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		logger.WithField("method", info.FullMethod).Debug("gRPC stream started")
-		
+
 		err := handler(srv, ss)
-		
+
 		if err != nil {
 			logger.WithFields(map[string]interface{}{
 				"method": info.FullMethod,
@@ -109,7 +159,7 @@ func streamLoggingInterceptor(logger logger.Interface) grpc.StreamServerIntercep
 		} else {
 			logger.WithField("method", info.FullMethod).Debug("gRPC stream completed")
 		}
-		
+
 		return err
 	}
 }

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -69,14 +70,14 @@ const (
 // GPIOConfig holds device-specific configuration
 type GPIOConfig struct {
 	// PWM specific
-	Frequency int `json:"frequency,omitempty"` // Hz
+	Frequency int `json:"frequency,omitempty"`  // Hz
 	DutyCycle int `json:"duty_cycle,omitempty"` // 0-100
 
 	// SPI specific
-	SPIMode     int `json:"spi_mode,omitempty"`     // 0-3
-	SPIBits     int `json:"spi_bits,omitempty"`     // bits per word
-	SPISpeed    int `json:"spi_speed,omitempty"`    // Hz
-	SPIChannel  int `json:"spi_channel,omitempty"`  // 0 or 1
+	SPIMode    int `json:"spi_mode,omitempty"`    // 0-3
+	SPIBits    int `json:"spi_bits,omitempty"`    // bits per word
+	SPISpeed   int `json:"spi_speed,omitempty"`   // Hz
+	SPIChannel int `json:"spi_channel,omitempty"` // 0 or 1
 
 	// I2C specific
 	I2CAddress int `json:"i2c_address,omitempty"` // 7-bit address
@@ -114,16 +115,37 @@ func (GPIODevice) TableName() string {
 
 // GPIOReading represents a time-series reading from a GPIO device
 type GPIOReading struct {
-	ID         uint      `json:"id" gorm:"primarykey"`
-	DeviceID   uint      `json:"device_id" gorm:"not null"`
-	Value      float64   `json:"value"`
-	Timestamp  time.Time `json:"timestamp" gorm:"index"`
-	
+	ID        uint      `json:"id" gorm:"primarykey"`
+	DeviceID  uint      `json:"device_id" gorm:"not null"`
+	Value     float64   `json:"value"`
+	Timestamp time.Time `json:"timestamp" gorm:"index"`
+
 	// Relationships
 	Device GPIODevice `json:"device,omitempty" gorm:"foreignKey:DeviceID"`
 }
 
-// TableName returns the table name for the GPIOReading model
-func (GPIOReading) TableName() string {
-	return "gpio_readings"
+// ParseGPIODirection parses a string into a GPIODirection
+func ParseGPIODirection(s string) (GPIODirection, error) {
+	switch s {
+	case "input", "in":
+		return GPIODirectionInput, nil
+	case "output", "out":
+		return GPIODirectionOutput, nil
+	default:
+		return "", fmt.Errorf("invalid GPIO direction: %s", s)
+	}
+}
+
+// ParseGPIOPullMode parses a string into a GPIOPullMode
+func ParseGPIOPullMode(s string) (GPIOPullMode, error) {
+	switch s {
+	case "none", "off":
+		return GPIOPullNone, nil
+	case "up":
+		return GPIOPullUp, nil
+	case "down":
+		return GPIOPullDown, nil
+	default:
+		return "", fmt.Errorf("invalid GPIO pull mode: %s", s)
+	}
 }

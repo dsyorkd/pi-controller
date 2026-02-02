@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"time"
 
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	pb "github.com/dsyorkd/pi-controller/proto"
@@ -17,13 +18,13 @@ type AgentService struct {
 }
 
 // NewAgentService creates a new complete agent service
-func NewAgentService(logger logger.Interface) (*AgentService, error) {
+func NewAgentService(logger logger.Interface, controllerClient pb.PiControllerServiceClient, nodeID string) (*AgentService, error) {
 	gpio, err := NewGPIOService(logger)
 	if err != nil {
 		return nil, err
 	}
 
-	metrics := NewMetricsService(logger)
+	metrics := NewMetricsService(logger, controllerClient, nodeID)
 
 	return &AgentService{
 		gpio:    gpio,
@@ -79,10 +80,22 @@ func (s *AgentService) GetSystemInfo(ctx context.Context, req *pb.GetSystemInfoR
 
 // Metrics-related methods - delegate to metrics service
 
+// GetSystemMetrics returns current system metrics
 func (s *AgentService) GetSystemMetrics(ctx context.Context, req *pb.GetSystemMetricsRequest) (*pb.GetSystemMetricsResponse, error) {
 	return s.metrics.GetSystemMetrics(ctx, req)
 }
 
+// StreamSystemMetrics streams system metrics to the client
 func (s *AgentService) StreamSystemMetrics(req *pb.StreamSystemMetricsRequest, stream pb.PiAgentService_StreamSystemMetricsServer) error {
 	return s.metrics.StreamSystemMetrics(req, stream)
+}
+
+// StartMetricsStreaming starts streaming metrics to the controller
+func (s *AgentService) StartMetricsStreaming(ctx context.Context, interval time.Duration) {
+	go func() {
+		if err := s.metrics.StreamMetricsToController(ctx, interval); err != nil {
+			s.logger.Errorf("failed to start metrics streaming to controller: %v", err)
+		}
+		s.logger.Info("metrics streaming to controller stopped")
+	}()
 }

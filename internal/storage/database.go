@@ -7,14 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
-
 	"github.com/dsyorkd/pi-controller/internal/errors"
 	applogger "github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/migrations"
 	"github.com/dsyorkd/pi-controller/internal/models"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // Database wraps GORM database connection with additional functionality
@@ -90,7 +89,7 @@ func New(config *Config, logger applogger.Interface) (*Database, error) {
 
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
-	
+
 	if config.ConnMaxLifetime != "" {
 		duration, err := time.ParseDuration(config.ConnMaxLifetime)
 		if err != nil {
@@ -162,7 +161,7 @@ func NewWithoutMigration(config *Config, logger applogger.Interface) (*Database,
 
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
-	
+
 	if config.ConnMaxLifetime != "" {
 		duration, err := time.ParseDuration(config.ConnMaxLifetime)
 		if err != nil {
@@ -210,20 +209,20 @@ func (d *Database) Health() error {
 // migrate runs database migrations
 func (d *Database) migrate() error {
 	d.logger.Info("Running database migrations")
-	
+
 	// Use the new migration system
 	migrator := migrations.NewMigrator(d.db, d.logger)
-	
+
 	// Validate migration order first
 	if err := migrator.ValidateMigrationOrder(); err != nil {
 		return errors.Wrapf(err, "migration validation failed")
 	}
-	
+
 	// Run migrations
 	if err := migrator.Up(); err != nil {
 		return errors.Wrapf(err, "failed to run migrations")
 	}
-	
+
 	d.logger.Info("Database migrations completed successfully")
 	return nil
 }
@@ -234,24 +233,24 @@ func (d *Database) BeginTx() *gorm.DB {
 }
 
 // WithTx executes a function within a transaction
-func (d *Database) WithTx(fn func(tx *gorm.DB) error) error {
+func (d *Database) WithTx(fn func(tx *gorm.DB) error) (err error) {
 	tx := d.db.Begin()
 	if tx.Error != nil {
 		return tx.Error
 	}
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
-			panic(r)
+			err = fmt.Errorf("panic recovered: %v", r)
 		}
 	}()
-	
-	if err := fn(tx); err != nil {
+
+	if err = fn(tx); err != nil {
 		tx.Rollback()
 		return err
 	}
-	
+
 	return tx.Commit().Error
 }
 
@@ -260,7 +259,7 @@ func ensureDirExists(dir string) error {
 	if dir == "" || dir == "." {
 		return nil
 	}
-	
+
 	info, err := os.Stat(dir)
 	if err == nil {
 		if !info.IsDir() {
@@ -268,12 +267,12 @@ func ensureDirExists(dir string) error {
 		}
 		return nil
 	}
-	
+
 	if !os.IsNotExist(err) {
 		return err
 	}
-	
-	return os.MkdirAll(dir, 0755)
+
+	return os.MkdirAll(dir, 0750) // #nosec G301 - secure directory permissions
 }
 
 // gormSlogAdapter adapts our structured logger to GORM logger interface
@@ -301,13 +300,13 @@ func (g *gormSlogAdapter) Error(ctx context.Context, msg string, data ...interfa
 func (g *gormSlogAdapter) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	elapsed := time.Since(begin)
 	sql, rows := fc()
-	
+
 	fields := map[string]interface{}{
 		"duration": elapsed.String(),
 		"rows":     rows,
 		"sql":      sql,
 	}
-	
+
 	if err != nil {
 		g.logger.WithFields(fields).WithError(err).Error("Database query failed")
 	} else {
@@ -315,7 +314,7 @@ func (g *gormSlogAdapter) Trace(ctx context.Context, begin time.Time, fc func() 
 	}
 }
 
-// NewForTest creates a new database connection for testing without running migrations
+// NewForTest creates a new database connection for testing with migrations
 func NewForTest(logger applogger.Interface) (*Database, error) {
 	config := &Config{
 		Path:            ":memory:",
@@ -341,6 +340,11 @@ func NewForTest(logger applogger.Interface) (*Database, error) {
 	database := &Database{
 		db:     db,
 		logger: logger,
+	}
+
+	// Run migrations for test database
+	if err := database.migrate(); err != nil {
+		return nil, errors.Wrapf(err, "failed to migrate test database")
 	}
 
 	return database, nil

@@ -1,0 +1,97 @@
+---
+# Cluster Lock Role
+# ==================
+# Provides distributed locking to prevent race conditions during:
+# - Cluster-wide tests
+# - K3s installation/uninstallation
+# - Rolling upgrades
+#
+# Uses a simple file-based lock on the bootstrap node.
+# More sophisticated implementations could use etcd, Redis, or pi-controller's API.
+
+- name: Set lock facts
+  ansible.builtin.set_fact:
+    lock_holder: "{{ ansible_hostname }}-{{ ansible_date_time.epoch }}"
+    lock_file: "{{ test_cluster_lock_file | default('/tmp/pi-controller-test.lock') }}"
+    lock_timeout: "{{ test_lock_timeout | default(600) }}"
+
+- name: Check for existing lock
+  ansible.builtin.stat:
+    path: "{{ lock_file }}"
+  register: lock_stat
+  delegate_to: "{{ groups['bootstrap'][0] }}"
+  run_once: true
+
+- name: Read existing lock if present
+  ansible.builtin.slurp:
+    src: "{{ lock_file }}"
+  register: existing_lock
+  when: lock_stat.stat.exists
+  delegate_to: "{{ groups['bootstrap'][0] }}"
+  run_once: true
+
+- name: Parse lock metadata
+  ansible.builtin.set_fact:
+    lock_metadata: "{{ existing_lock.content | b64decode | from_json }}"
+  when: lock_stat.stat.exists and existing_lock.content is defined
+  run_once: true
+
+- name: Check if lock is expired
+  ansible.builtin.set_fact:
+    lock_expired: "{{ (ansible_date_time.epoch | int) - (lock_metadata.timestamp | int) > (lock_timeout | int) }}"
+  when: lock_metadata is defined
+  run_once: true
+
+- name: Fail if lock is held by another process
+  ansible.builtin.fail:
+    msg: |
+      Cluster is locked by another process!
+      Lock holder: {{ lock_metadata.holder }}
+      Lock acquired: {{ lock_metadata.timestamp | int | strftime('%Y-%m-%d %H:%M:%S') }}
+      Lock reason: {{ lock_metadata.reason | default('unspecified') }}
+
+      To force release (DANGEROUS): ansible-playbook playbooks/release-lock.yml
+  when:
+    - lock_metadata is defined
+    - not (lock_expired | default(false))
+    - lock_action | default('acquire') == 'acquire'
+  run_once: true
+
+- name: Remove expired lock
+  ansible.builtin.file:
+    path: "{{ lock_file }}"
+    state: absent
+  when:
+    - lock_metadata is defined
+    - lock_expired | default(false)
+  delegate_to: "{{ groups['bootstrap'][0] }}"
+  run_once: true
+
+- name: Acquire cluster lock
+  ansible.builtin.copy:
+    content: |
+      {
+        "holder": "{{ lock_holder }}",
+        "timestamp": {{ ansible_date_time.epoch }},
+        "reason": "{{ lock_reason | default('ansible-playbook') }}",
+        "playbook": "{{ ansible_play_name | default('unknown') }}",
+        "user": "{{ lookup('env', 'USER') | default('unknown') }}"
+      }
+    dest: "{{ lock_file }}"
+    mode: "0644"
+  when: lock_action | default('acquire') == 'acquire'
+  delegate_to: "{{ groups['bootstrap'][0] }}"
+  run_once: true
+
+- name: Release cluster lock
+  ansible.builtin.file:
+    path: "{{ lock_file }}"
+    state: absent
+  when: lock_action == 'release'
+  delegate_to: "{{ groups['bootstrap'][0] }}"
+  run_once: true
+
+- name: Display lock status
+  ansible.builtin.debug:
+    msg: "Cluster lock {{ 'acquired' if lock_action | default('acquire') == 'acquire' else 'released' }} by {{ lock_holder }}"
+  run_once: true

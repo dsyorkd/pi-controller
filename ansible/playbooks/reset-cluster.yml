@@ -1,0 +1,169 @@
+---
+# Reset Cluster Playbook
+# ======================
+# Performs a complete cleanup of the cluster:
+# 1. Stops pi-controller
+# 2. Removes K3s (if installed)
+# 3. Cleans pi-controller state
+# 4. Optionally reinstalls fresh
+#
+# USE WITH CAUTION - This is destructive!
+#
+# Usage:
+#   # Full reset (leaves cluster clean but empty)
+#   ansible-playbook playbooks/reset-cluster.yml
+#
+#   # Reset and reinstall
+#   ansible-playbook playbooks/reset-cluster.yml -e reinstall=true
+#
+#   # Reset specific nodes only
+#   ansible-playbook playbooks/reset-cluster.yml --limit pi-node-2,pi-node-3
+#
+#   # Skip confirmation prompt
+#   ansible-playbook playbooks/reset-cluster.yml -e force_reset=true
+
+- name: Confirm destructive operation
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Confirm reset
+      ansible.builtin.pause:
+        prompt: |
+          ⚠️  WARNING: This will DESTROY all cluster data!
+
+          Targets: {{ groups['pis'] | join(', ') }}
+
+          This will:
+          - Stop pi-controller service
+          - Uninstall K3s (if present)
+          - Delete all pi-controller data
+          - Remove cluster state
+
+          Type 'yes' to continue
+      register: confirm
+      when: not (force_reset | default(false) | bool)
+
+    - name: Abort if not confirmed
+      ansible.builtin.fail:
+        msg: "Reset cancelled by user"
+      when:
+        - not (force_reset | default(false) | bool)
+        - confirm.user_input != 'yes'
+
+- name: Acquire cluster lock
+  hosts: bootstrap
+  gather_facts: true
+  tasks:
+    - name: Force acquire lock for reset
+      ansible.builtin.include_role:
+        name: cluster-lock
+      vars:
+        lock_action: acquire
+        lock_reason: "cluster reset"
+
+- name: Stop pi-controller on all nodes
+  hosts: pis
+  gather_facts: false
+  tasks:
+    - name: Stop pi-controller service
+      ansible.builtin.systemd:
+        name: pi-controller
+        state: stopped
+      ignore_errors: true
+
+    - name: Disable pi-controller service
+      ansible.builtin.systemd:
+        name: pi-controller
+        enabled: false
+      ignore_errors: true
+
+- name: Clean K3s from worker nodes first
+  hosts: workers
+  gather_facts: false
+  serial: 1
+  roles:
+    - role: k3s
+      tags: [k3s, cleanup]
+
+- name: Clean K3s from bootstrap node
+  hosts: bootstrap
+  gather_facts: false
+  roles:
+    - role: k3s
+      tags: [k3s, cleanup]
+
+- name: Clean pi-controller state
+  hosts: pis
+  gather_facts: false
+  tasks:
+    - name: Remove pi-controller data directory
+      ansible.builtin.file:
+        path: "{{ data_dir }}"
+        state: absent
+
+    - name: Remove pi-controller config directory
+      ansible.builtin.file:
+        path: "{{ config_dir }}"
+        state: absent
+
+    - name: Remove pi-controller logs
+      ansible.builtin.file:
+        path: "{{ log_dir | default('/var/log/pi-controller') }}"
+        state: absent
+
+    - name: Remove pi-controller binary (optional)
+      ansible.builtin.file:
+        path: /usr/local/bin/pi-controller
+        state: absent
+      when: remove_binary | default(false) | bool
+
+    - name: Remove systemd service file
+      ansible.builtin.file:
+        path: /etc/systemd/system/pi-controller.service
+        state: absent
+      notify: reload systemd
+
+  handlers:
+    - name: reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+- name: Release cluster lock
+  hosts: bootstrap
+  gather_facts: false
+  tasks:
+    - name: Release lock
+      ansible.builtin.include_role:
+        name: cluster-lock
+      vars:
+        lock_action: release
+
+- name: Reinstall if requested
+  hosts: pis
+  gather_facts: true
+  tasks:
+    - name: Reinstall pi-controller
+      ansible.builtin.include_role:
+        name: pi-controller
+      when: reinstall | default(false) | bool
+
+- name: Report final status
+  hosts: pis
+  gather_facts: false
+  tasks:
+    - name: Check for remaining k3s
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s
+      register: k3s_check
+
+    - name: Check for remaining pi-controller data
+      ansible.builtin.stat:
+        path: "{{ data_dir }}"
+      register: data_check
+
+    - name: Display cleanup status
+      ansible.builtin.debug:
+        msg: |
+          Reset complete on {{ inventory_hostname }}:
+          - K3s removed: {{ not k3s_check.stat.exists }}
+          - Data removed: {{ not data_check.stat.exists }}

@@ -1,0 +1,178 @@
+# Pi-Controller Configuration Example
+#
+# This file provides a complete example configuration for pi-controller.
+# Copy this file to your configuration directory and customize as needed.
+#
+# Default locations:
+#   - Linux: /etc/pi-controller/config.yaml
+#   - macOS/Windows: ./config.yaml
+#
+# Override with: --config=/path/to/config.yaml or PI_CONTROLLER_CONFIG env var
+
+# Application settings
+app:
+  name: "pi-controller"
+  environment: "production"  # production, development, staging
+  data_dir: "./data"         # Directory for database and runtime data
+  debug: false               # Enable debug mode
+
+# Database configuration
+database:
+  path: "pi-controller.db"   # SQLite database file (relative to data_dir)
+  max_open_conns: 25         # Maximum open database connections
+  max_idle_conns: 5          # Maximum idle connections
+  conn_max_lifetime: "5m"    # Connection lifetime
+  log_level: "warn"          # Database query log level (debug, info, warn, error)
+
+# REST API configuration
+api:
+  host: "0.0.0.0"            # Listen address (0.0.0.0 = all interfaces)
+  port: 8080                 # REST API port
+  read_timeout: "30s"        # Read timeout
+  write_timeout: "30s"       # Write timeout
+  cors_enabled: true         # Enable CORS
+  cors_origins:              # Allowed CORS origins (empty = all)
+    - "*"
+  auth_enabled: true         # Enable JWT authentication
+  tls_enabled: false         # Enable HTTPS
+  tls_cert: ""               # TLS certificate path
+  tls_key: ""                # TLS key path
+
+# gRPC server configuration
+grpc:
+  host: "0.0.0.0"            # Listen address
+  port: 9090                 # gRPC port
+  max_recv_msg_size: 4194304 # 4MB max receive message size
+  max_send_msg_size: 4194304 # 4MB max send message size
+  tls_enabled: false         # Enable TLS
+  tls_cert: ""               # TLS certificate path
+  tls_key: ""                # TLS key path
+
+# WebSocket server configuration
+websocket:
+  host: "0.0.0.0"            # Listen address
+  port: 8081                 # WebSocket port
+  path: "/ws"                # WebSocket endpoint path
+  read_buffer_size: 1024     # Read buffer size
+  write_buffer_size: 1024    # Write buffer size
+
+# Logging configuration
+log:
+  level: "info"              # Log level (debug, info, warn, error)
+  format: "json"             # Log format (json, text)
+  output: "stdout"           # Output destination (stdout, stderr, file path)
+
+# Raft cluster configuration (on-device mode only)
+cluster:
+  enabled: true              # Enable Raft clustering
+  node_id: ""                # Unique node ID (auto-generated if empty)
+  bind_addr: "0.0.0.0:9091"  # Raft bind address
+  advertise_addr: ""         # Advertised address (auto-detected if empty)
+  bootstrap: false           # Bootstrap new cluster (first node only)
+  join_addresses: []         # Existing cluster addresses to join
+
+  # Raft tuning
+  heartbeat_timeout: "1s"    # Heartbeat interval
+  election_timeout: "1s"     # Election timeout
+  commit_timeout: "500ms"    # Commit timeout
+  snapshot_interval: "30m"   # Snapshot interval
+  snapshot_threshold: 8192   # Snapshot after N log entries
+  max_append_entries: 64     # Max entries per append
+
+# GPIO configuration
+gpio:
+  enabled: true              # Enable GPIO functionality
+  mock_mode: false           # Use mock GPIO (for testing)
+  default_direction: "input" # Default pin direction
+  default_pull_mode: "none"  # Default pull resistor (none, up, down)
+
+  # Pin restrictions (pins that cannot be configured)
+  restricted_pins:
+    - 2   # I2C SDA
+    - 3   # I2C SCL
+    - 14  # UART TX
+    - 15  # UART RX
+
+  # Rate limiting (prevent hardware damage)
+  max_toggles_per_second: 100
+  min_toggle_interval: "10ms"
+
+# Node discovery configuration
+discovery:
+  enabled: true              # Enable discovery
+  method: "mdns"             # Discovery method (mdns, scan, static)
+  interface: ""              # Network interface (auto-detect if empty)
+  domain: "local"            # mDNS domain
+  service_name: "_pi-controller._tcp"
+  interval: "30s"            # Periodic scan interval
+
+  # Static node list (when method: static)
+  static_nodes: []
+
+  # Network scan configuration (when method: scan or combined with mdns)
+  # Provides fallback discovery for environments where mDNS is blocked (VLANs, corporate networks)
+  scan_ranges: []            # IP ranges to scan in CIDR notation (e.g., ["192.168.1.0/24", "10.0.0.0/16"])
+  scan_ports: [9091]         # Ports to scan on each host (default: pi-agent gRPC port)
+  scan_timeout: "2s"         # Timeout for individual port scans
+  scan_concurrency: 10       # Number of concurrent scan workers
+  scan_rate_limit: 100       # Maximum scans per second (prevents network flooding)
+
+# Certificate Authority configuration
+ca:
+  enabled: true              # Enable embedded CA
+  backend: "local"           # Backend type (local, vault)
+
+  # Local CA settings
+  local:
+    ca_cert: "./certs/ca.crt"
+    ca_key: "./certs/ca.key"
+    cert_dir: "./certs"
+    key_size: 2048
+    validity_days: 365
+
+  # Vault PKI settings (when backend=vault)
+  vault:
+    address: "http://127.0.0.1:8200"
+    token: ""
+    mount_path: "pki"
+    role: "pi-controller"
+
+# Kubernetes integration (optional)
+kubernetes:
+  enabled: false             # Enable Kubernetes integration
+  distribution: "k3s"        # Distribution (k3s, k0s, k8s)
+  config_path: ""            # Kubeconfig path (auto-detect if empty)
+  namespace: "default"       # Default namespace
+
+  # K3s-specific settings
+  k3s:
+    server_url: ""           # K3s server URL
+    token: ""                # K3s token
+    install_path: "/usr/local/bin/k3s"
+
+# Security settings
+security:
+  # JWT settings
+  jwt_secret: ""             # JWT signing secret (auto-generated if empty)
+  jwt_expiry: "24h"          # Token expiry duration
+
+  # Session settings
+  session_timeout: "1h"      # Session timeout
+  max_sessions_per_user: 5   # Max concurrent sessions
+
+  # Rate limiting
+  rate_limit_enabled: true
+  requests_per_minute: 60
+  burst_size: 10
+
+# Monitoring & Observability
+monitoring:
+  metrics_enabled: true      # Enable Prometheus metrics
+  metrics_port: 9100         # Metrics port
+  metrics_path: "/metrics"   # Metrics endpoint path
+
+  health_check_enabled: true
+  health_check_path: "/health"
+
+  tracing_enabled: false     # Enable distributed tracing
+  tracing_endpoint: ""       # Jaeger/OTLP endpoint

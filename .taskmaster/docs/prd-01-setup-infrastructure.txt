@@ -1,0 +1,324 @@
+# PRD: Setup Testing Infrastructure for Pi-Controller
+
+## Product Overview
+Establish the foundational testing and quality assurance infrastructure for the pi-controller project, including SonarQube integration for code quality analysis and Playwright test framework for end-to-end UI testing.
+
+## Problem Statement
+The pi-controller project currently lacks:
+1. Automated code quality analysis (SonarQube not configured)
+2. Comprehensive end-to-end testing infrastructure (Playwright setup incomplete)
+3. CI/CD integration for quality gates and test automation
+4. Standardized test fixtures and mock data for consistent testing
+
+## Goals & Success Metrics
+
+### Primary Goals
+- Configure SonarQube integration with minimum 80% code coverage requirement
+- Set up complete Playwright testing infrastructure with fixtures and mocks
+- Integrate both systems into CI/CD pipeline
+- Enable parallel test execution for efficient testing
+
+### Success Metrics
+- SonarQube successfully scans codebase on every PR
+- Quality gates block PRs with critical/blocker issues
+- Playwright tests run in < 5 minutes locally
+- All tests pass in CI/CD environment
+- Mock API endpoints provide consistent test data
+
+## User Stories
+
+### Story 1: SonarQube Integration
+**As a** developer
+**I want** SonarQube to analyze my code on every commit
+**So that** I can identify and fix quality issues before they reach production
+
+**Acceptance Criteria:**
+- SonarQube project created and configured
+- Authentication credentials securely stored in GitHub secrets
+- Quality gates configured with 80% minimum coverage
+- Code smells, bugs, and vulnerabilities reported
+- GitHub PR checks display SonarQube status
+- Scan results visible in SonarQube dashboard
+
+### Story 2: Playwright Test Infrastructure
+**As a** QA engineer
+**I want** a standardized Playwright testing framework
+**So that** I can write consistent, reliable end-to-end tests
+
+**Acceptance Criteria:**
+- Playwright configuration file with browser settings
+- Test fixtures for authentication, nodes, clusters
+- Mock API endpoints for consistent test data
+- Helper utilities for common test operations
+- Tests run successfully both locally and in CI
+- Test reports generated with screenshots on failure
+
+## Technical Requirements
+
+### SonarQube Configuration
+
+#### Files to Create:
+1. **`sonar-project.properties`** (project root)
+   ```properties
+   sonar.projectKey=pi-controller
+   sonar.organization=yorkserv
+   sonar.sources=internal,pkg,cmd
+   sonar.tests=test
+   sonar.go.coverage.reportPaths=coverage.out
+   sonar.test.inclusions=**/*_test.go
+   sonar.exclusions=**/vendor/**,**/web/**
+   ```
+
+2. **`.github/workflows/sonarqube.yml`**
+   - Trigger on: push to develop, main; pull requests
+   - Steps: checkout, setup Go, run tests with coverage, SonarQube scan
+   - Use sonarcloud-github-action for scanning
+   - Report status back to PR
+
+#### Configuration Requirements:
+- Quality Gate: "Sonar way" with custom conditions:
+  - Coverage on New Code: >= 80%
+  - Duplicated Lines on New Code: <= 3%
+  - Maintainability Rating: A or B
+  - Reliability Rating: A
+  - Security Rating: A
+- Configure branch analysis for develop and main
+- Enable PR decoration for inline comments
+
+### Playwright Test Infrastructure
+
+#### Files to Create:
+
+1. **`web/kubes-aura/tests/setup/fixtures.ts`**
+   ```typescript
+   import { test as base } from '@playwright/test';
+
+   export interface TestFixtures {
+     authenticatedPage: Page;
+     mockNodes: Node[];
+     mockClusters: Cluster[];
+   }
+
+   export const test = base.extend<TestFixtures>({
+     // Fixture implementations
+   });
+   ```
+
+2. **`web/kubes-aura/tests/setup/test-data.ts`**
+   - Mock node data (5+ nodes with various states)
+   - Mock cluster data (3+ clusters of different types)
+   - Mock GPIO pin configurations
+   - Mock system metrics data
+   - Mock user credentials for testing
+
+3. **`web/kubes-aura/tests/utils/helpers.ts`**
+   - login(page, username, password)
+   - navigateTo(page, route)
+   - waitForApiResponse(page, endpoint)
+   - fillForm(page, formData)
+   - assertToast(page, message)
+
+4. **`web/kubes-aura/playwright.config.ts`** (enhanced)
+   ```typescript
+   export default defineConfig({
+     testDir: './tests',
+     fullyParallel: true,
+     retries: process.env.CI ? 2 : 0,
+     workers: process.env.CI ? 2 : undefined,
+     reporter: [
+       ['html'],
+       ['json', { outputFile: 'test-results/results.json' }],
+       ['junit', { outputFile: 'test-results/junit.xml' }]
+     ],
+     use: {
+       baseURL: 'http://localhost:8080',
+       trace: 'on-first-retry',
+       screenshot: 'only-on-failure',
+     },
+     webServer: {
+       command: 'npm run dev',
+       port: 8080,
+       reuseExistingServer: !process.env.CI,
+     },
+   });
+   ```
+
+5. **`web/kubes-aura/tests/setup/global-setup.ts`**
+   - Start mock backend server
+   - Seed test database
+   - Configure test environment variables
+
+6. **`web/kubes-aura/tests/setup/global-teardown.ts`**
+   - Stop mock backend server
+   - Clean up test data
+   - Generate test report summary
+
+#### Package.json Updates:
+```json
+{
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report"
+  }
+}
+```
+
+### CI/CD Integration
+
+#### GitHub Actions Workflow: `.github/workflows/playwright.yml`
+```yaml
+name: Playwright Tests
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        working-directory: web/kubes-aura
+        run: npm ci
+      - name: Install Playwright Browsers
+        working-directory: web/kubes-aura
+        run: npx playwright install --with-deps
+      - name: Run Playwright tests
+        working-directory: web/kubes-aura
+        run: npm run test
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/kubes-aura/playwright-report/
+```
+
+## Implementation Tasks
+
+### Task 1.1: Configure SonarQube Integration
+**Priority:** HIGH
+**Estimated Effort:** 2-3 hours
+
+**Subtasks:**
+1. Create SonarQube project in yorkserv organization
+2. Generate and securely store authentication token
+3. Create `sonar-project.properties` with proper configuration
+4. Add SonarQube workflow to GitHub Actions
+5. Configure quality gates with required thresholds
+6. Test integration with sample PR
+7. Document SonarQube setup in project README
+
+**Dependencies:** None
+
+**Verification:**
+- Run SonarQube scan on current codebase
+- Verify quality gate status appears in PR
+- Check that coverage reports are uploaded
+- Confirm dashboard displays project metrics
+
+### Task 1.2: Set Up Playwright Test Infrastructure
+**Priority:** HIGH
+**Estimated Effort:** 3-4 hours
+
+**Subtasks:**
+1. Create test directory structure under `web/kubes-aura/tests/`
+2. Implement test fixtures (authenticated page, mock data)
+3. Create comprehensive test data (nodes, clusters, users)
+4. Build helper utilities for common operations
+5. Enhance playwright.config.ts with reporters and retry logic
+6. Create global setup/teardown scripts
+7. Add test scripts to package.json
+8. Create Playwright CI/CD workflow
+9. Run sample test to verify setup
+10. Document test infrastructure in README
+
+**Dependencies:** None
+
+**Verification:**
+- Run `npm test` successfully locally
+- Verify mock API endpoints respond correctly
+- Test fixtures load consistently
+- CI/CD workflow executes tests
+- Test reports generated with proper formatting
+
+## Mock Data Specifications
+
+### Mock Nodes (test-data.ts)
+```typescript
+export const mockNodes: Node[] = [
+  {
+    id: 'node-1',
+    hostname: 'pi-controller-01',
+    ip: '192.168.1.101',
+    status: 'online',
+    role: 'master',
+    cluster_id: 'cluster-1',
+    cpu_percent: 45.2,
+    memory_percent: 62.8,
+    disk_percent: 38.5,
+    temperature: 52.3,
+    uptime: 8640000, // 100 days in seconds
+    discovery_method: 'mdns',
+  },
+  // ... 4 more nodes with varied states
+];
+```
+
+### Mock Clusters (test-data.ts)
+```typescript
+export const mockClusters: Cluster[] = [
+  {
+    id: 'cluster-1',
+    name: 'Production Cluster',
+    type: 'kubernetes',
+    status: 'healthy',
+    nodes_online: 3,
+    nodes_total: 3,
+    region: 'us-east',
+    version: 'k3s-v1.28.5',
+  },
+  // ... 2 more clusters
+];
+```
+
+## Security Considerations
+- Store SonarQube tokens in GitHub secrets, never in code
+- Use environment-specific configurations for different environments
+- Implement proper CORS for mock API endpoints
+- Sanitize test data to avoid exposing sensitive patterns
+
+## Documentation Requirements
+- README section on running tests locally
+- README section on interpreting SonarQube results
+- Inline comments for complex test fixtures
+- Troubleshooting guide for common test failures
+
+## Dependencies
+- Node.js 20.x
+- Playwright 1.40+
+- SonarQube Scanner 5.0+
+- Go 1.21+ (for backend tests)
+
+## Rollout Plan
+1. Set up SonarQube in development environment
+2. Create and test Playwright infrastructure locally
+3. Integrate both into CI/CD pipeline
+4. Run full test suite to establish baseline
+5. Train team on new testing infrastructure
+6. Enable PR blocking based on quality gates
+
+## Future Enhancements
+- Visual regression testing with Percy/Chromatic
+- Performance testing with Lighthouse CI
+- Contract testing for API endpoints
+- Mutation testing for test quality assessment

@@ -1,0 +1,58 @@
+# PRD: Accessibility Compliance Testing
+
+## Product Overview
+Ensure the pi-controller web interface meets WCAG 2.1 AA accessibility standards through automated testing of ARIA attributes, keyboard navigation, and screen reader compatibility.
+
+## Implementation Tasks
+
+### Task 2.9: Accessibility Testing
+**Priority:** MEDIUM
+**Estimated Effort:** 4-5 hours
+
+**Subtasks:**
+1. Create `accessibility.spec.ts` test file
+2. Implement ARIA attributes test for interactive elements
+3. Implement form label association test
+4. Implement button descriptive text test
+5. Implement aria-live regions test for status indicators
+6. Implement keyboard navigation test (all elements focusable)
+7. Implement tab order test
+8. Implement Escape key closes dialogs test
+9. Implement Enter key submits forms test
+10. Implement screen reader page title test
+11. Implement heading hierarchy test
+12. Run automated accessibility audit (axe-core)
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication)
+
+## Test Scenarios
+
+### Keyboard Navigation
+```typescript
+test('should navigate entire form using keyboard', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller/settings');
+
+  // Tab through form fields
+  await page.keyboard.press('Tab');
+  await expect(page.locator('input[name="hostname"]')).toBeFocused();
+
+  await page.keyboard.press('Tab');
+  await expect(page.locator('select[name="timezone"]')).toBeFocused();
+});
+```
+
+### ARIA Labels
+```typescript
+test('should have proper ARIA labels on interactive elements', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/pi-controller');
+
+  const buttons = await page.locator('button').all();
+  for (const button of buttons) {
+    const ariaLabel = await button.getAttribute('aria-label');
+    const text = await button.textContent();
+    expect(ariaLabel || text).toBeTruthy();
+  }
+});
+```

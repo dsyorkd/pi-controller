@@ -2,18 +2,18 @@ package testing
 
 import (
 	"database/sql/driver"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/dsyorkd/pi-controller/internal/models"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	"github.com/dsyorkd/pi-controller/internal/models"
 )
 
 // TestDB holds test database connection and mock
@@ -54,15 +54,19 @@ func SetupTestDBFile(t *testing.T) (*gorm.DB, func()) {
 		&models.Node{},
 		&models.GPIODevice{},
 		&models.GPIOReading{},
+		&models.User{},
+		&models.Certificate{},
+		&models.CertificateRequest{},
+		&models.CAInfo{},
 	)
 	require.NoError(t, err)
 
 	cleanup := func() {
 		sqlDB, _ := db.DB()
 		if sqlDB != nil {
-			sqlDB.Close()
+			_ = sqlDB.Close() // #nosec G104 - test cleanup, error not actionable
 		}
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) // #nosec G104 - test cleanup, error not actionable
 	}
 
 	return db, cleanup
@@ -72,7 +76,7 @@ func SetupTestDBFile(t *testing.T) (*gorm.DB, func()) {
 func (tdb *TestDB) Close(t *testing.T) {
 	sqlDB, err := tdb.DB.DB()
 	require.NoError(t, err)
-	sqlDB.Close()
+	_ = sqlDB.Close() // #nosec G104 - test cleanup, error checked via ExpectationsWereMet
 	require.NoError(t, tdb.Mock.ExpectationsWereMet())
 }
 
@@ -87,9 +91,10 @@ func (a AnyTime) Match(v driver.Value) bool {
 
 // CreateTestCluster creates a test cluster for testing purposes
 func CreateTestCluster(t *testing.T) *models.Cluster {
+	// Use test name and timestamp to ensure unique names
+	uniqueName := fmt.Sprintf("test-cluster-%s-%d", t.Name(), time.Now().UnixNano())
 	return &models.Cluster{
-		ID:          1,
-		Name:        "test-cluster",
+		Name:        uniqueName,
 		Description: "Test cluster for unit tests",
 		Status:      models.ClusterStatusActive,
 		CreatedAt:   time.Now(),
@@ -99,22 +104,26 @@ func CreateTestCluster(t *testing.T) *models.Cluster {
 
 // CreateTestNode creates a test node for testing purposes
 func CreateTestNode(t *testing.T, clusterID uint) *models.Node {
+	// Use test name and timestamp to ensure unique names
+	uniqueName := fmt.Sprintf("test-node-%s-%d", t.Name(), time.Now().UnixNano())
+	uniqueMAC := fmt.Sprintf("00:00:00:00:%02x:%02x", time.Now().Unix()%256, time.Now().UnixNano()%256)
 	return &models.Node{
-		ID:        1,
-		Name:      "test-node",
-		IPAddress: "192.168.1.100",
-		Status:    models.NodeStatusReady,
-		ClusterID: &clusterID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Name:       uniqueName,
+		IPAddress:  "192.168.1.100",
+		MACAddress: uniqueMAC,
+		Status:     models.NodeStatusReady,
+		ClusterID:  &clusterID,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
 	}
 }
 
 // CreateTestGPIODevice creates a test GPIO device for testing purposes
 func CreateTestGPIODevice(t *testing.T, nodeID uint) *models.GPIODevice {
+	// Use test name and timestamp to ensure unique names
+	uniqueName := fmt.Sprintf("test-gpio-%s-%d", t.Name(), time.Now().UnixNano())
 	return &models.GPIODevice{
-		ID:          1,
-		Name:        "test-gpio",
+		Name:        uniqueName,
 		Description: "Test GPIO device",
 		PinNumber:   18,
 		Direction:   models.GPIODirectionOutput,
@@ -131,7 +140,6 @@ func CreateTestGPIODevice(t *testing.T, nodeID uint) *models.GPIODevice {
 // CreateTestGPIOReading creates a test GPIO reading for testing purposes
 func CreateTestGPIOReading(t *testing.T, deviceID uint) *models.GPIOReading {
 	return &models.GPIOReading{
-		ID:        1,
 		DeviceID:  deviceID,
 		Value:     1.0,
 		Timestamp: time.Now(),

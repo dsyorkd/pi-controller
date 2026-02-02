@@ -40,4 +40,3 @@ In a new `auth_test.go` file, create a test for the happy path. This may require
 ### Description: Implement unit tests for the failure scenarios of the `Auth` middleware. Test cases should include missing, malformed, and invalid/expired tokens. Verify that the middleware returns a `401 Unauthorized` status and does not call the next handler.
 ### Details:
 In `auth_test.go`, add test cases for failure conditions. Use a table-driven test approach. Cases should include: 1) no `Authorization` header, 2) a malformed header (e.g., no 'Bearer' prefix), 3) a token that the mock validator rejects. For each case, assert that the response status code is `401 Unauthorized` and that a flag or channel indicates the downstream handler was never called.
-

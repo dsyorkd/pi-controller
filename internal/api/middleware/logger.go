@@ -3,8 +3,8 @@ package middleware
 import (
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/gin-gonic/gin"
 )
 
 // Logger creates a gin middleware for request logging using logrus

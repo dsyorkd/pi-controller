@@ -1,0 +1,8 @@
+---
+# K3s Cleanup Role Defaults
+# =========================
+# Note: This role only handles cleanup, not installation.
+# pi-controller handles K3s installation.
+
+# Whether to flush iptables (use with caution - may affect other services)
+flush_iptables: false

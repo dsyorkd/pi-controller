@@ -1,0 +1,80 @@
+---
+# Example 1: RGB LED controller using 3 PWM channels
+apiVersion: gpio.pi-controller.io/v1
+kind: PWMController
+metadata:
+  name: rgb-led-controller
+  namespace: default
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: pi-node-02
+  channels:
+  - pinNumber: 12  # Red channel
+    frequency: 1000
+    dutyCycle: 50
+    enabled: true
+  - pinNumber: 13  # Green channel
+    frequency: 1000
+    dutyCycle: 75
+    enabled: true
+  - pinNumber: 19  # Blue channel
+    frequency: 1000
+    dutyCycle: 25
+    enabled: true
+  globalSettings:
+    clockDivider: 32
+    range: 1024
+---
+# Example 2: Multi-servo controller for robotic arm
+apiVersion: gpio.pi-controller.io/v1
+kind: PWMController
+metadata:
+  name: robotic-arm-servos
+  namespace: robotics
+spec:
+  nodeSelector:
+    application: robotics
+  channels:
+  - pinNumber: 12  # Base rotation servo
+    frequency: 50
+    dutyCycle: 7.5   # Neutral position
+    enabled: true
+  - pinNumber: 13  # Shoulder servo
+    frequency: 50
+    dutyCycle: 5.0   # 90 degrees
+    enabled: true
+  - pinNumber: 18  # Elbow servo
+    frequency: 50
+    dutyCycle: 10.0  # 180 degrees
+    enabled: true
+  - pinNumber: 19  # Wrist servo
+    frequency: 50
+    dutyCycle: 7.5   # Neutral position
+    enabled: true
+  globalSettings:
+    clockDivider: 64
+    range: 2048
+---
+# Example 3: Motor speed controller with phase offset
+apiVersion: gpio.pi-controller.io/v1
+kind: PWMController
+metadata:
+  name: motor-speed-controller
+  namespace: automation
+spec:
+  nodeSelector:
+    zone: factory-floor
+  channels:
+  - pinNumber: 18  # Motor A
+    frequency: 1000
+    dutyCycle: 80
+    enabled: true
+    phase: 0
+  - pinNumber: 19  # Motor B (with phase offset)
+    frequency: 1000
+    dutyCycle: 80
+    enabled: true
+    phase: 120
+  globalSettings:
+    clockDivider: 16
+    range: 4096

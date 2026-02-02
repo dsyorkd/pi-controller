@@ -1,0 +1,152 @@
+name: Pi Integration Tests
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      reset_before_test:
+        description: 'Reset cluster before running tests'
+        required: false
+        default: false
+        type: boolean
+
+# Only ONE run at a time against the Pi cluster
+concurrency:
+  group: pi-cluster
+  cancel-in-progress: false
+
+env:
+  PI_CONTROLLER_VERSION: ${{ github.sha }}
+
+jobs:
+  build:
+    name: Build ARM64 Binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install protoc
+        run: |
+          PROTOC_VERSION="28.3"
+          curl -Lo protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
+          sudo unzip -q protoc.zip -d /usr/local
+          sudo chmod +x /usr/local/bin/protoc
+          rm protoc.zip
+          protoc --version
+
+      - name: Generate proto files and install dependencies
+        run: |
+          make proto
+          make deps
+
+      - name: Build for ARM64
+        run: make build-linux-arm64
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-controller-linux-arm64
+          path: build/pi-controller-linux-arm64
+          retention-days: 1
+
+  deploy-and-test:
+    name: Deploy & Test on Pi Cluster
+    needs: build
+    runs-on: [self-hosted, raspberry-pi]
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: pi-controller-linux-arm64
+          path: build/
+
+      - name: Install Ansible (if needed)
+        run: |
+          # Check if Ansible is already installed in venv
+          if [ -x "$HOME/.ansible-venv/bin/ansible" ]; then
+            INSTALLED_VERSION=$("$HOME/.ansible-venv/bin/ansible" --version | head -1 | awk '{print $3}' | tr -d '[]')
+            echo "Ansible already installed: $INSTALLED_VERSION"
+            echo "$HOME/.ansible-venv/bin" >> $GITHUB_PATH
+          else
+            echo "Installing Ansible in virtual environment..."
+            # Use virtual environment on self-hosted runner (Debian 12 requires this)
+            python3 -m venv ~/.ansible-venv
+            source ~/.ansible-venv/bin/activate
+            pip install --upgrade pip
+            pip install ansible ansible-lint
+            echo "$HOME/.ansible-venv/bin" >> $GITHUB_PATH
+          fi
+          # Verify installation
+          ansible --version
+
+      - name: Set up SSH key
+        run: |
+          # SSH key is pre-configured on the self-hosted runner at ~/.ssh/pi_cluster_key
+          # Only write from secret if key doesn't exist (for fresh runner setups)
+          if [ ! -f ~/.ssh/pi_cluster_key ]; then
+            mkdir -p ~/.ssh
+            echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/pi_cluster_key
+            chmod 600 ~/.ssh/pi_cluster_key
+          fi
+          # Verify key exists
+          ls -la ~/.ssh/pi_cluster_key
+
+      - name: Reset cluster (if requested)
+        if: github.event.inputs.reset_before_test == 'true'
+        working-directory: ansible
+        run: |
+          ansible-playbook playbooks/reset-cluster.yml \
+            -i inventory/hosts.yml \
+            -e force_reset=true
+
+      - name: Deploy and test
+        working-directory: ansible
+        run: |
+          chmod +x $GITHUB_WORKSPACE/build/pi-controller-linux-arm64
+          ansible-playbook playbooks/deploy-test.yml \
+            -i inventory/hosts.yml \
+            -e pi_controller_local_binary="$GITHUB_WORKSPACE/build/pi-controller-linux-arm64"
+
+      - name: Cleanup on failure
+        if: failure()
+        working-directory: ansible
+        run: |
+          # Release lock if held
+          ansible-playbook playbooks/release-lock.yml \
+            -i inventory/hosts.yml || true
+          # Optionally reset cluster
+          # ansible-playbook playbooks/reset-cluster.yml \
+          #   -i inventory/ci-hosts.yml \
+          #   -e force_reset=true
+
+      - name: Collect logs on failure
+        if: failure()
+        working-directory: ansible
+        run: |
+          ansible pis -i inventory/hosts.yml -m shell \
+            -a "journalctl -u pi-controller --no-pager -n 100" \
+            > ../pi-controller-logs.txt 2>&1 || true
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-controller-logs
+          path: pi-controller-logs.txt
+          retention-days: 7

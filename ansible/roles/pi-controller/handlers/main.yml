@@ -1,0 +1,17 @@
+---
+# Pi Controller Handlers
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart pi-controller
+  ansible.builtin.systemd:
+    name: pi-controller
+    state: restarted
+  when: start_service | default(true)
+
+- name: stop pi-controller
+  ansible.builtin.systemd:
+    name: pi-controller
+    state: stopped

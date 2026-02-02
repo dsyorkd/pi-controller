@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-	"github.com/sirupsen/logrus"
-
-	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/pkg/gpio"
 	pb "github.com/dsyorkd/pi-controller/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // GPIOService implements the PiAgent GPIO gRPC service
@@ -24,15 +22,14 @@ func NewGPIOService(logger logger.Interface) (*GPIOService, error) {
 	// Create GPIO configuration with secure defaults
 	gpioConfig := gpio.DefaultConfig()
 	securityConfig := gpio.DefaultSecurityConfig()
-	
+
 	// For agent mode, we can be less restrictive since it's running on the node
 	securityConfig.Level = gpio.SecurityLevelPermissive
 	securityConfig.RequireUserContext = false // Agent operations are system-level
 
 	// Initialize GPIO controller
-	logrusLogger := logrus.New()
-	controller := gpio.NewController(gpioConfig, securityConfig, logrusLogger)
-	
+	controller := gpio.NewController(gpioConfig, securityConfig, logger)
+
 	return &GPIOService{
 		controller: controller,
 		logger:     logger.WithField("component", "gpio-service"),
@@ -42,12 +39,12 @@ func NewGPIOService(logger logger.Interface) (*GPIOService, error) {
 // Initialize initializes the GPIO service
 func (s *GPIOService) Initialize(ctx context.Context) error {
 	s.logger.Info("Initializing GPIO service")
-	
+
 	if err := s.controller.Initialize(ctx); err != nil {
 		s.logger.WithError(err).Error("Failed to initialize GPIO controller")
 		return fmt.Errorf("failed to initialize GPIO controller: %w", err)
 	}
-	
+
 	s.logger.Info("GPIO service initialized successfully")
 	return nil
 }
@@ -55,12 +52,12 @@ func (s *GPIOService) Initialize(ctx context.Context) error {
 // Close shuts down the GPIO service
 func (s *GPIOService) Close() error {
 	s.logger.Info("Shutting down GPIO service")
-	
+
 	if err := s.controller.Close(); err != nil {
 		s.logger.WithError(err).Error("Failed to close GPIO controller")
 		return fmt.Errorf("failed to close GPIO controller: %w", err)
 	}
-	
+
 	s.logger.Info("GPIO service shut down successfully")
 	return nil
 }
@@ -114,7 +111,7 @@ func (s *GPIOService) ReadGPIOPin(ctx context.Context, req *pb.ReadGPIOPinReques
 
 	return &pb.ReadGPIOPinResponse{
 		Pin:       req.Pin,
-		Value:     int32(value),
+		Value:     int32(value), // #nosec G115 -- GPIO values are 0 or 1
 		Timestamp: timestamppb.Now(),
 	}, nil
 }
@@ -177,7 +174,151 @@ func (s *GPIOService) SetGPIOPWM(ctx context.Context, req *pb.SetGPIOPWMRequest)
 	}, nil
 }
 
-// ListConfiguredPins returns all configured GPIO pins
+// SPIExchange performs an SPI exchange
+func (s *GPIOService) SPIExchange(ctx context.Context, req *pb.SPIExchangeRequest) (*pb.SPIExchangeResponse, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"channel":  req.Channel,
+		"data_len": len(req.Data),
+	}).Debug("Performing SPI exchange")
+
+	respData, err := s.controller.SPITransfer(int(req.Channel), req.Data, "agent")
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to perform SPI exchange")
+		return nil, fmt.Errorf("failed to perform SPI exchange: %w", err)
+	}
+
+	return &pb.SPIExchangeResponse{
+		Data: respData,
+	}, nil
+}
+
+// SPIWrite performs an SPI write
+func (s *GPIOService) SPIWrite(ctx context.Context, req *pb.SPIWriteRequest) (*pb.SPIWriteResponse, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"channel":  req.Channel,
+		"data_len": len(req.Data),
+	}).Debug("Performing SPI write")
+
+	err := s.controller.SPIWrite(int(req.Channel), req.Data, "agent")
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to perform SPI write")
+		return &pb.SPIWriteResponse{
+			Success: false,
+			Message: fmt.Sprintf("Failed to perform SPI write: %v", err),
+		}, nil
+	}
+
+	return &pb.SPIWriteResponse{
+		Success: true,
+		Message: "SPI write successful",
+	}, nil
+}
+
+// SPIRead performs an SPI read
+func (s *GPIOService) SPIRead(ctx context.Context, req *pb.SPIReadRequest) (*pb.SPIReadResponse, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"channel": req.Channel,
+		"length":  req.Length,
+	}).Debug("Performing SPI read")
+
+	respData, err := s.controller.SPIRead(int(req.Channel), int(req.Length), "agent")
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to perform SPI read")
+		return nil, fmt.Errorf("failed to perform SPI read: %w", err)
+	}
+
+	return &pb.SPIReadResponse{
+		Data: respData,
+	}, nil
+}
+
+// I2CWrite performs an I2C write
+func (s *GPIOService) I2CWrite(ctx context.Context, req *pb.I2CWriteRequest) (*pb.I2CWriteResponse, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"bus":      req.Bus,
+		"address":  req.Address,
+		"data_len": len(req.Data),
+	}).Debug("Performing I2C write")
+
+	err := s.controller.I2CWrite(int(req.Bus), int(req.Address), req.Data, "agent")
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to perform I2C write")
+		return &pb.I2CWriteResponse{
+			Success: false,
+			Message: fmt.Sprintf("Failed to perform I2C write: %v", err),
+		}, nil
+	}
+
+	return &pb.I2CWriteResponse{
+		Success: true,
+		Message: "I2C write successful",
+	}, nil
+}
+
+// I2CRead performs an I2C read
+func (s *GPIOService) I2CRead(ctx context.Context, req *pb.I2CReadRequest) (*pb.I2CReadResponse, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"bus":     req.Bus,
+		"address": req.Address,
+		"length":  req.Length,
+	}).Debug("Performing I2C read")
+
+	respData, err := s.controller.I2CRead(int(req.Bus), int(req.Address), int(req.Length), "agent")
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to perform I2C read")
+		return nil, fmt.Errorf("failed to perform I2C read: %w", err)
+	}
+
+	return &pb.I2CReadResponse{
+		Data: respData,
+	}, nil
+}
+
+// I2CWriteRegister performs an I2C write to a register
+func (s *GPIOService) I2CWriteRegister(ctx context.Context, req *pb.I2CWriteRegisterRequest) (*pb.I2CWriteRegisterResponse, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"bus":      req.Bus,
+		"address":  req.Address,
+		"register": req.Register,
+		"data_len": len(req.Data),
+	}).Debug("Performing I2C write register")
+
+	err := s.controller.I2CWriteRegister(int(req.Bus), int(req.Address), int(req.Register), req.Data, "agent")
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to perform I2C write register")
+		return &pb.I2CWriteRegisterResponse{
+			Success: false,
+			Message: fmt.Sprintf("Failed to perform I2C write register: %v", err),
+		}, nil
+	}
+
+	return &pb.I2CWriteRegisterResponse{
+		Success: true,
+		Message: "I2C write register successful",
+	}, nil
+}
+
+// I2CReadRegister performs an I2C read from a register
+func (s *GPIOService) I2CReadRegister(ctx context.Context, req *pb.I2CReadRegisterRequest) (*pb.I2CReadRegisterResponse, error) {
+	s.logger.WithFields(map[string]interface{}{
+		"bus":      req.Bus,
+		"address":  req.Address,
+		"register": req.Register,
+		"length":   req.Length,
+	}).Debug("Performing I2C read register")
+
+	respData, err := s.controller.I2CReadRegister(int(req.Bus), int(req.Address), int(req.Register), int(req.Length), "agent")
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to perform I2C read register")
+		return nil, fmt.Errorf("failed to perform I2C read register: %w", err)
+	}
+
+	return &pb.I2CReadRegisterResponse{
+		Data: respData,
+	}, nil
+}
+
+// ListConfiguredPins lists configured GPIO pins
 func (s *GPIOService) ListConfiguredPins(ctx context.Context, req *pb.ListConfiguredPinsRequest) (*pb.ListConfiguredPinsResponse, error) {
 	s.logger.Debug("Listing configured GPIO pins")
 
@@ -187,15 +328,15 @@ func (s *GPIOService) ListConfiguredPins(ctx context.Context, req *pb.ListConfig
 		return nil, fmt.Errorf("failed to list configured pins: %w", err)
 	}
 
-	pbPins := make([]*pb.GPIOPinState, len(pins))
-	for i, pin := range pins {
-		pbPins[i] = &pb.GPIOPinState{
-			Pin:         int32(pin.Pin),
+	var pbPins []*pb.GPIOPinState
+	for _, pin := range pins {
+		pbPins = append(pbPins, &pb.GPIOPinState{
+			Pin:         int32(pin.Pin), //nolint:gosec // GPIO pin numbers are always small positive integers
 			Direction:   convertDirectionToPB(pin.Direction),
 			PullMode:    convertPullModeToPB(pin.PullMode),
-			Value:       int32(pin.Value),
+			Value:       int32(pin.Value), //nolint:gosec // GPIO values are 0 or 1
 			LastUpdated: timestamppb.New(pin.Timestamp),
-		}
+		})
 	}
 
 	return &pb.ListConfiguredPinsResponse{
@@ -207,17 +348,24 @@ func (s *GPIOService) ListConfiguredPins(ctx context.Context, req *pb.ListConfig
 func (s *GPIOService) AgentHealth(ctx context.Context, req *pb.AgentHealthRequest) (*pb.AgentHealthResponse, error) {
 	status := "ok"
 	gpioAvailable := s.controller.IsAvailable()
-	
+
 	if !gpioAvailable {
 		status = "gpio_unavailable"
+	}
+
+	capabilities := []string{"gpio"}
+	// TODO: Add more granular capability detection
+	if gpioAvailable {
+		capabilities = append(capabilities, "pwm", "spi", "i2c")
 	}
 
 	return &pb.AgentHealthResponse{
 		Status:        status,
 		Timestamp:     timestamppb.Now(),
 		Version:       "1.0.0", // TODO: Get from build info
-		Uptime:        "0s",     // TODO: Calculate uptime
+		Uptime:        "0s",    // TODO: Calculate uptime
 		GpioAvailable: gpioAvailable,
+		Capabilities:  capabilities,
 	}, nil
 }
 
@@ -226,17 +374,17 @@ func (s *GPIOService) GetSystemInfo(ctx context.Context, req *pb.GetSystemInfoRe
 	// TODO: Implement system info collection
 	// For now, return basic placeholder info
 	return &pb.GetSystemInfoResponse{
-		Hostname:         "pi-agent",
-		Platform:         "linux",
-		Architecture:     "arm64",
-		CpuCores:         4,
-		MemoryTotal:      4 * 1024 * 1024 * 1024, // 4GB
-		MemoryAvailable:  2 * 1024 * 1024 * 1024, // 2GB
-		KernelVersion:    "6.0.0",
-		LoadAverage_1M:   0.1,
-		LoadAverage_5M:   0.2,
-		LoadAverage_15M:  0.3,
-		Timestamp:        timestamppb.Now(),
+		Hostname:        "pi-agent",
+		Platform:        "linux",
+		Architecture:    "arm64",
+		CpuCores:        4,
+		MemoryTotal:     4 * 1024 * 1024 * 1024, // 4GB
+		MemoryAvailable: 2 * 1024 * 1024 * 1024, // 2GB
+		KernelVersion:   "6.0.0",
+		LoadAverage_1M:  0.1,
+		LoadAverage_5M:  0.2,
+		LoadAverage_15M: 0.3,
+		Timestamp:       timestamppb.Now(),
 	}, nil
 }
 

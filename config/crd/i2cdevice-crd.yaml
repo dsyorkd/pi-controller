@@ -1,0 +1,250 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: i2cdevices.gpio.pi-controller.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+spec:
+  group: gpio.pi-controller.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        description: I2CDevice is the Schema for the i2cdevices API
+        properties:
+          apiVersion:
+            type: string
+            description: 'APIVersion defines the versioned schema of this representation of an object.'
+          kind:
+            type: string
+            description: 'Kind is a string value representing the REST resource this object represents.'
+          metadata:
+            type: object
+          spec:
+            type: object
+            description: I2CDeviceSpec defines the desired state of I2CDevice
+            properties:
+              nodeSelector:
+                type: object
+                description: NodeSelector specifies which node this I2C device should be managed on
+                additionalProperties:
+                  type: string
+              busNumber:
+                type: integer
+                description: BusNumber is the I2C bus number (typically 0 or 1 on Raspberry Pi)
+                minimum: 0
+                maximum: 10
+                default: 1
+              address:
+                type: string
+                description: Address is the I2C device address in hex format (e.g., "0x48")
+                pattern: '^0x[0-9A-Fa-f]{2}$'
+              deviceType:
+                type: string
+                description: DeviceType specifies the type of I2C device
+                enum:
+                - sensor
+                - display
+                - actuator
+                - gpio-expander
+                - adc
+                - dac
+                - rtc
+                - eeprom
+                - generic
+              registers:
+                type: array
+                description: Registers defines the device registers to monitor/configure
+                items:
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                      description: Address is the register address in hex format
+                      pattern: '^0x[0-9A-Fa-f]{2}$'
+                    name:
+                      type: string
+                      description: Name is a human-readable name for the register
+                    mode:
+                      type: string
+                      description: Mode specifies if the register is read-only, write-only, or read-write
+                      enum:
+                      - read-only
+                      - write-only
+                      - read-write
+                      default: read-write
+                    dataType:
+                      type: string
+                      description: DataType specifies the data type of the register value
+                      enum:
+                      - uint8
+                      - uint16
+                      - uint32
+                      - int8
+                      - int16
+                      - int32
+                      - float32
+                      - boolean
+                      default: uint8
+                    initialValue:
+                      type: string
+                      description: InitialValue sets the initial register value (for writable registers)
+                    pollInterval:
+                      type: string
+                      description: PollInterval sets how often to read this register (Go duration format)
+                      default: "1s"
+                  required:
+                  - address
+                  - name
+              configuration:
+                type: object
+                description: Configuration contains device-specific settings
+                properties:
+                  clockSpeed:
+                    type: integer
+                    description: ClockSpeed sets the I2C bus clock speed in Hz
+                    minimum: 1000
+                    maximum: 1000000
+                    default: 100000
+                  timeout:
+                    type: string
+                    description: Timeout sets the I2C operation timeout (Go duration format)
+                    default: "1s"
+                  retries:
+                    type: integer
+                    description: Retries sets the number of retry attempts for failed operations
+                    minimum: 0
+                    maximum: 10
+                    default: 3
+            required:
+            - nodeSelector
+            - address
+            - deviceType
+          status:
+            type: object
+            description: I2CDeviceStatus defines the observed state of I2CDevice
+            properties:
+              phase:
+                type: string
+                description: Phase represents the current lifecycle phase
+                enum:
+                - Pending
+                - Connecting
+                - Ready
+                - Failed
+                - Disconnected
+              nodeId:
+                type: string
+                description: NodeID is the ID of the node managing this I2C device
+              connected:
+                type: boolean
+                description: Connected indicates if the device is currently accessible
+              lastPing:
+                type: string
+                format: date-time
+                description: LastPing is the timestamp of the last successful communication
+              registerValues:
+                type: array
+                description: RegisterValues contains the current values of monitored registers
+                items:
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                      description: Address is the register address
+                    name:
+                      type: string
+                      description: Name is the register name
+                    value:
+                      type: string
+                      description: Value is the current register value as string
+                    lastRead:
+                      type: string
+                      format: date-time
+                      description: LastRead is when this register was last read
+                    error:
+                      type: string
+                      description: Error contains any error from the last read attempt
+              deviceInfo:
+                type: object
+                description: DeviceInfo contains information discovered about the device
+                properties:
+                  manufacturer:
+                    type: string
+                    description: Manufacturer name if discoverable
+                  model:
+                    type: string
+                    description: Device model if discoverable
+                  version:
+                    type: string
+                    description: Firmware/hardware version if discoverable
+              lastUpdated:
+                type: string
+                format: date-time
+                description: LastUpdated is the timestamp of the last status update
+              conditions:
+                type: array
+                description: Conditions represent the current service state
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      description: Type of condition
+                    status:
+                      type: string
+                      description: Status of the condition (True, False, Unknown)
+                      enum:
+                      - "True"
+                      - "False"
+                      - "Unknown"
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                      description: Last time the condition transitioned
+                    reason:
+                      type: string
+                      description: Reason for the condition's last transition
+                    message:
+                      type: string
+                      description: Human readable message indicating details
+                  required:
+                  - type
+                  - status
+              message:
+                type: string
+                description: Message provides additional information about the current state
+    additionalPrinterColumns:
+    - name: Node
+      type: string
+      jsonPath: .status.nodeId
+    - name: Bus
+      type: integer
+      jsonPath: .spec.busNumber
+    - name: Address
+      type: string
+      jsonPath: .spec.address
+    - name: Type
+      type: string
+      jsonPath: .spec.deviceType
+    - name: Phase
+      type: string
+      jsonPath: .status.phase
+    - name: Connected
+      type: boolean
+      jsonPath: .status.connected
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: i2cdevices
+    singular: i2cdevice
+    kind: I2CDevice
+    shortNames:
+    - i2c
+    categories:
+    - pi-controller

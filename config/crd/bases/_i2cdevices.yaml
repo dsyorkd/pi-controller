@@ -1,0 +1,202 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: i2cdevices.
+spec:
+  group: ""
+  names:
+    kind: I2CDevice
+    listKind: I2CDeviceList
+    plural: i2cdevices
+    singular: i2cdevice
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.nodeId
+      name: Node
+      type: string
+    - jsonPath: .spec.address
+      name: Address
+      type: string
+    - jsonPath: .spec.deviceType
+      name: Device Type
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: ""
+    schema:
+      openAPIV3Schema:
+        description: I2CDevice is the Schema for the i2cdevices API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: I2CDeviceSpec defines the desired state of I2CDevice
+            properties:
+              address:
+                description: Address is the I2C address of the device (e.g., "0x48")
+                type: string
+              busNumber:
+                description: 'BusNumber specifies the I2C bus number (default: 1)'
+                type: integer
+              dataFormat:
+                description: DataFormat specifies how to interpret device data
+                enum:
+                - raw
+                - integer
+                - float
+                - string
+                - json
+                type: string
+              deviceType:
+                description: DeviceType identifies the type of I2C device
+                enum:
+                - sensor
+                - display
+                - pwm
+                - gpio
+                - adc
+                - dac
+                - rtc
+                - eeprom
+                - other
+                type: string
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: NodeSelector specifies which node this I2C device should
+                  be managed on
+                type: object
+              registers:
+                description: Registers defines the register configuration for the
+                  device
+                items:
+                  description: I2CRegister defines configuration for reading/writing
+                    I2C device registers
+                  properties:
+                    address:
+                      description: Address is the register address
+                      type: integer
+                    initialValue:
+                      description: InitialValue sets the initial value to write (for
+                        writable registers)
+                      type: integer
+                    mode:
+                      description: Mode defines whether this register is readable,
+                        writable, or both
+                      enum:
+                      - read
+                      - write
+                      - readwrite
+                      type: string
+                    name:
+                      description: Name is a human-readable name for this register
+                      type: string
+                    size:
+                      description: Size is the register size in bytes (1, 2, or 4)
+                      type: integer
+                  required:
+                  - address
+                  - mode
+                  - name
+                  - size
+                  type: object
+                type: array
+              scanInterval:
+                description: ScanInterval sets how often to read from the device (in
+                  seconds)
+                type: integer
+            required:
+            - address
+            - deviceType
+            - nodeSelector
+            type: object
+          status:
+            description: I2CDeviceStatus defines the observed state of I2CDevice
+            properties:
+              conditions:
+                description: Conditions represent the current service state
+                items:
+                  description: I2CCondition represents a condition of the I2C device
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human readable message indicating
+                        details
+                      type: string
+                    reason:
+                      description: Reason is the reason for the condition's last transition
+                      type: string
+                    status:
+                      description: Status of the condition (True, False, Unknown)
+                      type: string
+                    type:
+                      description: Type of condition
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastScan:
+                description: LastScan is the timestamp of the last successful device
+                  scan
+                format: date-time
+                type: string
+              lastUpdated:
+                description: LastUpdated is the timestamp of the last status update
+                format: date-time
+                type: string
+              message:
+                description: Message provides additional information about the current
+                  state
+                type: string
+              nodeId:
+                description: NodeID is the ID of the node managing this device
+                type: string
+              phase:
+                description: Phase represents the current lifecycle phase
+                enum:
+                - Pending
+                - Configuring
+                - Ready
+                - Failed
+                type: string
+              registerData:
+                description: RegisterData contains the latest data read from device
+                  registers
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

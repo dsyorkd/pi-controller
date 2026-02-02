@@ -10,7 +10,7 @@ LDFLAGS = -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DAT
 # Go build variables
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
-CGO_ENABLED ?= 0
+CGO_ENABLED ?= 1
 
 # Directories
 BUILD_DIR = build
@@ -20,12 +20,18 @@ SCRIPTS_DIR = scripts
 
 # Binaries
 CONTROLLER_BINARY = pi-controller
-AGENT_BINARY = pi-agent
 WEB_BINARY = pi-web
 
 # Docker
 DOCKER_REGISTRY ?= localhost:5000
 DOCKER_TAG ?= $(VERSION)
+# Use existing ci-image from separate repository
+CI_IMAGE ?= ghcr.io/dsyorkd/ci-image/ci-go:v2.0
+
+# Web UI variables
+KUBES_AURA_REPO ?= https://github.com/dsyorkd/kubes-aura.git
+UI_DIR = web/kubes-aura
+UI_DIST = internal/ui/dist
 
 # Default target
 help: ## Show this help message
@@ -37,7 +43,7 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
 # Dependencies
-deps: ## Install Go dependencies
+deps: proto ## Install Go dependencies (generates proto first)
 	@echo "Installing dependencies..."
 	go mod download
 	go mod tidy
@@ -45,12 +51,66 @@ deps: ## Install Go dependencies
 # Protocol buffers
 proto: ## Generate protobuf code
 	@echo "Generating protobuf code..."
-	@command -v protoc >/dev/null 2>&1 || { echo "protoc is required but not installed. Aborting." >&2; exit 1; }
-	@command -v protoc-gen-go >/dev/null 2>&1 || go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	@command -v protoc-gen-go-grpc >/dev/null 2>&1 || go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		$(PROTO_DIR)/*.proto
+	@if [ -f "$(PROTO_DIR)/pi_controller.pb.go" ]; then \
+		echo "Proto files already exist, skipping generation..."; \
+	elif command -v protoc >/dev/null 2>&1; then \
+		command -v protoc-gen-go >/dev/null 2>&1 || go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; \
+		command -v protoc-gen-go-grpc >/dev/null 2>&1 || go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; \
+		protoc --go_out=. --go_opt=paths=source_relative \
+			--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+			$(PROTO_DIR)/*.proto; \
+	else \
+		echo "Warning: protoc not found and proto files don't exist. Using committed proto files."; \
+	fi
+
+# Web UI
+ui: ## Build kubes-aura web interface
+	@echo "Building Web UI..."
+	@if ! command -v npm >/dev/null 2>&1; then \
+		echo "Error: npm is required to build the Web UI"; \
+		exit 1; \
+	fi
+	@mkdir -p web
+	@if [ ! -d "$(UI_DIR)/.git" ]; then \
+		echo "Initializing kubes-aura submodule..."; \
+		git submodule update --init --recursive $(UI_DIR); \
+	else \
+		echo "Updating kubes-aura submodule..."; \
+		git submodule update --remote $(UI_DIR); \
+	fi
+	@echo "Installing UI dependencies..."
+	@cd $(UI_DIR) && npm install
+	@echo "Building UI..."
+	@cd $(UI_DIR) && VITE_API_BASE_URL=/api/v1 VITE_SOCKET_IO_URL=/ npm run build
+	@echo "Copying UI assets to embedded directory..."
+	@mkdir -p $(UI_DIST)
+	@rm -rf $(UI_DIST)/*
+	@cp -r $(UI_DIR)/dist/* $(UI_DIST)/
+	@touch $(UI_DIST)/.keep
+
+ui-clean: ## Clean Web UI build artifacts
+	@echo "Cleaning Web UI..."
+	rm -rf $(UI_DIR)
+	rm -rf $(UI_DIST)/*
+	@mkdir -p $(UI_DIST)
+	@echo "<html><body><h1>UI not built</h1><p>Please run 'make ui' to build the web interface.</p></body></html>" > $(UI_DIST)/index.html
+
+ui-from-release: ## Download and extract pre-built UI from GitHub release
+	@echo "Downloading pre-built Web UI from GitHub release..."
+	@if [ -z "$(UI_VERSION)" ]; then \
+		echo "Error: UI_VERSION is required. Example: make ui-from-release UI_VERSION=v1.0.0"; \
+		exit 1; \
+	fi
+	@mkdir -p $(UI_DIST)
+	@rm -rf $(UI_DIST)/*
+	@echo "Fetching kubes-aura $(UI_VERSION)..."
+	@curl -L -o /tmp/kubes-aura.tar.gz \
+		"https://github.com/dsyorkd/kubes-aura/releases/download/$(UI_VERSION)/kubes-aura-$${UI_VERSION#v}.tar.gz"
+	@echo "Extracting UI assets..."
+	@tar -xzf /tmp/kubes-aura.tar.gz -C $(UI_DIST)/
+	@rm /tmp/kubes-aura.tar.gz
+	@touch $(UI_DIST)/.keep
+	@echo "Web UI $(UI_VERSION) installed successfully"
 
 # Code quality
 fmt: ## Format Go code
@@ -135,9 +195,9 @@ test-all: test-unit test-integration test-security test-gpio test-api ## Run all
 test-comprehensive: test-all test-benchmarks test-security-verbose ## Run comprehensive test suite including benchmarks
 
 # Build targets
-build: build-controller build-agent ## Build all binaries
+build: build-controller ## Build all binaries
 
-build-controller: ## Build pi-controller binary
+build-controller: ui ## Build pi-controller binary (includes Web UI)
 	@echo "Building pi-controller for $(GOOS)/$(GOARCH)..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
@@ -145,23 +205,17 @@ build-controller: ## Build pi-controller binary
 		-o $(BUILD_DIR)/$(CONTROLLER_BINARY)-$(GOOS)-$(GOARCH) \
 		./cmd/pi-controller
 
-build-agent: ## Build pi-agent binary
-	@echo "Building pi-agent for $(GOOS)/$(GOARCH)..."
-	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
-		-ldflags "$(LDFLAGS)" \
-		-o $(BUILD_DIR)/$(AGENT_BINARY)-$(GOOS)-$(GOARCH) \
-		./cmd/pi-agent
 
 # Cross-compilation targets
+# Note: CGO_ENABLED=0 for cross-compilation (no C dependencies needed for main binary)
 build-linux-amd64: ## Build for Linux AMD64
-	@$(MAKE) build GOOS=linux GOARCH=amd64
+	@$(MAKE) build GOOS=linux GOARCH=amd64 CGO_ENABLED=0
 
-build-linux-arm64: ## Build for Linux ARM64 (Raspberry Pi)
-	@$(MAKE) build GOOS=linux GOARCH=arm64
+build-linux-arm64: ## Build for Linux ARM64 (Raspberry Pi 64-bit)
+	@$(MAKE) build GOOS=linux GOARCH=arm64 CGO_ENABLED=0
 
 build-linux-arm: ## Build for Linux ARM (Raspberry Pi 32-bit)
-	@$(MAKE) build GOOS=linux GOARCH=arm GOARM=7
+	@$(MAKE) build GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0
 
 build-darwin-amd64: ## Build for macOS AMD64
 	@$(MAKE) build GOOS=darwin GOARCH=amd64
@@ -170,7 +224,7 @@ build-darwin-arm64: ## Build for macOS ARM64 (Apple Silicon)
 	@$(MAKE) build GOOS=darwin GOARCH=arm64
 
 build-windows-amd64: ## Build for Windows AMD64
-	@$(MAKE) build GOOS=windows GOARCH=amd64
+	@$(MAKE) build GOOS=windows GOARCH=amd64 CGO_ENABLED=0
 
 build-all: ## Build for all supported platforms
 	@echo "Building for all platforms..."
@@ -182,13 +236,12 @@ build-all: ## Build for all supported platforms
 	@$(MAKE) build-windows-amd64
 
 # Installation
-install: build-controller build-agent ## Install binaries to GOPATH/bin
+install: build-controller ## Install binaries to GOPATH/bin
 	@echo "Installing binaries..."
 	go install -ldflags "$(LDFLAGS)" ./cmd/pi-controller
-	go install -ldflags "$(LDFLAGS)" ./cmd/pi-agent
 
 # Docker targets
-docker: docker-controller docker-agent ## Build all Docker images
+docker: docker-controller ## Build all Docker images
 
 docker-controller: ## Build pi-controller Docker image
 	@echo "Building pi-controller Docker image..."
@@ -198,27 +251,110 @@ docker-controller: ## Build pi-controller Docker image
 		--build-arg DATE=$(DATE) \
 		-f docker/Dockerfile.controller .
 
-docker-agent: ## Build pi-agent Docker image
-	@echo "Building pi-agent Docker image..."
-	docker build -t $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG) \
+
+# Multi-architecture Docker build targets
+docker-buildx-setup: ## Set up Docker buildx for multi-arch builds
+	@echo "Setting up Docker buildx for multi-architecture builds..."
+	@docker buildx inspect pi-controller-builder >/dev/null 2>&1 || \
+		docker buildx create --name pi-controller-builder --driver docker-container --bootstrap
+	@docker buildx use pi-controller-builder
+
+docker-multiarch: docker-buildx-setup docker-multiarch-controller ## Build all Docker images for multiple architectures
+
+docker-multiarch-test: docker-buildx-setup ## Test multi-arch Docker builds without pushing
+	@echo "Testing multi-architecture Docker builds..."
+	@echo "Testing pi-controller for linux/amd64,linux/arm64,linux/arm/v7..."
+	docker buildx build \
+		--platform linux/amd64,linux/arm64,linux/arm/v7 \
 		--build-arg VERSION=$(VERSION) \
 		--build-arg COMMIT=$(COMMIT) \
 		--build-arg DATE=$(DATE) \
-		-f docker/Dockerfile.agent .
+		-t $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)-test \
+		-f docker/Dockerfile.controller .
+	@echo "Multi-architecture Docker build test completed successfully!"
+
+docker-multiarch-controller: docker-buildx-setup ## Build pi-controller Docker image for multiple architectures
+	@echo "Building pi-controller Docker image for linux/amd64,linux/arm64,linux/arm/v7..."
+	docker buildx build \
+		--platform linux/amd64,linux/arm64,linux/arm/v7 \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg DATE=$(DATE) \
+		-t $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG) \
+		-f docker/Dockerfile.controller \
+		--push .
+
+
+# Architecture-specific build targets
+docker-amd64: docker-amd64-controller ## Build Docker images for AMD64
+
+docker-amd64-controller: ## Build pi-controller Docker image for AMD64
+	@echo "Building pi-controller Docker image for linux/amd64..."
+	docker buildx build \
+		--platform linux/amd64 \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg DATE=$(DATE) \
+		-t $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)-amd64 \
+		-f docker/Dockerfile.controller \
+		--load .
+
+
+docker-arm64: docker-arm64-controller ## Build Docker images for ARM64
+
+docker-arm: docker-arm-controller ## Build Docker images for ARM32
+
+docker-arm-controller: ## Build pi-controller Docker image for ARM32
+	@echo "Building pi-controller Docker image for linux/arm/v7..."
+	docker buildx build \
+		--platform linux/arm/v7 \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg DATE=$(DATE) \
+		-t $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)-armv7 \
+		-f docker/Dockerfile.controller \
+		--load .
+
+
+docker-arm64-controller: ## Build pi-controller Docker image for ARM64
+	@echo "Building pi-controller Docker image for linux/arm64..."
+	docker buildx build \
+		--platform linux/arm64 \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg DATE=$(DATE) \
+		-t $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)-arm64 \
+		-f docker/Dockerfile.controller \
+		--load .
+
+
+docker-ci-test: ## Test CI image functionality
+	@echo "Testing CI image functionality..."
+	@docker run --rm $(CI_IMAGE) sh -c ' \
+		echo "Testing protobuf tools..." && \
+		protoc --version && \
+		protoc-gen-go --version && \
+		echo "Testing Go tools..." && \
+		go version && \
+		golangci-lint version && \
+		echo "Testing security tools..." && \
+		govulncheck -h > /dev/null && \
+		osv-scanner --version && \
+		syft version && \
+		gosec -version && \
+		staticcheck -version && \
+		go-licenses version && \
+		echo "✅ All tools are working correctly"'
 
 docker-push: docker ## Push Docker images to registry
 	@echo "Pushing Docker images..."
 	docker push $(DOCKER_REGISTRY)/pi-controller:$(DOCKER_TAG)
-	docker push $(DOCKER_REGISTRY)/pi-agent:$(DOCKER_TAG)
 
 # Development
 run-controller: ## Run pi-controller locally
 	@echo "Running pi-controller..."
 	go run -ldflags "$(LDFLAGS)" ./cmd/pi-controller
 
-run-agent: ## Run pi-agent locally
-	@echo "Running pi-agent..."
-	go run -ldflags "$(LDFLAGS)" ./cmd/pi-agent
 
 dev: ## Start development environment
 	@echo "Starting development environment..."
@@ -306,7 +442,7 @@ config-example: ## Generate example configuration
 	@echo "Example configuration written to config/pi-controller.example.yaml"
 
 # Cleanup
-clean: ## Clean build artifacts
+clean: ui-clean ## Clean build artifacts
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)
 	rm -f coverage.out coverage.html
@@ -346,10 +482,18 @@ ci-build: ## Run CI build
 	@$(MAKE) build-all
 
 # Documentation
-docs: ## Generate documentation
-	@echo "Generating documentation..."
-	@mkdir -p $(DOCS_DIR)
-	@echo "Documentation generation not yet implemented"
+docs: api-docs ## Generate documentation
+	@echo "Documentation generated successfully"
+
+api-docs: ## Generate API documentation from code annotations
+	@./scripts/generate-api-docs.sh
+
+api-serve: ## Serve interactive API documentation
+	@echo "Starting Swagger UI on http://localhost:8080"
+	@docker run -p 8080:8080 \
+		-e SWAGGER_JSON=/api/swagger.yaml \
+		-v $(PWD)/docs/api:/api \
+		swaggerapi/swagger-ui
 
 # Version info
 version: ## Show version information

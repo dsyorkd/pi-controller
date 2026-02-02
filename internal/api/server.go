@@ -1,39 +1,74 @@
+// Package api provides the REST API server
+//
+// @title           Pi-Controller API
+// @version         1.0
+// @description     REST API for managing Raspberry Pi clusters, nodes, and GPIO resources
+// @termsOfService  http://swagger.io/terms/
+//
+// @contact.name   API Support
+// @contact.url    http://github.com/dsyorkd/pi-controller/issues
+// @contact.email  support@example.com
+//
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+//
+// @host      localhost:8765
+// @BasePath  /api/v1
+//
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 package api
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
-
-	"github.com/gin-gonic/gin"
 
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/api/middleware"
+	"github.com/dsyorkd/pi-controller/internal/clustering"
+	"github.com/dsyorkd/pi-controller/internal/clustering/health"
 	"github.com/dsyorkd/pi-controller/internal/config"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/services"
 	"github.com/dsyorkd/pi-controller/internal/storage"
-	"github.com/sirupsen/logrus"
+	"github.com/dsyorkd/pi-controller/internal/ui"
+	"github.com/getsentry/sentry-go"
+	sentrygin "github.com/getsentry/sentry-go/gin"
+	"github.com/gin-gonic/gin"
 )
 
 // Server represents the REST API server
 type Server struct {
-	config         *config.APIConfig
-	logger         logger.Interface
-	database       *storage.Database
-	clusterService *services.ClusterService
-	nodeService    *services.NodeService
-	gpioService    *services.GPIOService
-	authManager    *middleware.AuthManager
-	validator      *middleware.Validator
-	rateLimiter    *middleware.RateLimiter
-	router         *gin.Engine
-	server         *http.Server
+	config              *config.APIConfig
+	discoveryConfig     *config.DiscoveryConfig
+	logger              logger.Interface
+	database            *storage.Database
+	clusterService      *services.ClusterService
+	nodeService         *services.NodeService
+	gpioService         *services.GPIOService
+	provisioningService *services.ProvisioningService
+	caService           services.CAService
+	authManager         *middleware.AuthManager
+	validator           *middleware.Validator
+	rateLimiter         *middleware.RateLimiter
+	gpioRateLimiter     *middleware.GPIORateLimiter
+	securityMiddleware  *middleware.SecurityMiddleware
+	raftCluster         *clustering.RaftCluster
+	healthChecker       *health.HealthChecker
+	router              *gin.Engine
+	server              *http.Server
 }
 
 // New creates a new API server instance
-func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Server {
-	// Set Gin mode based on environment  
+func New(cfg *config.APIConfig, discoveryCfg *config.DiscoveryConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
+	// Set Gin mode based on environment
 	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
 
 	router := gin.New()
@@ -41,7 +76,11 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Ser
 	// Initialize services
 	clusterService := services.NewClusterService(db, log)
 	nodeService := services.NewNodeService(db, log)
-	gpioService := services.NewGPIOService(db, log)
+	gpioService := services.NewGPIOService(db, log, nil) // TODO: Pass TLS config for mTLS
+	provisioningService := services.NewProvisioningService(nodeService, log)
+
+	// Set dependencies after all services are created
+	clusterService.SetDependencies(provisioningService, nodeService)
 
 	// Initialize authentication manager if auth is enabled
 	var authManager *middleware.AuthManager
@@ -58,20 +97,30 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Ser
 	validator := middleware.NewValidator(middleware.DefaultValidationConfig(), log)
 
 	// Initialize rate limiter with default secure configuration
-	logrusLogger := logrus.New()
-	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), logrusLogger)
+	rateLimiter := middleware.NewRateLimiter(middleware.DefaultRateLimitConfig(), log)
+
+	// Initialize GPIO-specific rate limiter with stricter limits
+	gpioRateLimiter := middleware.NewGPIORateLimiter(middleware.DefaultGPIORateLimitConfig(), log)
+
+	// Initialize security middleware for HTTP security headers
+	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), log)
 
 	s := &Server{
-		config:         cfg,
-		logger:         log,
-		database:       db,
-		clusterService: clusterService,
-		nodeService:    nodeService,
-		gpioService:    gpioService,
-		authManager:    authManager,
-		validator:      validator,
-		rateLimiter:    rateLimiter,
-		router:         router,
+		config:              cfg,
+		discoveryConfig:     discoveryCfg,
+		logger:              log,
+		database:            db,
+		clusterService:      clusterService,
+		nodeService:         nodeService,
+		gpioService:         gpioService,
+		provisioningService: provisioningService,
+		caService:           caService,
+		authManager:         authManager,
+		validator:           validator,
+		rateLimiter:         rateLimiter,
+		gpioRateLimiter:     gpioRateLimiter,
+		securityMiddleware:  securityMiddleware,
+		router:              router,
 	}
 
 	s.setupRoutes()
@@ -82,11 +131,28 @@ func New(cfg *config.APIConfig, log logger.Interface, db *storage.Database) *Ser
 func (s *Server) setupRoutes() {
 	// Global middleware
 	s.router.Use(middleware.Logger(s.logger))
+	s.router.Use(s.securityMiddleware.SecurityHeaders()) // Add security headers to all responses
+
+	// Add NoMethod handler to return 405 for unsupported methods
+	s.router.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+	})
+
+	// Add Sentry middleware if Sentry is initialized
+	if sentry.CurrentHub().Client() != nil {
+		s.router.Use(sentrygin.New(sentrygin.Options{
+			Repanic:         true,  // Let our recovery middleware handle panics after capturing
+			WaitForDelivery: false, // Don't block requests waiting for Sentry
+			Timeout:         2 * time.Second,
+		}))
+		s.logger.Debug("Sentry Gin middleware enabled")
+	}
+
 	s.router.Use(middleware.Recovery(s.logger))
 	s.router.Use(middleware.RequestID())
 	s.router.Use(s.validator.ValidateRequest()) // Add input validation
 	s.router.Use(s.rateLimiter.RateLimit())     // Add rate limiting
-	
+
 	if s.config.CORSEnabled {
 		s.router.Use(middleware.CORS())
 	}
@@ -95,9 +161,27 @@ func (s *Server) setupRoutes() {
 	s.router.GET("/health", handlers.NewHealthHandler(s.database).Health)
 	s.router.GET("/ready", handlers.NewHealthHandler(s.database).Ready)
 
+	// Authentication endpoints (no auth required)
+	if s.authManager != nil {
+		authHandler := handlers.NewAuthHandler(s.database, s.authManager, s.logger)
+		auth := s.router.Group("/api/v1/auth")
+		{
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/refresh", authHandler.RefreshToken)
+			auth.GET("/profile", s.authManager.Auth(), authHandler.GetProfile)
+			auth.POST("/logout", s.authManager.Auth(), authHandler.Logout)
+		}
+	}
+
 	// API v1 routes
 	v1 := s.router.Group("/api/v1")
 	{
+		// Health check endpoints (no auth required) - register before auth middleware
+		healthHandler := handlers.NewHealthHandler(s.database)
+		v1.GET("/health", healthHandler.Health)
+		v1.GET("/ready", healthHandler.Ready)
+
 		// Authentication middleware for protected routes
 		if s.config.AuthEnabled && s.authManager != nil {
 			v1.Use(s.authManager.Auth())
@@ -112,52 +196,120 @@ func (s *Server) setupRoutes() {
 			clusters.GET("/:id", s.requireRole("viewer"), clusterHandler.Get)
 			clusters.GET("/:id/nodes", s.requireRole("viewer"), clusterHandler.ListNodes)
 			clusters.GET("/:id/status", s.requireRole("viewer"), clusterHandler.Status)
-			
+
 			// Write operations - require operator role
 			clusters.POST("", s.requireRole("operator"), clusterHandler.Create)
 			clusters.PUT("/:id", s.requireRole("operator"), clusterHandler.Update)
-			
+
+			// Cluster lifecycle operations - require admin role
+			clusters.POST("/:id/provision", s.requireRole("admin"), clusterHandler.ProvisionCluster)
+			clusters.POST("/:id/deprovision", s.requireRole("admin"), clusterHandler.DeprovisionCluster)
+			clusters.POST("/:id/scale", s.requireRole("admin"), clusterHandler.ScaleCluster)
+
 			// Delete operations - require admin role
 			clusters.DELETE("/:id", s.requireRole("admin"), clusterHandler.Delete)
 		}
 
 		// Node management
-		nodeHandler := handlers.NewNodeHandler(s.nodeService, s.logger)
+		trustToken := ""
+		if s.discoveryConfig != nil {
+			trustToken = s.discoveryConfig.TrustToken
+		}
+		nodeHandler := handlers.NewNodeHandler(s.nodeService, s.logger, trustToken)
 		nodes := v1.Group("/nodes")
 		{
 			// Read operations - require viewer role
 			nodes.GET("", s.requireRole("viewer"), nodeHandler.List)
 			nodes.GET("/:id", s.requireRole("viewer"), nodeHandler.Get)
 			nodes.GET("/:id/gpio", s.requireRole("viewer"), nodeHandler.ListGPIO)
-			
+			nodes.GET("/:id/system", s.requireRole("viewer"), nodeHandler.GetSystemMetrics)
+
 			// Write operations - require operator role
 			nodes.POST("", s.requireRole("operator"), nodeHandler.Create)
 			nodes.PUT("/:id", s.requireRole("operator"), nodeHandler.Update)
-			nodes.POST("/:id/provision", s.requireRole("operator"), nodeHandler.Provision)
-			nodes.POST("/:id/deprovision", s.requireRole("operator"), nodeHandler.Deprovision)
-			
+			nodes.POST("/:id/adopt", s.requireRole("operator"), nodeHandler.Adopt)
+
 			// Delete operations - require admin role
 			nodes.DELETE("/:id", s.requireRole("admin"), nodeHandler.Delete)
 		}
 
-		// GPIO management
+		// GPIO management with strict rate limiting
 		gpioHandler := handlers.NewGPIOHandler(s.gpioService, s.logger)
 		gpio := v1.Group("/gpio")
 		{
+			// Apply GPIO-specific rate limiting to all GPIO endpoints
+			// This protects hardware from rapid switching that could cause damage
+			gpio.Use(s.gpioRateLimiter.RateLimit())
+
 			// Read operations - require viewer role
 			gpio.GET("", s.requireRole("viewer"), gpioHandler.List)
 			gpio.GET("/:id", s.requireRole("viewer"), gpioHandler.Get)
 			gpio.GET("/:id/readings", s.requireRole("viewer"), gpioHandler.GetReadings)
 			gpio.POST("/:id/read", s.requireRole("viewer"), gpioHandler.Read)
-			
+
 			// Write operations - require operator role (GPIO control is sensitive)
 			gpio.POST("", s.requireRole("operator"), gpioHandler.Create)
 			gpio.PUT("/:id", s.requireRole("operator"), gpioHandler.Update)
 			gpio.POST("/:id/write", s.requireRole("operator"), gpioHandler.Write)
-			
+
 			// Delete operations - require admin role
 			gpio.DELETE("/:id", s.requireRole("admin"), gpioHandler.Delete)
 		}
+
+		// Certificate Authority management (only if CA service is available)
+		if s.caService != nil {
+			caHandler := handlers.NewCAHandler(s.caService, s.logger)
+			ca := v1.Group("/ca")
+			{
+				// CA Management - require admin role for initialization
+				ca.POST("/initialize", s.requireRole("admin"), caHandler.InitializeCA)
+
+				// CA Information - require viewer role
+				ca.GET("/info", s.requireRole("viewer"), caHandler.GetCAInfo)
+				ca.GET("/certificate", s.requireRole("viewer"), caHandler.GetCACertificate)
+				ca.GET("/stats", s.requireRole("viewer"), caHandler.GetCertificateStats)
+
+				// Certificate Management
+				certs := ca.Group("/certificates")
+				{
+					// Read operations - require viewer role
+					certs.GET("", s.requireRole("viewer"), caHandler.ListCertificates)
+					certs.GET("/:id", s.requireRole("viewer"), caHandler.GetCertificate)
+					certs.GET("/serial/:serial", s.requireRole("viewer"), caHandler.GetCertificateBySerial)
+
+					// Certificate operations - require admin role
+					certs.POST("", s.requireRole("admin"), caHandler.IssueCertificate)
+					certs.POST("/:id/renew", s.requireRole("admin"), caHandler.RenewCertificate)
+					certs.POST("/:id/revoke", s.requireRole("admin"), caHandler.RevokeCertificate)
+					certs.POST("/validate", s.requireRole("viewer"), caHandler.ValidateCertificate)
+				}
+
+				// Certificate Requests (CSR)
+				requests := ca.Group("/requests")
+				{
+					// Read operations - require operator role (can see their own requests)
+					requests.GET("", s.requireRole("operator"), caHandler.ListCertificateRequests)
+
+					// CSR operations - require operator role to create, admin to process
+					requests.POST("", s.requireRole("operator"), caHandler.CreateCertificateRequest)
+					requests.POST("/:id/process", s.requireRole("admin"), caHandler.ProcessCertificateRequest)
+				}
+
+				// Maintenance operations - require admin role
+				ca.POST("/cleanup", s.requireRole("admin"), caHandler.CleanupExpiredCertificates)
+			}
+		}
+
+		// K3s Provisioning endpoints for individual nodes
+		provisionerHandler := handlers.NewProvisionerHandler(s.provisioningService, s.logger)
+
+		// Individual node provisioning operations
+		nodes.POST("/:id/provision", s.requireRole("admin"), provisionerHandler.ProvisionNode)
+		nodes.POST("/:id/deprovision", s.requireRole("admin"), provisionerHandler.DeprovisionNode)
+
+		// Utility operations for master nodes
+		nodes.POST("/:id/cluster-token", s.requireRole("operator"), provisionerHandler.GetClusterToken)
+		nodes.POST("/:id/kubeconfig", s.requireRole("operator"), provisionerHandler.GetKubeConfig)
 
 		// System information - require viewer role
 		system := v1.Group("/system")
@@ -165,7 +317,40 @@ func (s *Server) setupRoutes() {
 			system.GET("/info", s.requireRole("viewer"), handlers.SystemInfo)
 			system.GET("/metrics", s.requireRole("viewer"), handlers.SystemMetrics)
 		}
+
+		// Raft cluster management (if clustering is enabled)
+		if s.raftCluster != nil {
+			raftHandler := handlers.NewRaftClusterHandler(s.raftCluster, s.healthChecker, s.logger)
+			raft := v1.Group("/raft")
+			{
+				// Read operations - require viewer role
+				raft.GET("/status", s.requireRole("viewer"), raftHandler.GetStatus)
+				raft.GET("/members", s.requireRole("viewer"), raftHandler.GetMembers)
+				raft.GET("/leader", s.requireRole("viewer"), raftHandler.GetLeader)
+				raft.GET("/health", s.requireRole("viewer"), raftHandler.GetHealth)
+
+				// Write operations - require admin role
+				raft.POST("/members", s.requireRole("admin"), raftHandler.JoinMember)
+				raft.DELETE("/members/:id", s.requireRole("admin"), raftHandler.RemoveMember)
+			}
+		}
 	}
+
+	// Register UI routes (SPA catch-all)
+	// This must be registered last to ensure API routes take precedence
+	if err := ui.RegisterRoutes(s.router); err != nil {
+		s.logger.WithError(err).Warn("Failed to register UI routes - web interface may not be available")
+	}
+}
+
+// SetClusteringComponents sets the Raft cluster and health checker for this server
+// This allows clustering to be initialized after the server is created
+func (s *Server) SetClusteringComponents(cluster *clustering.RaftCluster, healthChecker *health.HealthChecker) {
+	s.raftCluster = cluster
+	s.healthChecker = healthChecker
+
+	// Re-setup routes to include clustering endpoints
+	s.setupRoutes()
 }
 
 // Start starts the HTTP server
@@ -191,16 +376,71 @@ func (s *Server) Start() error {
 	s.logger.WithField("address", s.config.GetAddress()).Info("Starting API server")
 
 	if s.config.IsTLSEnabled() {
-		return s.server.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
+		s.logger.WithFields(map[string]interface{}{
+			"cert_file": s.config.TLSCertFile,
+			"key_file":  s.config.TLSKeyFile,
+			"ca_file":   s.config.TLSCAFile,
+		}).Info("Starting HTTPS server with mutual TLS (mTLS) enabled")
+
+		// Load server cert and key
+		serverCert, err := tls.LoadX509KeyPair(s.config.TLSCertFile, s.config.TLSKeyFile)
+		if err != nil {
+			return fmt.Errorf("failed to load server TLS key pair: %w", err)
+		}
+
+		// Load client CA cert for mutual TLS
+		caCertPool := x509.NewCertPool()
+		caPEM, err := os.ReadFile(s.config.TLSCAFile)
+		if err != nil {
+			return fmt.Errorf("failed to read CA certificate for mTLS: %w", err)
+		}
+		if !caCertPool.AppendCertsFromPEM(caPEM) {
+			return fmt.Errorf("failed to append CA certificate to pool for mTLS")
+		}
+
+		s.server.TLSConfig = &tls.Config{
+			Certificates: []tls.Certificate{serverCert},
+			ClientCAs:    caCertPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS12,
+		}
+
+		return s.server.ListenAndServeTLS("", "") // Cert and Key are handled by TLSConfig
 	}
-	
+
+	s.logger.Warn("⚠️  Starting HTTP server without TLS - not recommended for production!")
 	return s.server.ListenAndServe()
 }
 
 // Stop gracefully stops the HTTP server
 func (s *Server) Stop(ctx context.Context) error {
 	s.logger.Info("Shutting down API server")
+
+	// Close all services first
+	if err := s.Close(); err != nil {
+		s.logger.WithError(err).Error("Failed to close services during shutdown")
+	}
+
 	return s.server.Shutdown(ctx)
+}
+
+// Close closes all services and their connections
+func (s *Server) Close() error {
+	s.logger.Info("Closing API server services")
+
+	// Close GPIO service and its agent connections
+	if s.gpioService != nil {
+		if err := s.gpioService.Close(); err != nil {
+			s.logger.WithError(err).Error("Failed to close GPIO service")
+			return err
+		}
+	}
+
+	// Close other services as needed
+	// (cluster service and node service don't currently need cleanup)
+
+	s.logger.Info("API server services closed successfully")
+	return nil
 }
 
 // Router returns the underlying Gin router for testing
@@ -216,6 +456,72 @@ func (s *Server) requireRole(role string) gin.HandlerFunc {
 			c.Next()
 		}
 	}
-	
+
 	return s.authManager.RequireRole(role)
+}
+
+// NewForTest creates a new API server instance with rate limiting disabled for testing
+func NewForTest(cfg *config.APIConfig, log logger.Interface, db *storage.Database, caService services.CAService) *Server {
+	// Use empty discovery config for tests
+	discoveryCfg := &config.DiscoveryConfig{}
+	// Set Gin mode based on environment
+	gin.SetMode(gin.ReleaseMode) // Default to release mode for structured logging
+
+	router := gin.New()
+
+	// Initialize services
+	clusterService := services.NewClusterService(db, log)
+	nodeService := services.NewNodeService(db, log)
+	gpioService := services.NewGPIOService(db, log, nil)
+	provisioningService := services.NewProvisioningService(nodeService, log)
+
+	// Set dependencies after all services are created
+	clusterService.SetDependencies(provisioningService, nodeService)
+
+	// Initialize authentication manager if auth is enabled
+	var authManager *middleware.AuthManager
+	if cfg.AuthEnabled {
+		authConfig := middleware.DefaultAuthConfig()
+		var err error
+		authManager, err = middleware.NewAuthManager(authConfig, log)
+		if err != nil {
+			log.WithError(err).Fatalf("Failed to initialize authentication manager")
+		}
+	}
+
+	// Initialize validator for input validation
+	validator := middleware.NewValidator(middleware.DefaultValidationConfig(), log)
+
+	// Initialize rate limiters with disabled configuration for testing
+	disabledConfig := middleware.DefaultRateLimitConfig()
+	disabledConfig.Enabled = false
+	rateLimiter := middleware.NewRateLimiter(disabledConfig, log)
+
+	disabledGPIOConfig := middleware.DefaultGPIORateLimitConfig()
+	disabledGPIOConfig.Enabled = false
+	gpioRateLimiter := middleware.NewGPIORateLimiter(disabledGPIOConfig, log)
+
+	// Initialize security middleware for HTTP security headers
+	securityMiddleware := middleware.NewSecurityMiddleware(middleware.DefaultSecurityConfig(), log)
+
+	s := &Server{
+		config:              cfg,
+		discoveryConfig:     discoveryCfg,
+		logger:              log,
+		database:            db,
+		clusterService:      clusterService,
+		nodeService:         nodeService,
+		gpioService:         gpioService,
+		provisioningService: provisioningService,
+		caService:           caService,
+		authManager:         authManager,
+		validator:           validator,
+		rateLimiter:         rateLimiter,
+		gpioRateLimiter:     gpioRateLimiter,
+		securityMiddleware:  securityMiddleware,
+		router:              router,
+	}
+
+	s.setupRoutes()
+	return s
 }

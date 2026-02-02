@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://json.schemastore.org/yamllint.json
+
+extends: default
+
+rules:
+  # Line length - GitHub Actions YAML can be long due to descriptions
+  line-length:
+    max: 160
+    level: warning
+
+  # Allow trailing commas in flow sequences (useful for arrays)
+  trailing-spaces: enable
+
+  # Indentation - GitHub Actions uses 2 spaces (relaxed for template files)
+  indentation:
+    spaces: 2
+    indent-sequences: consistent  # Allow flexible sequence indentation
+    check-multi-line-strings: false
+
+  # Comments - allow more flexible commenting
+  comments:
+    min-spaces-from-content: 1
+    require-starting-space: true
+
+  # Document start - allow YAML files without ---
+  document-start: disable
+
+  # Allow truthy values (yes/no/on/off) - common in GitHub Actions
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+
+  # Brackets - GitHub Actions uses brackets for expressions
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  # Braces - for JSON-like structures
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  # Colons
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  # Commas
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: 1
+
+  # Hyphens (list items)
+  hyphens:
+    max-spaces-after: 1
+
+  # Key duplicates - error on duplicate keys
+  key-duplicates: enable
+
+  # Empty lines
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+# Ignore patterns
+ignore: |
+  .taskmaster/
+  node_modules/
+  vendor/
+  build/
+  .git/
+  *.lock

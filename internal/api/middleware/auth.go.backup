@@ -31,7 +31,7 @@ func Auth() gin.HandlerFunc {
 		// Basic token validation (placeholder)
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error":   "Unauthorized", 
+				"error":   "Unauthorized",
 				"message": "Invalid authorization header format",
 			})
 			c.Abort()
@@ -39,7 +39,7 @@ func Auth() gin.HandlerFunc {
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		
+
 		// TODO: Implement proper token validation
 		if token == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{

@@ -1,14 +1,17 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -22,23 +25,31 @@ var (
 
 // ValidationConfig holds validation configuration
 type ValidationConfig struct {
-	MaxNameLength    int   `yaml:"max_name_length"`
-	MaxDescLength    int   `yaml:"max_description_length"`
-	MaxQueryLimit    int   `yaml:"max_query_limit"`
-	AllowedMethods   []string `yaml:"allowed_methods"`
-	EnableSQLCheck   bool  `yaml:"enable_sql_check"`
-	EnableXSSCheck   bool  `yaml:"enable_xss_check"`
+	MaxNameLength   int      `yaml:"max_name_length"`
+	MaxDescLength   int      `yaml:"max_description_length"`
+	MaxQueryLimit   int      `yaml:"max_query_limit"`
+	MaxRequestSize  int64    `yaml:"max_request_size"`
+	AllowedMethods  []string `yaml:"allowed_methods"`
+	EnableSQLCheck  bool     `yaml:"enable_sql_check"`
+	EnableXSSCheck  bool     `yaml:"enable_xss_check"`
+	EnableBodyCheck bool     `yaml:"enable_body_check"`
+	EnablePathCheck bool     `yaml:"enable_path_check"`
+	EnableSizeCheck bool     `yaml:"enable_size_check"`
 }
 
 // DefaultValidationConfig returns secure validation defaults
 func DefaultValidationConfig() *ValidationConfig {
 	return &ValidationConfig{
-		MaxNameLength:  63,   // DNS-safe length
-		MaxDescLength:  255,  // Reasonable description length
-		MaxQueryLimit:  1000, // Prevent excessive queries
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		EnableSQLCheck: true,
-		EnableXSSCheck: true,
+		MaxNameLength:   63,          // DNS-safe length
+		MaxDescLength:   255,         // Reasonable description length
+		MaxQueryLimit:   1000,        // Prevent excessive queries
+		MaxRequestSize:  1024 * 1024, // 1MB max request size
+		AllowedMethods:  []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		EnableSQLCheck:  true,
+		EnableXSSCheck:  true,
+		EnableBodyCheck: true,
+		EnablePathCheck: true,
+		EnableSizeCheck: true,
 	}
 }
 
@@ -74,6 +85,30 @@ func (v *Validator) ValidateRequest() gin.HandlerFunc {
 			return
 		}
 
+		// Check request size first (before reading body)
+		if v.config.EnableSizeCheck && c.Request.ContentLength > v.config.MaxRequestSize {
+			v.logger.WithField("content_length", c.Request.ContentLength).Warn("Request size exceeds limit")
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+				"error":   "Request Entity Too Large",
+				"message": fmt.Sprintf("Request size exceeds maximum of %d bytes", v.config.MaxRequestSize),
+			})
+			c.Abort()
+			return
+		}
+
+		// Validate request path for traversal attempts
+		if v.config.EnablePathCheck {
+			if err := v.validatePath(c.Request.URL.Path); err != nil {
+				v.logger.WithError(err).Warn("Invalid request path")
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Bad Request",
+					"message": err.Error(),
+				})
+				c.Abort()
+				return
+			}
+		}
+
 		// Validate request headers
 		if err := v.validateHeaders(c); err != nil {
 			v.logger.WithError(err).Warn("Invalid request headers")
@@ -89,11 +124,24 @@ func (v *Validator) ValidateRequest() gin.HandlerFunc {
 		if err := v.validateQueryParams(c); err != nil {
 			v.logger.WithError(err).Warn("Invalid query parameters")
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "Bad Request", 
+				"error":   "Bad Request",
 				"message": err.Error(),
 			})
 			c.Abort()
 			return
+		}
+
+		// Validate JSON body for POST/PUT/PATCH requests
+		if v.config.EnableBodyCheck && (c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH") {
+			if err := v.validateJSONBody(c); err != nil {
+				v.logger.WithError(err).Warn("Invalid request body")
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Bad Request",
+					"message": err.Error(),
+				})
+				c.Abort()
+				return
+			}
 		}
 
 		c.Next()
@@ -110,13 +158,18 @@ func (v *Validator) ValidateName(name string, resourceType string) error {
 		return fmt.Errorf("%s name exceeds maximum length of %d characters", resourceType, v.config.MaxNameLength)
 	}
 
-	if !safeNamePattern.MatchString(name) {
+	// Check for XSS patterns first (these will fail the pattern match anyway, but need specific message)
+	if v.config.EnableXSSCheck && v.containsXSS(name) {
 		return fmt.Errorf("%s name contains invalid characters. Only alphanumeric, dots, hyphens and underscores allowed", resourceType)
 	}
 
-	// Check for SQL injection patterns
+	// Check for SQL injection patterns (more specific error)
 	if v.config.EnableSQLCheck && v.containsSQLInjection(name) {
 		return fmt.Errorf("%s name contains potentially malicious content", resourceType)
+	}
+
+	if !safeNamePattern.MatchString(name) {
+		return fmt.Errorf("%s name contains invalid characters. Only alphanumeric, dots, hyphens and underscores allowed", resourceType)
 	}
 
 	return nil
@@ -217,6 +270,18 @@ func (v *Validator) validateHeaders(c *gin.Context) error {
 
 // validateQueryParams validates query parameters
 func (v *Validator) validateQueryParams(c *gin.Context) error {
+	// First check the raw query string for malicious content
+	// This catches injection attempts that break URL parsing
+	rawQuery := c.Request.URL.RawQuery
+	if rawQuery != "" {
+		if v.config.EnableSQLCheck && v.containsSQLInjection(rawQuery) {
+			return fmt.Errorf("query parameters contain potentially malicious content")
+		}
+		if v.config.EnableXSSCheck && v.containsXSS(rawQuery) {
+			return fmt.Errorf("query parameters contain potentially malicious content")
+		}
+	}
+
 	// Validate common query parameters
 	if limitStr := c.Query("limit"); limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
@@ -266,40 +331,40 @@ func (v *Validator) isAllowedMethod(method string) bool {
 // containsSQLInjection checks for SQL injection patterns
 func (v *Validator) containsSQLInjection(input string) bool {
 	lowerInput := strings.ToLower(input)
-	
+
 	// Common SQL injection patterns
 	sqlPatterns := []string{
 		"'", "\"", ";", "--", "/*", "*/", "xp_", "sp_",
 		"union", "select", "insert", "update", "delete", "drop", "create", "alter",
 		"exec", "execute", "script", "javascript:", "vbscript:", "onload", "onerror",
 	}
-	
+
 	for _, pattern := range sqlPatterns {
 		if strings.Contains(lowerInput, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // containsXSS checks for XSS patterns
 func (v *Validator) containsXSS(input string) bool {
 	lowerInput := strings.ToLower(input)
-	
+
 	// Common XSS patterns
 	xssPatterns := []string{
-		"<script", "</script>", "javascript:", "vbscript:", "onload=", "onerror=", 
+		"<script", "</script>", "javascript:", "vbscript:", "onload=", "onerror=",
 		"onmouseover=", "onfocus=", "onblur=", "onchange=", "onsubmit=",
 		"<iframe", "<object", "<embed", "<form", "eval(", "alert(",
 	}
-	
+
 	for _, pattern := range xssPatterns {
 		if strings.Contains(lowerInput, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -312,7 +377,150 @@ func (v *Validator) SanitizeInput(input string) string {
 		}
 		return r
 	}, input)
-	
+
 	// Trim whitespace
 	return strings.TrimSpace(input)
+}
+
+// validatePath checks for path traversal attempts
+func (v *Validator) validatePath(path string) error {
+	// Check for path traversal patterns
+	pathTraversalPatterns := []string{
+		"../",
+		"..\\",
+		"%2e%2e%2f",
+		"%2e%2e/",
+		"..%2f",
+		"%2e%2e%5c",
+	}
+
+	lowerPath := strings.ToLower(path)
+	for _, pattern := range pathTraversalPatterns {
+		if strings.Contains(lowerPath, pattern) {
+			return fmt.Errorf("path contains potentially malicious traversal pattern")
+		}
+	}
+
+	return nil
+}
+
+// validateJSONBody validates JSON request body for malicious content
+func (v *Validator) validateJSONBody(c *gin.Context) error {
+	// Check if body is nil first
+	if c.Request.Body == nil {
+		return nil
+	}
+
+	// Read the body
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read request body")
+	}
+
+	// Restore the body for subsequent handlers
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// Skip validation if body is empty
+	if len(bodyBytes) == 0 {
+		return nil
+	}
+
+	// Check total size again (in case ContentLength was not set)
+	if v.config.EnableSizeCheck && int64(len(bodyBytes)) > v.config.MaxRequestSize {
+		return fmt.Errorf("request body size exceeds maximum of %d bytes", v.config.MaxRequestSize)
+	}
+
+	// Parse JSON to validate structure and scan for malicious content
+	var data interface{}
+	if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		// Not valid JSON, but let the handler deal with it
+		return nil
+	}
+
+	// Recursively check all string values in the JSON
+	if err := v.validateJSONValueWithKey(data, ""); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// shouldSkipValidation checks if a field should be excluded from content validation
+func (v *Validator) shouldSkipValidation(key string) bool {
+	// Skip validation for token fields as they contain encoded data
+	// that may trigger false positives
+	skipFields := []string{
+		"token",
+		"access_token",
+		"refresh_token",
+		"jwt",
+		"password", // Also skip passwords as they may contain special characters
+	}
+
+	lowerKey := strings.ToLower(key)
+	for _, skipField := range skipFields {
+		if strings.Contains(lowerKey, skipField) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// validateJSONValueWithKey recursively validates JSON values with field name context
+func (v *Validator) validateJSONValueWithKey(value interface{}, key string) error {
+	switch val := value.(type) {
+	case string:
+		// Skip validation for token and password fields
+		if v.shouldSkipValidation(key) {
+			return nil
+		}
+
+		// Check string value for malicious content
+		if v.config.EnableSQLCheck && v.containsSQLInjection(val) {
+			return fmt.Errorf("request body contains potentially malicious content")
+		}
+		if v.config.EnableXSSCheck && v.containsXSS(val) {
+			return fmt.Errorf("request body contains potentially malicious content")
+		}
+		if v.config.EnablePathCheck && v.containsPathTraversal(val) {
+			return fmt.Errorf("request body contains potentially malicious content")
+		}
+	case map[string]interface{}:
+		// Recursively check all values in the map
+		for mapKey, mapVal := range val {
+			if err := v.validateJSONValueWithKey(mapVal, mapKey); err != nil {
+				return err
+			}
+		}
+	case []interface{}:
+		// Recursively check all values in the array
+		for _, arrVal := range val {
+			if err := v.validateJSONValueWithKey(arrVal, key); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// containsPathTraversal checks for path traversal patterns
+func (v *Validator) containsPathTraversal(input string) bool {
+	pathTraversalPatterns := []string{
+		"../",
+		"..\\",
+		"%2e%2e",
+		"etc/passwd",
+		"windows\\system32",
+	}
+
+	lowerInput := strings.ToLower(input)
+	for _, pattern := range pathTraversalPatterns {
+		if strings.Contains(lowerInput, pattern) {
+			return true
+		}
+	}
+
+	return false
 }

@@ -21,6 +21,7 @@ func TestLoad(t *testing.T) {
 		t.Setenv("PI_CONTROLLER_DEBUG", "true")
 		t.Setenv("PI_CONTROLLER_DATA_DIR", "/tmp/pi-controller")
 		t.Setenv("PI_CONTROLLER_API_HOST", "localhost")
+		t.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 
 		cfg, err := Load("")
 		assert.NoError(t, err)
@@ -41,6 +42,8 @@ log:
 app:
   debug: true
   data_dir: "/tmp/test"
+gpio:
+  sample_interval: "1s"
 `
 		tmpfile, err := os.CreateTemp("", "config-*.yaml")
 		assert.NoError(t, err)
@@ -79,6 +82,7 @@ log:
 
 		t.Setenv("PI_CONTROLLER_API_PORT", "9999")
 		t.Setenv("PI_CONTROLLER_LOG_LEVEL", "panic")
+		t.Setenv("PI_CONTROLLER_GPIO_SAMPLE_INTERVAL", "1s")
 
 		cfg, err := Load(tmpfile.Name())
 		assert.NoError(t, err)
@@ -97,6 +101,8 @@ log:
 app:
   debug: true
   data_dir: "/tmp/test"
+gpio:
+  sample_interval: "1s"
 invalid-yaml
 `
 		tmpfile, err := os.CreateTemp("", "config-*.yaml")

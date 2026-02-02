@@ -5,9 +5,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/dsyorkd/pi-controller/internal/storage"
+	"github.com/gin-gonic/gin"
 )
 
 // HealthHandler handles health check endpoints
@@ -39,7 +38,14 @@ type ReadinessResponse struct {
 
 var startTime = time.Now()
 
-// Health returns the basic health status
+// Health godoc
+// @Summary      Health check
+// @Description  Returns basic health status of the API
+// @Tags         health
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  HealthResponse
+// @Router       /health [get]
 func (h *HealthHandler) Health(c *gin.Context) {
 	response := HealthResponse{
 		Status:    "ok",
@@ -50,7 +56,15 @@ func (h *HealthHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// Ready returns the readiness status including service dependencies
+// Ready godoc
+// @Summary      Readiness check
+// @Description  Returns readiness status including service dependencies
+// @Tags         health
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  ReadinessResponse
+// @Failure      503  {object}  ReadinessResponse
+// @Router       /ready [get]
 func (h *HealthHandler) Ready(c *gin.Context) {
 	services := make(map[string]string)
 	status := "ready"
@@ -80,11 +94,11 @@ func SystemInfo(c *gin.Context) {
 	runtime.ReadMemStats(&m)
 
 	info := gin.H{
-		"go_version":     runtime.Version(),
-		"go_os":          runtime.GOOS,
-		"go_arch":        runtime.GOARCH,
-		"cpu_count":      runtime.NumCPU(),
-		"goroutines":     runtime.NumGoroutine(),
+		"go_version": runtime.Version(),
+		"go_os":      runtime.GOOS,
+		"go_arch":    runtime.GOARCH,
+		"cpu_count":  runtime.NumCPU(),
+		"goroutines": runtime.NumGoroutine(),
 		"memory": gin.H{
 			"alloc":        m.Alloc,
 			"total_alloc":  m.TotalAlloc,
@@ -96,9 +110,9 @@ func SystemInfo(c *gin.Context) {
 			"heap_objects": m.HeapObjects,
 		},
 		"gc": gin.H{
-			"num_gc":        m.NumGC,
-			"pause_total":   m.PauseTotalNs,
-			"last_gc":       time.Unix(0, int64(m.LastGC)).Format(time.RFC3339),
+			"num_gc":      m.NumGC,
+			"pause_total": m.PauseTotalNs,
+			"last_gc":     time.Unix(0, int64(m.LastGC)).Format(time.RFC3339), // #nosec G115 -- GC timestamp fits in int64
 		},
 		"timestamp": time.Now(),
 		"uptime":    time.Since(startTime).String(),

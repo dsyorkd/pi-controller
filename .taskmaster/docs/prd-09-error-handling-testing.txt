@@ -1,0 +1,63 @@
+# PRD: Error Handling & Edge Cases Testing
+
+## Product Overview
+Comprehensive testing of error states, loading states, validation messages, and edge case scenarios to ensure robust error handling throughout the application.
+
+## Problem Statement
+Error handling is crucial for user experience but lacks:
+1. Automated testing of error state displays
+2. Validation of API error handling
+3. Network failure scenario testing
+4. Loading state verification
+5. Edge case coverage
+
+## Implementation Tasks
+
+### Task 2.8: Error Handling & Edge Cases
+**Priority:** MEDIUM
+**Estimated Effort:** 4-5 hours
+
+**Subtasks:**
+1. Create `error-handling.spec.ts` test file
+2. Implement 404 Not Found page test
+3. Implement network error handling test
+4. Implement API timeout handling test
+5. Implement server error responses test (500, 503)
+6. Implement unauthorized access test (401)
+7. Implement forbidden access test (403)
+8. Create `edge-cases.spec.ts` test file
+9. Implement loading states test (skeletons, spinners)
+10. Implement form validation messages test
+11. Implement invalid data handling test
+12. Implement empty states test
+
+**Dependencies:**
+- Task 1.2 (Playwright infrastructure)
+- Task 2.1 (Authentication)
+
+## Test Scenarios
+
+### 404 Error
+```typescript
+test('should display 404 page for invalid routes', async ({ page }) => {
+  await page.goto('/pi-controller/nonexistent-page');
+
+  await expect(page.locator('h1')).toContainText('404');
+  await expect(page.locator('a:has-text("Go Home")')).toBeVisible();
+});
+```
+
+### API Timeout
+```typescript
+test('should handle API timeout gracefully', async ({ authenticatedPage }) => {
+  // Intercept and delay API call
+  await page.route('**/api/v1/nodes', route => {
+    setTimeout(() => route.abort(), 5000);
+  });
+
+  await authenticatedPage.goto('/pi-controller/nodes');
+
+  await expect(page.locator('.error-message')).toBeVisible();
+  await expect(page.locator('button:has-text("Retry")')).toBeVisible();
+});
+```

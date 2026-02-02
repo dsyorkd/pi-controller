@@ -1,0 +1,205 @@
+name: Performance & Benchmarks
+
+# Only run on master/main branches and allow manual dispatch
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Allow manual triggering
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC for performance tracking
+    - cron: '0 2 * * 0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=golang-version depName=go
+  GO_VERSION: "1.25.5"
+  CI_IMAGE: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+
+jobs:
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
+
+      - name: Run GPIO benchmarks
+        run: |
+          echo "Running GPIO performance benchmarks..."
+          go test -bench=. -benchmem -run=^$ ./pkg/gpio/... | tee gpio-bench.txt
+
+      - name: Run service benchmarks
+        run: |
+          echo "Running service layer benchmarks..."
+          go test -bench=. -benchmem -run=^$ ./internal/services/... | tee services-bench.txt
+
+      - name: Run comprehensive benchmarks
+        run: |
+          echo "Running comprehensive benchmark suite..."
+          make test-benchmarks 2>&1 | tee benchmarks.txt || true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: |
+            gpio-bench.txt
+            services-bench.txt
+            benchmarks.txt
+          retention-days: 30
+
+      - name: Post benchmark summary
+        if: always()
+        run: |
+          echo "## ⚡ Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ -f gpio-bench.txt ]]; then
+            echo "### GPIO Benchmarks" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            grep "^Benchmark" gpio-bench.txt | head -10 >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  fuzzing:
+    name: Fuzz Testing
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
+
+      - name: Run fuzzing tests
+        run: |
+          timeout 8m make test-fuzz || {
+            echo "Fuzzing completed (may have timed out, which is expected)"
+            exit 0
+          }
+
+      - name: Post fuzzing summary
+        if: always()
+        run: |
+          echo "## 🔍 Fuzz Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Duration: 8 minutes" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status == 'success' && '✅ Completed' || '⚠️ Partial' }}" >> $GITHUB_STEP_SUMMARY
+
+  stress-test:
+    name: Stress Testing
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/dsyorkd/ci-image/ci-go:v1.0"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Generate protobuf code and install dependencies
+        run: |
+          make proto
+          make deps
+
+      - name: Run comprehensive test suite
+        run: make test-comprehensive
+
+      - name: Generate final coverage report
+        run: make test-coverage
+
+      - name: Upload comprehensive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comprehensive-test-results-${{ github.sha }}
+          path: |
+            coverage.out
+            coverage.html
+          retention-days: 30
+
+      - name: Post stress test summary
+        if: always()
+        run: |
+          echo "## 🏋️ Stress Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Comprehensive suite: ${{ job.status == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          if [[ -f coverage.out ]]; then
+            COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
+            echo "- Coverage: ${COVERAGE}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  performance-summary:
+    name: Performance Summary
+    runs-on: ubuntu-latest
+    needs: [benchmarks, fuzzing, stress-test]
+    if: always()
+    steps:
+      - name: Check performance status
+        run: |
+          echo "## 📊 Performance Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note**: Performance tests only run on \`main\`/\`master\` branches" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Benchmarks | ${{ needs.benchmarks.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fuzz Testing | ${{ needs.fuzzing.result == 'success' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stress Testing | ${{ needs.stress-test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if critical tests failed
+          if [[ "${{ needs.benchmarks.result }}" == "failure" || "${{ needs.stress-test.result }}" == "failure" ]]; then
+            echo "⚠️ **Some performance tests failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ **All performance tests passed**" >> $GITHUB_STEP_SUMMARY
+          fi

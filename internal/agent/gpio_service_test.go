@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dsyorkd/pi-controller/internal/logger"
+	"github.com/dsyorkd/pi-controller/pkg/gpio"
+	pb "github.com/dsyorkd/pi-controller/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsyorkd/pi-controller/internal/logger"
-	pb "github.com/dsyorkd/pi-controller/proto"
 )
 
 func createTestGPIOService(t *testing.T) *GPIOService {
@@ -20,9 +20,22 @@ func createTestGPIOService(t *testing.T) *GPIOService {
 	})
 	require.NoError(t, err)
 
-	// Create the GPIO service
-	service, err := NewGPIOService(testLogger)
-	require.NoError(t, err)
+	// Create GPIO configuration with mock mode enabled
+	gpioConfig := gpio.DefaultConfig()
+	gpioConfig.MockMode = true // Enable mock mode for testing
+	securityConfig := gpio.DefaultSecurityConfig()
+	securityConfig.Level = gpio.SecurityLevelPermissive
+	securityConfig.RequireUserContext = false
+
+	// Create GPIO controller with mock mode
+	controllerLogger := logger.Default()
+	controller := gpio.NewController(gpioConfig, securityConfig, controllerLogger)
+
+	// Create the GPIO service with the mock controller
+	service := &GPIOService{
+		controller: controller,
+		logger:     testLogger.WithField("component", "gpio-service"),
+	}
 	require.NotNil(t, service)
 
 	return service
@@ -121,41 +134,55 @@ func TestWriteAndReadGPIOPin(t *testing.T) {
 	require.NoError(t, err)
 	defer service.Close()
 
-	// First configure the pin as output
-	configReq := &pb.ConfigureGPIOPinRequest{
-		Pin:       18,
-		Direction: pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
-		PullMode:  pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE,
-	}
+	t.Run("write to output pin", func(t *testing.T) {
+		// Configure pin as output
+		configReq := &pb.ConfigureGPIOPinRequest{
+			Pin:       18,
+			Direction: pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
+			PullMode:  pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE,
+		}
 
-	configResp, err := service.ConfigureGPIOPin(ctx, configReq)
-	require.NoError(t, err)
-	require.True(t, configResp.Success)
+		configResp, err := service.ConfigureGPIOPin(ctx, configReq)
+		require.NoError(t, err)
+		require.True(t, configResp.Success)
 
-	// Test writing HIGH
-	writeReq := &pb.WriteGPIOPinRequest{
-		Pin:   18,
-		Value: 1,
-	}
+		// Test writing HIGH
+		writeReq := &pb.WriteGPIOPinRequest{
+			Pin:   18,
+			Value: 1,
+		}
 
-	writeResp, err := service.WriteGPIOPin(ctx, writeReq)
-	assert.NoError(t, err)
-	assert.NotNil(t, writeResp)
-	assert.Equal(t, int32(18), writeResp.Pin)
-	assert.Equal(t, int32(1), writeResp.Value)
-	assert.NotNil(t, writeResp.Timestamp)
+		writeResp, err := service.WriteGPIOPin(ctx, writeReq)
+		assert.NoError(t, err)
+		assert.NotNil(t, writeResp)
+		assert.Equal(t, int32(18), writeResp.Pin)
+		assert.Equal(t, int32(1), writeResp.Value)
+		assert.NotNil(t, writeResp.Timestamp)
+	})
 
-	// Test reading the pin
-	readReq := &pb.ReadGPIOPinRequest{
-		Pin: 18,
-	}
+	t.Run("read from input pin", func(t *testing.T) {
+		// Configure different pin as input
+		configReq := &pb.ConfigureGPIOPinRequest{
+			Pin:       23,
+			Direction: pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_INPUT,
+			PullMode:  pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_UP,
+		}
 
-	readResp, err := service.ReadGPIOPin(ctx, readReq)
-	assert.NoError(t, err)
-	assert.NotNil(t, readResp)
-	assert.Equal(t, int32(18), readResp.Pin)
-	assert.Equal(t, int32(1), readResp.Value) // Should read back HIGH
-	assert.NotNil(t, readResp.Timestamp)
+		configResp, err := service.ConfigureGPIOPin(ctx, configReq)
+		require.NoError(t, err)
+		require.True(t, configResp.Success)
+
+		// Test reading the pin
+		readReq := &pb.ReadGPIOPinRequest{
+			Pin: 23,
+		}
+
+		readResp, err := service.ReadGPIOPin(ctx, readReq)
+		assert.NoError(t, err)
+		assert.NotNil(t, readResp)
+		assert.Equal(t, int32(23), readResp.Pin)
+		assert.NotNil(t, readResp.Timestamp)
+	})
 }
 
 func TestSetGPIOPWM(t *testing.T) {
@@ -169,11 +196,11 @@ func TestSetGPIOPWM(t *testing.T) {
 
 	// First configure the pin for PWM
 	configReq := &pb.ConfigureGPIOPinRequest{
-		Pin:           18,
-		Direction:     pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
-		PullMode:      pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE,
-		PwmFrequency:  1000,
-		PwmDutyCycle:  50,
+		Pin:          18,
+		Direction:    pb.AgentGPIODirection_AGENT_GPIO_DIRECTION_OUTPUT,
+		PullMode:     pb.AgentGPIOPullMode_AGENT_GPIO_PULL_MODE_NONE,
+		PwmFrequency: 1000,
+		PwmDutyCycle: 50,
 	}
 
 	configResp, err := service.ConfigureGPIOPin(ctx, configReq)

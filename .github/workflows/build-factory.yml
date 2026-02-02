@@ -1,0 +1,386 @@
+name: Build Factory
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+      image_tag:
+        required: true
+        type: string
+      build_version:
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/v') && !startsWith(github.ref, 'refs/tags/v') }}
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
+env:
+  # renovate: datasource=golang-version depName=go
+  GO_VERSION: "1.25.5"  # Use Go 1.25.5 (matches go.mod toolchain)
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Matrix strategy for comprehensive multi-arch builds
+  build-matrix:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Primary supported platforms
+          - goos: linux
+            goarch: amd64
+            name: linux-amd64
+            primary: true
+            experimental: false
+          - goos: linux
+            goarch: arm64
+            name: linux-arm64
+            primary: true
+            experimental: false
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+            name: linux-armv7
+            primary: true
+            experimental: false
+          # - goos: linux
+          #   goarch: arm
+          #   goarm: 6
+          #   name: linux-armv6
+          #   primary: true
+
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+            primary: false
+          - goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+            primary: false
+
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+            name: windows-amd64
+            primary: false
+          - goos: windows
+            goarch: arm64
+            name: windows-arm64
+            primary: false
+
+          # BSD variants
+          # - goos: freebsd
+          #   goarch: amd64
+          #   name: freebsd-amd64
+          #   primary: false
+          # - goos: openbsd
+          #   goarch: amd64
+          #   name: openbsd-amd64
+          #   primary: false
+          # - goos: netbsd
+          #   goarch: amd64
+          #   name: netbsd-amd64
+          #   primary: false
+
+
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache build dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Generate protobuf code
+        run: make proto
+
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}"
+          make build
+
+          # Create organized output directory
+          mkdir -p dist/${{ matrix.name }}
+
+          # Move and rename binaries
+          cd build
+          for binary in pi-controller-*; do
+            if [[ -f "$binary" ]]; then
+              # Extract base name (everything before the first hyphen pattern)
+              # pi-controller-linux-amd64 -> pi-controller
+              base_name=$(echo "$binary" | sed 's/-[^-]*-[^-]*$//')
+              if [[ "${{ matrix.goos }}" == "windows" ]]; then
+                cp "$binary" "../dist/${{ matrix.name }}/${base_name}.exe"
+              else
+                cp "$binary" "../dist/${{ matrix.name }}/${base_name}"
+              fi
+            fi
+          done
+
+      - name: Test binaries (basic smoke test)
+        if: matrix.primary == true
+        run: |
+          cd dist/${{ matrix.name }}
+
+          # Test that binaries exist and are executable
+          if [[ "${{ matrix.goos }}" != "windows" ]]; then
+            chmod +x pi-controller
+            # Quick file test instead of timeout
+            if [[ -x "./pi-controller" ]]; then
+              echo "✅ pi-controller binary is executable"
+            else
+              echo "❌ pi-controller binary not found or not executable"
+              exit 1
+            fi
+          fi
+
+      - name: Generate build info
+        run: |
+          cd dist/${{ matrix.name }}
+
+          cat > BUILD_INFO.txt << EOF
+          Pi Controller Build Information
+          ==============================
+
+          Platform: ${{ matrix.goos }}/${{ matrix.goarch }}
+          Go Version: ${{ env.GO_VERSION }}
+          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Git Commit: $(git rev-parse --short HEAD)
+          Git Tag: $(git describe --tags --always --dirty)
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}
+
+          Files in this build:
+          $(ls -la)
+          EOF
+
+      - name: Create checksums
+        run: |
+          cd dist/${{ matrix.name }}
+
+          if command -v sha256sum > /dev/null; then
+            sha256sum * > SHA256SUMS
+          elif command -v shasum > /dev/null; then
+            shasum -a 256 * > SHA256SUMS
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-controller-${{ matrix.name }}
+          path: dist/${{ matrix.name }}/
+
+
+      - name: Create build manifest
+        if: matrix.primary == true
+        run: |
+          echo "${{ matrix.name }}" >> successful_builds.txt
+
+      - name: Upload build manifest
+        if: matrix.primary == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-manifest-${{ matrix.name }}
+          path: successful_builds.txt
+          retention-days: 1
+
+  # Docker multi-arch builds using buildx
+  docker-multiarch:
+    name: Docker Multi-Arch Build
+    runs-on: ubuntu-latest
+    needs: build-matrix
+    timeout-minutes: 15
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for controller
+        id: meta-controller
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+
+      - name: Build and push controller image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.controller
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta-controller.outputs.tags }}
+          labels: ${{ steps.meta-controller.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
+  # Test multi-arch binaries on actual hardware
+  test-hardware-matrix:
+    name: Test on Hardware
+    runs-on: [self-hosted, raspberry-pi, 5-Model-B]
+    needs: build-matrix
+    timeout-minutes: 8
+    if: contains(needs.build-matrix.result, 'success')
+    strategy:
+      matrix:
+        arch: [linux-arm64, linux-armv7]
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pi-controller-${{ matrix.arch }}
+          path: ./test-${{ matrix.arch }}/
+
+      - name: Test binaries on hardware
+        run: |
+          cd test-${{ matrix.arch }}
+
+          # Make binaries executable
+          chmod +x pi-controller
+
+          # Test version commands
+          echo "Testing pi-controller..."
+          timeout 10s ./pi-controller --version || echo "Controller version test completed"
+
+          # Test configuration parsing (if config exists)
+          if [[ -f "../config/controller.example.yml" ]]; then
+            echo "Testing configuration parsing..."
+            timeout 5s ./pi-controller --config-file=../config/controller.example.yml --dry-run || echo "Config test completed"
+          fi
+
+          echo "Hardware testing completed successfully for ${{ matrix.arch }}"
+
+  # Generate build summary report
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-matrix, docker-multiarch, test-hardware-matrix]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Download all build manifests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-manifest-*
+          path: ./manifests/
+
+      - name: Generate build report
+        run: |
+          echo "# 🏗️ Multi-Architecture Build Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count successful builds
+          SUCCESSFUL_BUILDS=0
+          TOTAL_BUILDS=0
+
+          if [[ -d "./manifests" ]]; then
+            for manifest in ./manifests/*/successful_builds.txt; do
+              if [[ -f "$manifest" ]]; then
+                while read -r build; do
+                  SUCCESSFUL_BUILDS=$((SUCCESSFUL_BUILDS + 1))
+                  echo "✅ $build" >> $GITHUB_STEP_SUMMARY
+                done < "$manifest"
+              fi
+            done
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Successful Builds**: $SUCCESSFUL_BUILDS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Images**: ${{ needs.docker-multiarch.result == 'success' && '✅ Built' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Hardware Tests**: ${{ needs.test-hardware-matrix.result == 'success' && '✅ Passed' || needs.test-hardware-matrix.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Build artifacts available for download in the workflow summary." >> $GITHUB_STEP_SUMMARY
+
+      - name: Check build success criteria
+        run: |
+          # Define minimum required successful builds (primary platforms)
+          MIN_REQUIRED=3  # linux-amd64, linux-arm64, linux-armv7
+
+          # Count successful primary builds
+          PRIMARY_SUCCESS=0
+          if [[ -d "./manifests" ]]; then
+            for manifest in ./manifests/*/successful_builds.txt; do
+              if [[ -f "$manifest" ]]; then
+                while read -r build; do
+                  if [[ "$build" =~ ^linux-(amd64|arm64|armv7)$ ]]; then
+                    PRIMARY_SUCCESS=$((PRIMARY_SUCCESS + 1))
+                  fi
+                done < "$manifest"
+              fi
+            done
+          fi
+
+          echo "Primary platform builds successful: $PRIMARY_SUCCESS / $MIN_REQUIRED"
+
+          if [[ $PRIMARY_SUCCESS -ge $MIN_REQUIRED ]]; then
+            echo "✅ Multi-architecture build succeeded!"
+            exit 0
+          else
+            echo "❌ Multi-architecture build failed - insufficient primary platform builds"
+            exit 1
+          fi

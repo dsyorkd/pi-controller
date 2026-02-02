@@ -1,0 +1,78 @@
+name: Bug report
+description: Create a bug report
+title: "[BUG] "
+type: "Bug"
+labels: ["kind/bug", "require/severity", "require/reproduce"]
+assignees:
+-
+body:
+- type: markdown
+  attributes:
+    value: |
+      Thanks for stopping by to let us know something could be better!
+
+      For general questions or discussions, please use the [Discussions](https://github.com/dsyorkd/pi-controller/discussions) tab.
+
+- type: textarea
+  attributes:
+    label: Describe the Bug
+    description: A clear and concise description of the bug.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: To Reproduce
+    description: Please provide the steps to reproduce the case.
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Expected Behavior
+    description: A clear and concise description of what you expected to happen.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Support Bundle for Troubleshooting
+    description: |
+      Please provide the support bundle for troubleshooting. You can generate a support bundle by following the instructions in the [documentation](https://pi-controller.readthedocs.io/en/latest/troubleshooting/support-bundle.html).
+      validations:
+    required: false
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Environment
+    description: Please provide the environment setup and problematic resources.
+    value: |
+      - Pi Controller version:
+      - Impacted Component:
+      - Operating System (e.g., Raspberry Pi OS, Ubuntu, etc.):
+      - OS Version (e.g., 10, 20.04, etc.):
+      - Pi Model (e.g., 3B+, 4B, 400, etc.):
+      - RAM (e.g., 2GB, 4GB, 8GB):
+      - Storage Type (e.g., SD Card, SSD, HDD):
+      - Storage Size:
+      - Network Setup (e.g., Ethernet, Wi-Fi):
+      - Underlying Infrastructure (e.g., Baremetal, 5-Model-B, 4-Model-B, Virtual Machine, AWS, GCP, Azure):
+
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: Additional context
+    description: Please add any other context about the problem here.
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Workaround and Mitigation
+    description: Please add any workaround or mitigation to the problem here.
+  validations:
+    required: false

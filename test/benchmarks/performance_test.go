@@ -8,9 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/dsyorkd/pi-controller/internal/api/handlers"
 	"github.com/dsyorkd/pi-controller/internal/logger"
 	"github.com/dsyorkd/pi-controller/internal/models"
@@ -18,6 +17,7 @@ import (
 	"github.com/dsyorkd/pi-controller/internal/storage"
 	testutils "github.com/dsyorkd/pi-controller/internal/testing"
 	"github.com/dsyorkd/pi-controller/pkg/gpio"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,12 +36,12 @@ func setupBenchmarkEnvironment(b *testing.B) (*gin.Engine, *storage.Database, fu
 	// Initialize services
 	clusterService := services.NewClusterService(database, testLogger)
 	nodeService := services.NewNodeService(database, testLogger)
-	gpioService := services.NewGPIOService(database, testLogger)
+	gpioService := services.NewGPIOService(database, testLogger, nil)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(database)
 	clusterHandler := handlers.NewClusterHandler(clusterService, testLogger)
-	nodeHandler := handlers.NewNodeHandler(nodeService, testLogger)
+	nodeHandler := handlers.NewNodeHandler(nodeService, testLogger, "")
 	gpioHandler := handlers.NewGPIOHandler(gpioService, testLogger)
 
 	// Setup router
@@ -150,7 +150,7 @@ func BenchmarkCluster_List(b *testing.B) {
 
 	// Pre-populate database with test clusters
 	testSizes := []int{10, 100, 1000}
-	
+
 	for _, size := range testSizes {
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			// Create test clusters
@@ -197,11 +197,11 @@ func BenchmarkNode_Create(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		createReq := services.CreateNodeRequest{
-			Name:        fmt.Sprintf("benchmark-node-%d", i),
-			IPAddress:   fmt.Sprintf("192.168.1.%d", (i%254)+1),
-			MACAddress:  fmt.Sprintf("02:00:00:00:00:%02x", i%256),
-			Role:        models.NodeRoleWorker,
-			ClusterID:   &cluster.ID,
+			Name:       fmt.Sprintf("benchmark-node-%d", i),
+			IPAddress:  fmt.Sprintf("192.168.1.%d", (i%254)+1),
+			MACAddress: fmt.Sprintf("02:00:00:00:00:%02x", i%256),
+			Role:       models.NodeRoleWorker,
+			ClusterID:  &cluster.ID,
 		}
 
 		body, _ := json.Marshal(createReq)
@@ -303,8 +303,14 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 		DefaultPullMode: gpio.PullNone,
 	}
 
-	gpioLogger := logrus.New()
-	controller := gpio.NewController(config, gpio.DefaultSecurityConfig(), gpioLogger)
+	gpioLogger := logger.Default()
+	securityConfig := gpio.DefaultSecurityConfig()
+	// Set high limit and short timeout for benchmarks
+	// The activeOps counter is only decremented after OperationTimeout,
+	// so we need a very short timeout for rapid benchmark operations
+	securityConfig.MaxConcurrentOps = 1000
+	securityConfig.OperationTimeout = 1 * time.Millisecond
+	controller := gpio.NewController(config, securityConfig, gpioLogger)
 	require.NotNil(b, controller)
 
 	ctx := context.Background()
@@ -322,6 +328,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("WritePin", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			value := gpio.PinValue(i % 2)
@@ -335,6 +342,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("ReadPin", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			_, err := controller.ReadPin(19, "benchmark")
@@ -347,6 +355,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("GetPinState", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			_, err := controller.GetPinState(18, "benchmark")
@@ -359,6 +368,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("SetPWM", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			frequency := 1000 + (i % 1000)
@@ -373,6 +383,7 @@ func BenchmarkGPIO_Controller_Operations(b *testing.B) {
 	b.Run("ListConfiguredPins", func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
+		b.SetParallelism(1)
 
 		for i := 0; i < b.N; i++ {
 			_, err := controller.ListConfiguredPins()
@@ -399,7 +410,7 @@ func BenchmarkDatabase_Operations(b *testing.B) {
 				Description: "Benchmark cluster",
 				Status:      models.ClusterStatusActive,
 			}
-			
+
 			result := db.Create(cluster)
 			if result.Error != nil {
 				b.Fatal(result.Error)

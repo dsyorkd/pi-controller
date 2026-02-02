@@ -2,5 +2,95 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ]
+  ],
+  "baseBranches": ["develop"],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "timezone": "America/Chicago",
+  "schedule": ["before 6am"],
+  "labels": ["dependencies"],
+  "assignees": ["@dsyorkd"],
+  "reviewers": ["@dsyorkd"],
+  "automerge": true,
+  "major": {
+    "automerge": false
+  },
+  "minor": {
+    "automerge": false
+  },
+  "patch": {
+    "automerge": false
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": false,
+    "schedule": ["before 6am on sunday"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "groupName": "Go dependencies",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "groupName": "Node.js dependencies",
+      "schedule": ["before 6am on tuesday"]
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "Development dependencies",
+      "schedule": ["before 6am on wednesday"]
+    },
+    {
+      "matchPackageNames": ["golang"],
+      "groupName": "Go toolchain updates",
+      "automerge": false,
+      "labels": ["go-toolchain"]
+    },
+    {
+      "matchPackageNames": ["node"],
+      "groupName": "Node.js toolchain updates",
+      "automerge": false,
+      "labels": ["node-toolchain"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "schedule": ["before 6am on thursday"],
+      "automerge": false,
+      "labels": ["github-actions"],
+      "pinDigests": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackagePatterns": ["^actions/"],
+      "groupName": "GitHub Actions (actions org)",
+      "schedule": ["before 6am on thursday"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackagePatterns": ["^github/codeql-action"],
+      "groupName": "CodeQL Actions",
+      "schedule": ["before 6am on thursday"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackagePatterns": ["^docker/"],
+      "groupName": "Docker Actions",
+      "schedule": ["before 6am on thursday"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "automerge": true
+  },
+  "commitMessagePrefix": "chore(deps): ",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "prTitle": "chore(deps): {{commitMessageAction}} {{commitMessageTopic}} {{commitMessageExtra}}",
+  "branchPrefix": "renovate/",
+  "gitAuthor": "Renovate Bot <bot@renovateapp.com>"
 }
